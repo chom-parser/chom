@@ -1,6 +1,7 @@
 use crate::CharSet;
 use super::Located;
 
+#[derive(Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Debug)]
 pub struct Ident(pub String);
 
 pub struct Grammar {
@@ -9,16 +10,13 @@ pub struct Grammar {
     pub types: Vec<Located<Type>>
 }
 
-pub enum Type {
-    Alias(Vec<Located<Token>>),
-    NonTerminal {
-        id: Located<Ident>,
-        rules: Vec<Located<Rule>>
-    }
+pub struct Type {
+    pub id: Located<Ident>,
+    pub rules: Vec<Located<Rule>>
 }
 
 pub struct Rule {
-    pub id: Located<Ident>,
+    pub id: Option<Located<Ident>>,
     pub tokens: Vec<Located<Token>>
 }
 
@@ -32,8 +30,8 @@ pub enum Terminal {
 }
 
 pub enum NonTerminal {
-    Type(Located<String>),
-    Repeat(Located<String>, usize, usize, Option<Located<Separator>>),
+    Type(Located<Ident>),
+    Repeat(Located<Ident>, usize, usize, Option<Located<Separator>>),
 }
 
 pub struct Separator {
@@ -41,13 +39,12 @@ pub struct Separator {
     pub terminal: Located<Terminal>
 }
 
-pub struct TypedRegExp {
-    pub ty: Option<Located<Ident>>,
-    pub exp: Located<RegExp>
-}
-
 pub struct RegExpDefinition {
     pub id: Located<Ident>,
+    pub exp: TypedRegExp
+}
+
+pub struct TypedRegExp {
     pub ty: Option<Located<Ident>>,
     pub exp: Located<RegExp>
 }
@@ -55,7 +52,7 @@ pub struct RegExpDefinition {
 pub struct RegExp(pub Vec<Located<RegExpAtom>>);
 
 pub enum RegExpAtom {
-    Ident(String),
+    Ident(Ident),
     CharSet(CharSet, bool),
     Literal(String, bool),
     Repeat(Box<Located<RegExpAtom>>, usize, usize),

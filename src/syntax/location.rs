@@ -35,6 +35,10 @@ impl<T: Clone> Clone for Located<T> {
     }
 }
 
+impl<T: Copy> Copy for Located<T> {
+    //
+}
+
 impl<T> AsRef<T> for Located<T> {
     fn as_ref(&self) -> &T {
         &self.value
