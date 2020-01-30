@@ -22,6 +22,47 @@ impl Range {
     pub fn last(&self) -> char {
         self.last.try_into().unwrap()
     }
+
+    pub fn is_empty(&self) -> bool {
+        self.first <= self.last
+    }
+
+    pub fn non_empty(self) -> Option<Range> {
+        if self.is_empty() {
+            None
+        } else {
+            Some(self)
+        }
+    }
+
+    pub fn inter_split(&self, other: &Range) -> (Option<Range>, Option<Range>, Option<Range>, Option<Range>, Option<Range>) {
+        let before = Range {
+            first: other.first,
+            last: self.first
+        };
+
+        let left_before = Range {
+            first: self.first,
+            last: other.first
+        };
+
+        let inter = Range {
+            first: std::cmp::max(self.first, other.first),
+            last: std::cmp::min(self.last, other.last)
+        };
+
+        let left_after = Range {
+            first: other.last,
+            last: self.last
+        };
+
+        let after = Range {
+            first: self.last,
+            last: other.last
+        };
+
+        (before.non_empty(), left_before.non_empty(), inter.non_empty(), left_after.non_empty(), after.non_empty())
+    }
 }
 
 impl From<char> for Range {
@@ -97,6 +138,17 @@ impl LinkedRange {
         }
     }
 
+    pub fn remove_tail(&mut self) -> Option<Box<LinkedRange>> {
+        let mut tail = None;
+        std::mem::swap(&mut self.tail, &mut tail);
+        tail
+    }
+
+    pub fn remove(&mut self) {
+        let mut tail = self.remove_tail().unwrap();
+        std::mem::swap(self, &mut tail);
+    }
+
     pub fn add(&mut self, range: Range) {
         if range.last + 1 < self.range.first {
             let mut new_tail: LinkedRange = self.range.into();
@@ -105,8 +157,16 @@ impl LinkedRange {
             self.tail = Some(Box::new(new_tail));
         } else {
             if range.first <= self.range.last + 1 {
-                self.range.first = std::cmp::min(self.range.first, range.first);
-                self.range.last = std::cmp::max(self.range.last, range.last);
+                match &mut self.tail {
+                    Some(tail) if range.last + 1 >= tail.range.first => {
+                        tail.add(range);
+                        self.remove();
+                    },
+                    _ => {
+                        self.range.first = std::cmp::min(self.range.first, range.first);
+                        self.range.last = std::cmp::max(self.range.last, range.last);
+                    }
+                }
             } else {
                 match &mut self.tail {
                     Some(tail) => tail.add(range),

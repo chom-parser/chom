@@ -1,7 +1,8 @@
 use std::collections::HashMap;
 use std::rc::Rc;
-use std::convert::TryFrom;
+use std::convert::{TryFrom, TryInto};
 use std::mem::MaybeUninit;
+use std::fmt;
 use source_span::Span;
 use crate::{CharSet, Ident};
 use crate::syntax;
@@ -14,6 +15,10 @@ pub struct Grammar {
 }
 
 impl Grammar {
+    pub fn compile(ast: Located<syntax::Grammar>) -> Result<Located<Grammar>, Located<Error>> {
+        ast.try_into()
+    }
+
     fn regexp_defined(&self, id: &Located<Ident>) -> Result<(), Located<Error>> {
         self.regexps.get(id.as_ref()).ok_or(Located::new(Error::UndefinedRegExp(id.as_ref().clone()), id.span()))?;
         Ok(())
@@ -82,6 +87,15 @@ pub enum Error {
     UndefinedType(Ident)
 }
 
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Error::UndefinedRegExp(id) => write!(f, "undefined regular expression `{}`", id),
+            Error::UndefinedType(id) => write!(f, "undefined type `{}`", id)
+        }
+    }
+}
+
 fn compile_located_regexp(g: &Grammar, ast: Located<syntax::RegExp>) -> Result<Located<RegExp>, Located<Error>> {
     let span = ast.span();
     Ok(Located::new(compile_regexp(g, ast.into_inner(), span)?, span))
@@ -99,7 +113,10 @@ fn compile_regexp(g: &Grammar, ast: syntax::RegExp, span: Span) -> Result<RegExp
 fn compile_regexp_atom(g: &Grammar, ast: Located<syntax::RegExpAtom>) -> Result<Located<RegExpAtom>, Located<Error>> {
     let span = ast.span();
     let exp = match ast.into_inner() {
-        syntax::RegExpAtom::Ident(id) => RegExpAtom::Ref(id),
+        syntax::RegExpAtom::Ident(id) => {
+            g.regexp_defined(&Located::new(id.clone(), span))?;
+            RegExpAtom::Ref(id)
+        },
         syntax::RegExpAtom::CharSet(set, negate) => RegExpAtom::CharSet(set, negate),
         syntax::RegExpAtom::Literal(str, case_sensitive) => RegExpAtom::Literal(str, case_sensitive),
         syntax::RegExpAtom::Repeat(atom, min, max) => {
@@ -149,8 +166,12 @@ fn compile_token(g: &Grammar, ast: Located<syntax::Token>) -> Result<Located<Tok
         },
         syntax::Token::NonTerminal(nt) => {
             let nt = match nt {
-                syntax::NonTerminal::Type(id) => NonTerminal::Type(id),
+                syntax::NonTerminal::Type(id) => {
+                    g.type_defined(&id)?;
+                    NonTerminal::Type(id)
+                },
                 syntax::NonTerminal::Repeat(id, min, max, sep) => {
+                    g.type_defined(&id)?;
                     let sep = match sep {
                         Some(s) => {
                             let span = s.span();
@@ -184,10 +205,12 @@ fn compile_rule(g: &Grammar, ast: Located<syntax::Rule>) -> Result<Located<Rule>
     }, span))
 }
 
-impl TryFrom<syntax::Grammar> for Grammar {
+impl TryFrom<Located<syntax::Grammar>> for Located<Grammar> {
     type Error = Located<Error>;
 
-    fn try_from(ast: syntax::Grammar) -> Result<Grammar, Located<Error>> {
+    fn try_from(ast: Located<syntax::Grammar>) -> Result<Located<Grammar>, Located<Error>> {
+        let span = ast.span();
+        let ast = ast.into_inner();
         let externs = ast.externs;
         let mut regexps = HashMap::new();
         let mut types = HashMap::new();
@@ -243,6 +266,6 @@ impl TryFrom<syntax::Grammar> for Grammar {
             std::mem::forget(def);
         }
 
-        Ok(g)
+        Ok(Located::new(g, span))
     }
 }
