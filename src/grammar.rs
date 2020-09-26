@@ -4,8 +4,8 @@ use std::convert::{
 	TryFrom,
 	TryInto
 };
-use std::mem::MaybeUninit;
 use std::fmt;
+use once_cell::unsync::OnceCell;
 use source_span::{
 	Span,
 	Loc
@@ -18,8 +18,8 @@ use crate::syntax;
 
 pub struct Grammar {
 	pub externs: Vec<Loc<Ident>>,
-	pub regexps: HashMap<Ident, MaybeUninit<Rc<Loc<RegExpDefinition>>>>,
-	pub types: HashMap<Ident, MaybeUninit<Rc<Loc<Type>>>>
+	pub regexps: HashMap<Ident, OnceCell<Rc<Loc<RegExpDefinition>>>>,
+	pub types: HashMap<Ident, OnceCell<Rc<Loc<Type>>>>
 }
 
 impl Grammar {
@@ -218,11 +218,11 @@ impl syntax::Grammar {
 		let mut types = HashMap::new();
 
 		for def in &ast.regexps {
-			regexps.insert(def.id.as_ref().clone(), unsafe { MaybeUninit::uninit() });
+			regexps.insert(def.id.as_ref().clone(), OnceCell::new());
 		}
 
 		for ty in &ast.types {
-			types.insert(ty.id.as_ref().clone(), unsafe { MaybeUninit::uninit() });
+			types.insert(ty.id.as_ref().clone(), OnceCell::new());
 		}
 
 		let mut g = Grammar {
@@ -236,16 +236,15 @@ impl syntax::Grammar {
 			let span = ast.span();
 			g.regexp_defined(&id);
 			let ast = ast.into_inner();
-			let mut def = MaybeUninit::new(Rc::new(Loc::new(RegExpDefinition {
-				id: ast.id,
-				exp: TypedRegExp {
-					ty: ast.exp.ty,
-					exp: compile_Loc_regexp(&g, ast.exp.exp)?
-				}
-			}, span)));
-			let undef = g.regexps.get_mut(&id).unwrap();
-			std::mem::swap(&mut def, undef);
-			std::mem::forget(def);
+			g.regexps.get(&id).unwrap().set(
+				Rc::new(Loc::new(RegExpDefinition {
+					id: ast.id,
+					exp: TypedRegExp {
+						ty: ast.exp.ty,
+						exp: compile_Loc_regexp(&g, ast.exp.exp)?
+					}
+				}, span))
+			);
 		}
 
 		for ast in ast.types.into_iter() {
@@ -259,13 +258,12 @@ impl syntax::Grammar {
 				rules.push(compile_rule(&g, rule)?);
 			}
 
-			let mut def = MaybeUninit::new(Rc::new(Loc::new(Type {
-				id: ast.id,
-				rules: rules
-			}, span)));
-			let undef = g.types.get_mut(&id).unwrap();
-			std::mem::swap(&mut def, undef);
-			std::mem::forget(def);
+			g.types.get(&id).unwrap().set(
+				Rc::new(Loc::new(Type {
+					id: ast.id,
+					rules: rules
+				}, span))
+			);
 		}
 
 		Ok(Loc::new(g, span))

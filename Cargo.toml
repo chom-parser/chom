@@ -6,6 +6,7 @@ edition = "2018"
 
 [dependencies]
 source-span = "*"
+once_cell = "*"
 
 utf8-decode = "*"
 stderrlog = "*"
