@@ -210,7 +210,7 @@ fn compile_rule(g: &Grammar, ast: Loc<syntax::Rule>) -> Result<Loc<Rule>, Loc<Er
 }
 
 impl syntax::Grammar {
-	fn compile(self: Loc<Self>) -> Result<Loc<Grammar>, Loc<Error>> {
+	pub fn compile(self: Loc<Self>) -> Result<Loc<Grammar>, Loc<Error>> {
 		let span = self.span();
 		let ast = self.into_inner();
 		let externs = ast.externs;

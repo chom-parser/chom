@@ -3,6 +3,9 @@ version: "1.0"
 author: Timothée Haudebourg <timothee@haudebourg.net>
 about: A programming language for cats
 args:
+  - FILE:
+      help: Input grammar file
+      required: true
   - verbose:
       short: v
       multiple: true

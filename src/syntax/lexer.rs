@@ -342,9 +342,9 @@ impl<I: Iterator<Item = io::Result<char>>, M: Metrics> Lexer<I, M> {
 
 		match id.as_ref() {
 			"" => Err(Loc::new(Error::IO(io::Error::new(io::ErrorKind::UnexpectedEof, "unexpected end of stream")), self.span)),
-			"@extern" => Ok(Loc::new(Token::Keyword(Keyword::Extern), self.span)),
-			"@regexp" => Ok(Loc::new(Token::Keyword(Keyword::RegExp), self.span)),
-			"@type" => Ok(Loc::new(Token::Keyword(Keyword::Type), self.span)),
+			"extern" => Ok(Loc::new(Token::Keyword(Keyword::Extern), self.span)),
+			"regexp" => Ok(Loc::new(Token::Keyword(Keyword::RegExp), self.span)),
+			"type" => Ok(Loc::new(Token::Keyword(Keyword::Type), self.span)),
 			_ => Ok(Loc::new(Token::Ident(id), self.span))
 		}
 	}
