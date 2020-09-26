@@ -1,3 +1,4 @@
+#![feature(arbitrary_self_types)]
 extern crate source_span;
 
 pub mod charset;

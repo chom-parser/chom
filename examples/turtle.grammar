@@ -10,55 +10,55 @@ extern iri
 
 # Regular expressions.
 
-regexp IRIREF: iri                                 = 	'<' { ([^\x00-\x20<>\"{}|^`\\] | UCHAR)* } '>' # \x00=NULL \x01-\x1F=control codes \x20=space
-regexp PNAME_NS: string                            = 	PN_PREFIX? ':'
-regexp PNAME_LN: string                            = 	PNAME_NS PN_LOCAL
-regexp BLANK_NODE_LABEL: string                    = 	'_:' { (PN_CHARS_U | [0-9]) ((PN_CHARS | '.')* PN_CHARS)? }
-regexp LANGTAG: lang_tag                           = 	'@' { [a-zA-Z]+ ('-' [a-zA-Z0-9]+)* }
-regexp INTEGER: int                                = 	{ [+-]? [0-9]+ }
-regexp DECIMAL: float                              = 	{ [+-]? [0-9]* '.' [0-9]+ }
-regexp DOUBLE: double                              = 	{ [+-]? ([0-9]+ '.' [0-9]* EXPONENT | '.' [0-9]+ EXPONENT | [0-9]+ EXPONENT) }
-regexp EXPONENT: string                            = 	[eE] [+-]? [0-9]+
-regexp STRING_LITERAL_QUOTE: string                = 	'"' { ([^\x22\x5C\x0A\x0D] | ECHAR | UCHAR)* } '"' # \x22=" #x5C=\ # \x0A=new line \x0D=carriage return
-regexp STRING_LITERAL_SINGLE_QUOTE: string         = 	"'" { ([^\x27\x5C\x0A\x0D] | ECHAR | UCHAR)* } "'" # \x27=' #x5C=\ # \x0A=new line \x0D=carriage return
-regexp STRING_LITERAL_LONG_SINGLE_QUOTE: string    = 	"'''" { (("'" | "''")? ([^'\] | ECHAR | UCHAR))* } "'''"
-regexp STRING_LITERAL_LONG_QUOTE: string           = 	"\"\"\"" { (('"' | "\"\"")? ([^\"\\] | ECHAR | UCHAR))* } "\"\"\""
-regexp UCHAR: char                                 = 	"\\u" { HEX HEX HEX HEX : hex } | "\\U" { HEX HEX HEX HEX HEX HEX HEX HEX : hex }
-regexp ECHAR: char                                 = 	'\\' { [tbnrf\"\'\\] : escape }
-regexp WS                                          = 	'\x20' | '\x09' | '\x0D' | '\x0A' # \x20=space \x09=character tabulation \x0D=carriage return \x0A=new line
-regexp ANON                                        = 	'[' WS* ']'
-regexp PN_CHARS_BASE: char                         = 	[A-Z] | [a-z] | [\u00C0-\u00D6] | [\u00D8-\u00F6] | [\u00F8-\u02FF] | [\u0370-\u037D] | [\u037F-\u1FFF] | [\u200C-\u200D] | [\u2070-\u218F] | [\u2C00-\u2FEF] | [\u3001-\uD7FF] | [\uF900-\uFDCF] | [\uFDF0-\uFFFD] | [\U00010000-\U000EFFFF]
-regexp PN_CHARS_U: char                            = 	PN_CHARS_BASE | '_'
-regexp PN_CHARS: char                              = 	PN_CHARS_U | '-' | [0-9] | '\u00B7' | [\u0300-\u036F] | [\u203F-\u2040]
-regexp PN_PREFIX: string                           = 	PN_CHARS_BASE ((PN_CHARS | '.')* PN_CHARS)?
-regexp PN_LOCAL: string                            = 	(PN_CHARS_U | ':' | [0-9] | PLX) ((PN_CHARS | '.' | ':' | PLX)* (PN_CHARS | ':' | PLX))?
-regexp PLX: string                                 = 	PERCENT | PN_LOCAL_ESC
-regexp PERCENT: string                             = 	'%' HEX HEX
-regexp HEX: char                                   = 	[0-9] | [A-F] | [a-f]
-regexp PN_LOCAL_ESC: char                          = 	'\\' { ('_' | '~' | '.' | '-' | '!' | '$' | '&' | "'" | '(' | ')' | '*' | '+' | ',' | ';' | '=' | '/' | '?' | '#' | '@' | '%') }
+regexp IRIREF: iri								 = 	'<' { ([^\x00-\x20<>\"{}|^`\\] | UCHAR)* } '>' # \x00=NULL \x01-\x1F=control codes \x20=space
+regexp PNAME_NS: string							= 	PN_PREFIX? ':'
+regexp PNAME_LN: string							= 	PNAME_NS PN_LOCAL
+regexp BLANK_NODE_LABEL: string					= 	'_:' { (PN_CHARS_U | [0-9]) ((PN_CHARS | '.')* PN_CHARS)? }
+regexp LANGTAG: lang_tag						   = 	'@' { [a-zA-Z]+ ('-' [a-zA-Z0-9]+)* }
+regexp INTEGER: int								= 	{ [+-]? [0-9]+ }
+regexp DECIMAL: float							  = 	{ [+-]? [0-9]* '.' [0-9]+ }
+regexp DOUBLE: double							  = 	{ [+-]? ([0-9]+ '.' [0-9]* EXPONENT | '.' [0-9]+ EXPONENT | [0-9]+ EXPONENT) }
+regexp EXPONENT: string							= 	[eE] [+-]? [0-9]+
+regexp STRING_LITERAL_QUOTE: string				= 	'"' { ([^\x22\x5C\x0A\x0D] | ECHAR | UCHAR)* } '"' # \x22=" #x5C=\ # \x0A=new line \x0D=carriage return
+regexp STRING_LITERAL_SINGLE_QUOTE: string		 = 	"'" { ([^\x27\x5C\x0A\x0D] | ECHAR | UCHAR)* } "'" # \x27=' #x5C=\ # \x0A=new line \x0D=carriage return
+regexp STRING_LITERAL_LONG_SINGLE_QUOTE: string	= 	"'''" { (("'" | "''")? ([^'\] | ECHAR | UCHAR))* } "'''"
+regexp STRING_LITERAL_LONG_QUOTE: string		   = 	"\"\"\"" { (('"' | "\"\"")? ([^\"\\] | ECHAR | UCHAR))* } "\"\"\""
+regexp UCHAR: char								 = 	"\\u" { HEX HEX HEX HEX : hex } | "\\U" { HEX HEX HEX HEX HEX HEX HEX HEX : hex }
+regexp ECHAR: char								 = 	'\\' { [tbnrf\"\'\\] : escape }
+regexp WS										  = 	'\x20' | '\x09' | '\x0D' | '\x0A' # \x20=space \x09=character tabulation \x0D=carriage return \x0A=new line
+regexp ANON										= 	'[' WS* ']'
+regexp PN_CHARS_BASE: char						 = 	[A-Z] | [a-z] | [\u00C0-\u00D6] | [\u00D8-\u00F6] | [\u00F8-\u02FF] | [\u0370-\u037D] | [\u037F-\u1FFF] | [\u200C-\u200D] | [\u2070-\u218F] | [\u2C00-\u2FEF] | [\u3001-\uD7FF] | [\uF900-\uFDCF] | [\uFDF0-\uFFFD] | [\U00010000-\U000EFFFF]
+regexp PN_CHARS_U: char							= 	PN_CHARS_BASE | '_'
+regexp PN_CHARS: char							  = 	PN_CHARS_U | '-' | [0-9] | '\u00B7' | [\u0300-\u036F] | [\u203F-\u2040]
+regexp PN_PREFIX: string						   = 	PN_CHARS_BASE ((PN_CHARS | '.')* PN_CHARS)?
+regexp PN_LOCAL: string							= 	(PN_CHARS_U | ':' | [0-9] | PLX) ((PN_CHARS | '.' | ':' | PLX)* (PN_CHARS | ':' | PLX))?
+regexp PLX: string								 = 	PERCENT | PN_LOCAL_ESC
+regexp PERCENT: string							 = 	'%' HEX HEX
+regexp HEX: char								   = 	[0-9] | [A-F] | [a-f]
+regexp PN_LOCAL_ESC: char						  = 	'\\' { ('_' | '~' | '.' | '-' | '!' | '$' | '&' | "'" | '(' | ')' | '*' | '+' | ',' | ';' | '=' | '/' | '?' | '#' | '@' | '%') }
 
 # Syntax rules
 
 type document = <statement*>
 
 type statement =
-  | directive:    <directive>
-  | triples:      <triples> '.'
+  | directive:	<directive>
+  | triples:	  <triples> '.'
 
 type directive =
-  | prefix_id:    '@prefix' PNAME_NS IRIREF '.'
-  | base:         '@base' IRIREF '.'
+  | prefix_id:	'@prefix' PNAME_NS IRIREF '.'
+  | base:		 '@base' IRIREF '.'
   | sparql_prefix: "PREFIX" PNAME_NS IRIREF
   | sparql_base:   "BASE" IRIREF
 
 type triples =
-  | subject:    <subject> <predicate_object+!';'>
+  | subject:	<subject> <predicate_object+!';'>
   | blank_node: <blank_node_property_list> <predicate_object*!';'>
 
 type blank_node_property_list = '[' <predicate_object+> ']'
 
 type subject =
-  | iri:        <iri>
+  | iri:		<iri>
   | blank_node: <blank_node>
   | collection: <collection>
 
@@ -72,30 +72,30 @@ type iri =
 
 type blank_node =
   | labeled:  BLANK_NODE_LABEL
-  | annon:    ANON
+  | annon:	ANON
 
 type verb =
   | predicate:  <iri>
-  | a:          'a'
+  | a:		  'a'
 
 type object =
-  | iri:            <iri>
-  | blank_node:     <blank_node>
-  | collection:     <collection>
+  | iri:			<iri>
+  | blank_node:	 <blank_node>
+  | collection:	 <collection>
   | property_list:  <blank_node_property_list>
-  | literal:        <literal>
+  | literal:		<literal>
 
 type prefixed_name =
   | ln: PNAME_LN
   | ns: PNAME_NS
 
 type literal =
-  | rdf:      <string> <tag>
+  | rdf:	  <string> <tag>
   | numeric:  <numeric>
   | boolean:  <boolean>
 
 type numeric =
-  | int:      INTEGER
+  | int:	  INTEGER
   | decimal:  DECIMAL
   | double:   DOUBLE
 

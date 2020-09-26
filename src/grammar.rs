@@ -1,271 +1,273 @@
 use std::collections::HashMap;
 use std::rc::Rc;
-use std::convert::{TryFrom, TryInto};
+use std::convert::{
+	TryFrom,
+	TryInto
+};
 use std::mem::MaybeUninit;
 use std::fmt;
-use source_span::Span;
-use crate::{CharSet, Ident};
+use source_span::{
+	Span,
+	Loc
+};
+use crate::{
+	CharSet,
+	Ident
+};
 use crate::syntax;
-use syntax::Located;
 
 pub struct Grammar {
-    pub externs: Vec<Located<Ident>>,
-    pub regexps: HashMap<Ident, MaybeUninit<Rc<Located<RegExpDefinition>>>>,
-    pub types: HashMap<Ident, MaybeUninit<Rc<Located<Type>>>>
+	pub externs: Vec<Loc<Ident>>,
+	pub regexps: HashMap<Ident, MaybeUninit<Rc<Loc<RegExpDefinition>>>>,
+	pub types: HashMap<Ident, MaybeUninit<Rc<Loc<Type>>>>
 }
 
 impl Grammar {
-    pub fn compile(ast: Located<syntax::Grammar>) -> Result<Located<Grammar>, Located<Error>> {
-        ast.try_into()
-    }
+	fn regexp_defined(&self, id: &Loc<Ident>) -> Result<(), Loc<Error>> {
+		self.regexps.get(id.as_ref()).ok_or(Loc::new(Error::UndefinedRegExp(id.as_ref().clone()), id.span()))?;
+		Ok(())
+	}
 
-    fn regexp_defined(&self, id: &Located<Ident>) -> Result<(), Located<Error>> {
-        self.regexps.get(id.as_ref()).ok_or(Located::new(Error::UndefinedRegExp(id.as_ref().clone()), id.span()))?;
-        Ok(())
-    }
-
-    fn type_defined(&self, id: &Located<Ident>) -> Result<(), Located<Error>> {
-        self.types.get(id.as_ref()).ok_or(Located::new(Error::UndefinedType(id.as_ref().clone()), id.span()))?;
-        Ok(())
-    }
+	fn type_defined(&self, id: &Loc<Ident>) -> Result<(), Loc<Error>> {
+		self.types.get(id.as_ref()).ok_or(Loc::new(Error::UndefinedType(id.as_ref().clone()), id.span()))?;
+		Ok(())
+	}
 }
 
 pub struct Type {
-    id: Located<Ident>,
-    rules: Vec<Located<Rule>>
+	id: Loc<Ident>,
+	rules: Vec<Loc<Rule>>
 }
 
 pub struct Rule {
-    pub id: Option<Located<Ident>>,
-    pub tokens: Vec<Located<Token>>
+	pub id: Option<Loc<Ident>>,
+	pub tokens: Vec<Loc<Token>>
 }
 
 pub enum Token {
-    Terminal(Terminal),
-    NonTerminal(NonTerminal)
+	Terminal(Terminal),
+	NonTerminal(NonTerminal)
 }
 
 pub enum Terminal {
-    RegExp(TypedRegExp)
+	RegExp(TypedRegExp)
 }
 
 pub enum NonTerminal {
-    Type(Located<Ident>),
-    Repeat(Located<Ident>, usize, usize, Option<Located<Separator>>),
+	Type(Loc<Ident>),
+	Repeat(Loc<Ident>, usize, usize, Option<Loc<Separator>>),
 }
 
 pub struct Separator {
-    pub strong: bool,
-    pub terminal: Located<Terminal>
+	pub strong: bool,
+	pub terminal: Loc<Terminal>
 }
 
 pub struct RegExpDefinition {
-    pub id: Located<Ident>,
-    pub exp: TypedRegExp
+	pub id: Loc<Ident>,
+	pub exp: TypedRegExp
 }
 
 pub struct TypedRegExp {
-    pub ty: Option<Located<Ident>>,
-    pub exp: Located<RegExp>
+	pub ty: Option<Loc<Ident>>,
+	pub exp: Loc<RegExp>
 }
 
-pub struct RegExp(pub Vec<Located<RegExpAtom>>);
+pub struct RegExp(pub Vec<Loc<RegExpAtom>>);
 
 pub enum RegExpAtom {
-    Ref(Ident),
-    CharSet(CharSet, bool),
-    Literal(String, bool),
-    Repeat(Box<Located<RegExpAtom>>, usize, usize),
-    Or(Vec<Located<RegExp>>),
-    Capture(RegExp),
-    Group(RegExp),
+	Ref(Ident),
+	CharSet(CharSet, bool),
+	Literal(String, bool),
+	Repeat(Box<Loc<RegExpAtom>>, usize, usize),
+	Or(Vec<Loc<RegExp>>),
+	Capture(RegExp),
+	Group(RegExp),
 }
 
 #[derive(Debug)]
 pub enum Error {
-    UndefinedRegExp(Ident),
-    UndefinedType(Ident)
+	UndefinedRegExp(Ident),
+	UndefinedType(Ident)
 }
 
 impl fmt::Display for Error {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            Error::UndefinedRegExp(id) => write!(f, "undefined regular expression `{}`", id),
-            Error::UndefinedType(id) => write!(f, "undefined type `{}`", id)
-        }
-    }
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		match self {
+			Error::UndefinedRegExp(id) => write!(f, "undefined regular expression `{}`", id),
+			Error::UndefinedType(id) => write!(f, "undefined type `{}`", id)
+		}
+	}
 }
 
-fn compile_located_regexp(g: &Grammar, ast: Located<syntax::RegExp>) -> Result<Located<RegExp>, Located<Error>> {
-    let span = ast.span();
-    Ok(Located::new(compile_regexp(g, ast.into_inner(), span)?, span))
+fn compile_Loc_regexp(g: &Grammar, ast: Loc<syntax::RegExp>) -> Result<Loc<RegExp>, Loc<Error>> {
+	let span = ast.span();
+	Ok(Loc::new(compile_regexp(g, ast.into_inner(), span)?, span))
 }
 
-fn compile_regexp(g: &Grammar, ast: syntax::RegExp, span: Span) -> Result<RegExp, Located<Error>> {
-    let mut atoms = Vec::new();
-    for ast in ast.0.into_iter() {
-        atoms.push(compile_regexp_atom(g, ast)?);
-    }
+fn compile_regexp(g: &Grammar, ast: syntax::RegExp, span: Span) -> Result<RegExp, Loc<Error>> {
+	let mut atoms = Vec::new();
+	for ast in ast.0.into_iter() {
+		atoms.push(compile_regexp_atom(g, ast)?);
+	}
 
-    Ok(RegExp(atoms))
+	Ok(RegExp(atoms))
 }
 
-fn compile_regexp_atom(g: &Grammar, ast: Located<syntax::RegExpAtom>) -> Result<Located<RegExpAtom>, Located<Error>> {
-    let span = ast.span();
-    let exp = match ast.into_inner() {
-        syntax::RegExpAtom::Ident(id) => {
-            g.regexp_defined(&Located::new(id.clone(), span))?;
-            RegExpAtom::Ref(id)
-        },
-        syntax::RegExpAtom::CharSet(set, negate) => RegExpAtom::CharSet(set, negate),
-        syntax::RegExpAtom::Literal(str, case_sensitive) => RegExpAtom::Literal(str, case_sensitive),
-        syntax::RegExpAtom::Repeat(atom, min, max) => {
-            RegExpAtom::Repeat(Box::new(compile_regexp_atom(g, *atom)?), min, max)
-        },
-        syntax::RegExpAtom::Or(exps) => {
-            let mut compiled_exps = Vec::new();
-            for e in exps.into_iter() {
-                compiled_exps.push(compile_located_regexp(g, e)?);
-            }
-            RegExpAtom::Or(compiled_exps)
-        },
-        syntax::RegExpAtom::Capture(exp) => {
-            RegExpAtom::Capture(compile_regexp(g, exp, span)?)
-        },
-        syntax::RegExpAtom::Group(exp) => {
-            RegExpAtom::Group(compile_regexp(g, exp, span)?)
-        }
-    };
+fn compile_regexp_atom(g: &Grammar, ast: Loc<syntax::RegExpAtom>) -> Result<Loc<RegExpAtom>, Loc<Error>> {
+	let span = ast.span();
+	let exp = match ast.into_inner() {
+		syntax::RegExpAtom::Ident(id) => {
+			g.regexp_defined(&Loc::new(id.clone(), span))?;
+			RegExpAtom::Ref(id)
+		},
+		syntax::RegExpAtom::CharSet(set, negate) => RegExpAtom::CharSet(set, negate),
+		syntax::RegExpAtom::Literal(str, case_sensitive) => RegExpAtom::Literal(str, case_sensitive),
+		syntax::RegExpAtom::Repeat(atom, min, max) => {
+			RegExpAtom::Repeat(Box::new(compile_regexp_atom(g, *atom)?), min, max)
+		},
+		syntax::RegExpAtom::Or(exps) => {
+			let mut compiled_exps = Vec::new();
+			for e in exps.into_iter() {
+				compiled_exps.push(compile_Loc_regexp(g, e)?);
+			}
+			RegExpAtom::Or(compiled_exps)
+		},
+		syntax::RegExpAtom::Capture(exp) => {
+			RegExpAtom::Capture(compile_regexp(g, exp, span)?)
+		},
+		syntax::RegExpAtom::Group(exp) => {
+			RegExpAtom::Group(compile_regexp(g, exp, span)?)
+		}
+	};
 
-    Ok(Located::new(exp, span))
+	Ok(Loc::new(exp, span))
 }
 
-fn compile_terminal(g: &Grammar, ast: syntax::Terminal) -> Result<Terminal, Located<Error>> {
-    let t = match ast {
-        syntax::Terminal::RegExp(exp) => {
-            Terminal::RegExp(TypedRegExp {
-                ty: exp.ty,
-                exp: compile_located_regexp(&g, exp.exp)?
-            })
-        }
-    };
+fn compile_terminal(g: &Grammar, ast: syntax::Terminal) -> Result<Terminal, Loc<Error>> {
+	let t = match ast {
+		syntax::Terminal::RegExp(exp) => {
+			Terminal::RegExp(TypedRegExp {
+				ty: exp.ty,
+				exp: compile_Loc_regexp(&g, exp.exp)?
+			})
+		}
+	};
 
-    Ok(t)
+	Ok(t)
 }
 
-fn compile_located_terminal(g: &Grammar, ast: Located<syntax::Terminal>) -> Result<Located<Terminal>, Located<Error>> {
-    let span = ast.span();
-    Ok(Located::new(compile_terminal(g, ast.into_inner())?, span))
+fn compile_Loc_terminal(g: &Grammar, ast: Loc<syntax::Terminal>) -> Result<Loc<Terminal>, Loc<Error>> {
+	let span = ast.span();
+	Ok(Loc::new(compile_terminal(g, ast.into_inner())?, span))
 }
 
-fn compile_token(g: &Grammar, ast: Located<syntax::Token>) -> Result<Located<Token>, Located<Error>> {
-    let span = ast.span();
-    let t = match ast.into_inner() {
-        syntax::Token::Terminal(t) => {
-            Token::Terminal(compile_terminal(g, t)?)
-        },
-        syntax::Token::NonTerminal(nt) => {
-            let nt = match nt {
-                syntax::NonTerminal::Type(id) => {
-                    g.type_defined(&id)?;
-                    NonTerminal::Type(id)
-                },
-                syntax::NonTerminal::Repeat(id, min, max, sep) => {
-                    g.type_defined(&id)?;
-                    let sep = match sep {
-                        Some(s) => {
-                            let span = s.span();
-                            let s = s.into_inner();
-                            Some(Located::new(Separator {
-                                strong: s.strong,
-                                terminal: compile_located_terminal(g, s.terminal)?
-                            }, span))
-                        },
-                        None => None
-                    };
-                    NonTerminal::Repeat(id, min, max, sep)
-                }
-            };
-            Token::NonTerminal(nt)
-        }
-    };
-    Ok(Located::new(t, span))
+fn compile_token(g: &Grammar, ast: Loc<syntax::Token>) -> Result<Loc<Token>, Loc<Error>> {
+	let span = ast.span();
+	let t = match ast.into_inner() {
+		syntax::Token::Terminal(t) => {
+			Token::Terminal(compile_terminal(g, t)?)
+		},
+		syntax::Token::NonTerminal(nt) => {
+			let nt = match nt {
+				syntax::NonTerminal::Type(id) => {
+					g.type_defined(&id)?;
+					NonTerminal::Type(id)
+				},
+				syntax::NonTerminal::Repeat(id, min, max, sep) => {
+					g.type_defined(&id)?;
+					let sep = match sep {
+						Some(s) => {
+							let span = s.span();
+							let s = s.into_inner();
+							Some(Loc::new(Separator {
+								strong: s.strong,
+								terminal: compile_Loc_terminal(g, s.terminal)?
+							}, span))
+						},
+						None => None
+					};
+					NonTerminal::Repeat(id, min, max, sep)
+				}
+			};
+			Token::NonTerminal(nt)
+		}
+	};
+	Ok(Loc::new(t, span))
 }
 
-fn compile_rule(g: &Grammar, ast: Located<syntax::Rule>) -> Result<Located<Rule>, Located<Error>> {
-    let span = ast.span();
-    let ast = ast.into_inner();
-    let mut tokens = Vec::new();
-    for token in ast.tokens.into_iter() {
-        tokens.push(compile_token(g, token)?);
-    }
-    Ok(Located::new(Rule {
-        id: ast.id,
-        tokens
-    }, span))
+fn compile_rule(g: &Grammar, ast: Loc<syntax::Rule>) -> Result<Loc<Rule>, Loc<Error>> {
+	let span = ast.span();
+	let ast = ast.into_inner();
+	let mut tokens = Vec::new();
+	for token in ast.tokens.into_iter() {
+		tokens.push(compile_token(g, token)?);
+	}
+	Ok(Loc::new(Rule {
+		id: ast.id,
+		tokens
+	}, span))
 }
 
-impl TryFrom<Located<syntax::Grammar>> for Located<Grammar> {
-    type Error = Located<Error>;
+impl syntax::Grammar {
+	fn compile(self: Loc<Self>) -> Result<Loc<Grammar>, Loc<Error>> {
+		let span = self.span();
+		let ast = self.into_inner();
+		let externs = ast.externs;
+		let mut regexps = HashMap::new();
+		let mut types = HashMap::new();
 
-    fn try_from(ast: Located<syntax::Grammar>) -> Result<Located<Grammar>, Located<Error>> {
-        let span = ast.span();
-        let ast = ast.into_inner();
-        let externs = ast.externs;
-        let mut regexps = HashMap::new();
-        let mut types = HashMap::new();
+		for def in &ast.regexps {
+			regexps.insert(def.id.as_ref().clone(), unsafe { MaybeUninit::uninit() });
+		}
 
-        for def in &ast.regexps {
-            regexps.insert(def.id.as_ref().clone(), unsafe { MaybeUninit::uninit() });
-        }
+		for ty in &ast.types {
+			types.insert(ty.id.as_ref().clone(), unsafe { MaybeUninit::uninit() });
+		}
 
-        for ty in &ast.types {
-            types.insert(ty.id.as_ref().clone(), unsafe { MaybeUninit::uninit() });
-        }
+		let mut g = Grammar {
+			externs,
+			regexps,
+			types
+		};
 
-        let mut g = Grammar {
-            externs,
-            regexps,
-            types
-        };
+		for ast in ast.regexps.into_iter() {
+			let id = ast.id.clone();
+			let span = ast.span();
+			g.regexp_defined(&id);
+			let ast = ast.into_inner();
+			let mut def = MaybeUninit::new(Rc::new(Loc::new(RegExpDefinition {
+				id: ast.id,
+				exp: TypedRegExp {
+					ty: ast.exp.ty,
+					exp: compile_Loc_regexp(&g, ast.exp.exp)?
+				}
+			}, span)));
+			let undef = g.regexps.get_mut(&id).unwrap();
+			std::mem::swap(&mut def, undef);
+			std::mem::forget(def);
+		}
 
-        for ast in ast.regexps.into_iter() {
-            let id = ast.id.clone();
-            let span = ast.span();
-            g.regexp_defined(&id);
-            let ast = ast.into_inner();
-            let mut def = MaybeUninit::new(Rc::new(Located::new(RegExpDefinition {
-                id: ast.id,
-                exp: TypedRegExp {
-                    ty: ast.exp.ty,
-                    exp: compile_located_regexp(&g, ast.exp.exp)?
-                }
-            }, span)));
-            let undef = g.regexps.get_mut(&id).unwrap();
-            std::mem::swap(&mut def, undef);
-            std::mem::forget(def);
-        }
+		for ast in ast.types.into_iter() {
+			let id = ast.id.clone();
+			let span = ast.span();
+			g.type_defined(&id);
+			let ast = ast.into_inner();
 
-        for ast in ast.types.into_iter() {
-            let id = ast.id.clone();
-            let span = ast.span();
-            g.type_defined(&id);
-            let ast = ast.into_inner();
+			let mut rules = Vec::new();
+			for rule in ast.rules {
+				rules.push(compile_rule(&g, rule)?);
+			}
 
-            let mut rules = Vec::new();
-            for rule in ast.rules {
-                rules.push(compile_rule(&g, rule)?);
-            }
+			let mut def = MaybeUninit::new(Rc::new(Loc::new(Type {
+				id: ast.id,
+				rules: rules
+			}, span)));
+			let undef = g.types.get_mut(&id).unwrap();
+			std::mem::swap(&mut def, undef);
+			std::mem::forget(def);
+		}
 
-            let mut def = MaybeUninit::new(Rc::new(Located::new(Type {
-                id: ast.id,
-                rules: rules
-            }, span)));
-            let undef = g.types.get_mut(&id).unwrap();
-            std::mem::swap(&mut def, undef);
-            std::mem::forget(def);
-        }
-
-        Ok(Located::new(g, span))
-    }
+		Ok(Loc::new(g, span))
+	}
 }

@@ -1,69 +1,69 @@
 use std::fmt;
+use source_span::Loc;
 use crate::CharSet;
-use super::Located;
 
 #[derive(Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Debug)]
 pub struct Ident(pub String);
 
 impl fmt::Display for Ident {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        self.0.fmt(f)
-    }
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		self.0.fmt(f)
+	}
 }
 
 pub struct Grammar {
-    pub externs: Vec<Located<Ident>>,
-    pub regexps: Vec<Located<RegExpDefinition>>,
-    pub types: Vec<Located<Type>>
+	pub externs: Vec<Loc<Ident>>,
+	pub regexps: Vec<Loc<RegExpDefinition>>,
+	pub types: Vec<Loc<Type>>
 }
 
 pub struct Type {
-    pub id: Located<Ident>,
-    pub rules: Vec<Located<Rule>>
+	pub id: Loc<Ident>,
+	pub rules: Vec<Loc<Rule>>
 }
 
 pub struct Rule {
-    pub id: Option<Located<Ident>>,
-    pub tokens: Vec<Located<Token>>
+	pub id: Option<Loc<Ident>>,
+	pub tokens: Vec<Loc<Token>>
 }
 
 pub enum Token {
-    Terminal(Terminal),
-    NonTerminal(NonTerminal)
+	Terminal(Terminal),
+	NonTerminal(NonTerminal)
 }
 
 pub enum Terminal {
-    RegExp(TypedRegExp)
+	RegExp(TypedRegExp)
 }
 
 pub enum NonTerminal {
-    Type(Located<Ident>),
-    Repeat(Located<Ident>, usize, usize, Option<Located<Separator>>),
+	Type(Loc<Ident>),
+	Repeat(Loc<Ident>, usize, usize, Option<Loc<Separator>>),
 }
 
 pub struct Separator {
-    pub strong: bool,
-    pub terminal: Located<Terminal>
+	pub strong: bool,
+	pub terminal: Loc<Terminal>
 }
 
 pub struct RegExpDefinition {
-    pub id: Located<Ident>,
-    pub exp: TypedRegExp
+	pub id: Loc<Ident>,
+	pub exp: TypedRegExp
 }
 
 pub struct TypedRegExp {
-    pub ty: Option<Located<Ident>>,
-    pub exp: Located<RegExp>
+	pub ty: Option<Loc<Ident>>,
+	pub exp: Loc<RegExp>
 }
 
-pub struct RegExp(pub Vec<Located<RegExpAtom>>);
+pub struct RegExp(pub Vec<Loc<RegExpAtom>>);
 
 pub enum RegExpAtom {
-    Ident(Ident),
-    CharSet(CharSet, bool),
-    Literal(String, bool),
-    Repeat(Box<Located<RegExpAtom>>, usize, usize),
-    Or(Vec<Located<RegExp>>),
-    Capture(RegExp),
-    Group(RegExp)
+	Ident(Ident),
+	CharSet(CharSet, bool),
+	Literal(String, bool),
+	Repeat(Box<Loc<RegExpAtom>>, usize, usize),
+	Or(Vec<Loc<RegExp>>),
+	Capture(RegExp),
+	Group(RegExp)
 }
