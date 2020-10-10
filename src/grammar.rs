@@ -77,7 +77,7 @@ pub struct RegExp(pub Vec<Loc<RegExpAtom>>);
 
 pub enum RegExpAtom {
 	Ref(Ident),
-	CharSet(CharSet, bool),
+	CharSet(CharSet),
 	Literal(String, bool),
 	Repeat(Box<Loc<RegExpAtom>>, usize, usize),
 	Or(Vec<Loc<RegExp>>),
@@ -121,7 +121,8 @@ fn compile_regexp_atom(g: &Grammar, ast: Loc<syntax::RegExpAtom>) -> Result<Loc<
 			g.regexp_defined(&Loc::new(id.clone(), span))?;
 			RegExpAtom::Ref(id)
 		},
-		syntax::RegExpAtom::CharSet(set, negate) => RegExpAtom::CharSet(set, negate),
+		syntax::RegExpAtom::CharSet(set, false) => RegExpAtom::CharSet(set),
+		syntax::RegExpAtom::CharSet(set, true) => RegExpAtom::CharSet(set.negated()),
 		syntax::RegExpAtom::Literal(str, case_sensitive) => RegExpAtom::Literal(str, case_sensitive),
 		syntax::RegExpAtom::Repeat(atom, min, max) => {
 			RegExpAtom::Repeat(Box::new(compile_regexp_atom(g, *atom)?), min, max)

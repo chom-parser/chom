@@ -200,6 +200,14 @@ impl CharSet {
 		}
 	}
 
+	pub fn from_char(c: char, case_sensitive: bool) -> CharSet {
+		panic!("TODO from_char")
+	}
+
+	pub fn negated(&self) -> CharSet {
+		panic!("TODO negated")
+	}
+
 	pub fn add(&mut self, range: Range) {
 		match &mut self.head {
 			Some(head) => head.add(range),

@@ -6,6 +6,8 @@ pub mod charmap;
 pub mod syntax;
 pub mod grammar;
 
+pub mod lexing;
+
 pub use syntax::Ident;
 pub use charset::CharSet;
 pub use charmap::CharMap;
