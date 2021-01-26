@@ -315,7 +315,7 @@ impl<I: Iterator<Item = io::Result<char>>, M: Metrics> Lexer<I, M> {
 					first
 				};
 
-				set.add(charset::Range::new(first, last));
+				set.insert(first..=last);
 			} else {
 				break
 			}

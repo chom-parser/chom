@@ -8,6 +8,7 @@ edition = "2018"
 source-span = "*"
 once_cell = "*"
 automaton = { path = "../../data-structures/automaton" }
+range-map = { path = "../../data-structures/range-map" }
 
 utf8-decode = "*"
 stderrlog = "*"

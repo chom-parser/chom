@@ -11,8 +11,8 @@ use source_span::{
 	Loc
 };
 use crate::{
-	CharSet,
-	Ident
+	Ident,
+	CharSet
 };
 use crate::syntax;
 
