@@ -7,8 +7,11 @@ edition = "2018"
 [dependencies]
 source-span = "*"
 once_cell = "*"
-automaton = { path = "../../data-structures/automaton" }
+btree-slab = { path = "../../data-structures/btree-slab" }
 range-map = { path = "../../data-structures/range-map" }
+
+proc-macro2 = "*"
+quote = "*"
 
 utf8-decode = "*"
 stderrlog = "*"

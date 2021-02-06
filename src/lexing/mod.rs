@@ -1,12 +1,13 @@
-use automaton::{
-	Automaton,
-	AutomatonMut
+use source_span::{
+	Loc
 };
 use std::collections::HashMap;
 use crate::{
 	Ident,
 	CharSet,
 	grammar::{
+		Grammar,
+		Error,
 		RegExpDefinition,
 		TypedRegExp,
 		RegExp,
@@ -14,127 +15,140 @@ use crate::{
 	}
 };
 
-#[derive(Clone, PartialEq, Eq, Hash)]
-pub enum State {
-	InitialOf(Ident),
-	FinalOf(Ident),
-	Anonymous(u32)
-}
+mod token;
+mod automaton;
 
-/// Lexing automaton.
-pub type LexAutomaton = automaton::RangeHashAutomaton<State, char>;
+pub use token::*;
+pub use automaton::*;
 
 /// Lexing table.
 pub struct Table {
 	next_state: u32,
-	aut: LexAutomaton,
-	defs: HashMap<Ident, State>
+	automaton: Automaton
 }
 
 impl Table {
+	pub fn new(grammar: &Grammar) -> Result<Table, Loc<Error>> {
+		let mut table = Table {
+			next_state: 0,
+			automaton: Automaton::new()
+		};
+
+		for (id, def) in &grammar.regexps {
+			let (a, b) = table.build(grammar, def.get().unwrap())?;
+			table.automaton.add(State::Initial, None, a);
+			table.automaton.add(b, None, State::Final(id.clone()));
+		}
+
+		Ok(table)
+	}
+
 	fn new_state(&mut self) -> State {
-		let q = State::Anonymous(self.next_state);
+		let q = self.next_state;
 		self.next_state += 1;
-		q
+		State::Intermediate(q)
 	}
 
-	fn build(&mut self, def: &RegExpDefinition) {
-		// ...
+	fn build(&mut self, grammar: &Grammar, def: &RegExpDefinition) -> Result<(State, State), Loc<Error>> {
+		self.build_typed_regexp(grammar, &def.exp)
 	}
 
-	fn build_typed_regexp(&mut self, e: &TypedRegExp) {
-		// ...
+	fn build_typed_regexp(&mut self, grammar: &Grammar, e: &TypedRegExp) -> Result<(State, State), Loc<Error>> {
+		self.build_regexp(grammar, &e.exp)
 	}
 
-	fn build_regexp(&mut self, e: &RegExp) -> (State, State) {
+	fn build_regexp(&mut self, grammar: &Grammar, e: &RegExp) -> Result<(State, State), Loc<Error>> {
 		match e.0.split_first() {
 			Some((first_atom, atoms)) => {
-				let (i, mut q) = self.build_regexp_atom(first_atom);
+				let (i, mut q) = self.build_regexp_atom(grammar, first_atom)?;
 				for atom in atoms {
-					let (ai, aq) = self.build_regexp_atom(atom);
-					self.aut.add_epsilon_transition(q, ai);
+					let (ai, aq) = self.build_regexp_atom(grammar, atom)?;
+					self.automaton.add(q, None, ai);
 					q = aq;
 				}
 
-				(i, q)
+				Ok((i, q))
 			},
 			None => {
 				let q = self.new_state();
-				(q.clone(), q)
+				Ok((q.clone(), q))
 			}
 		}
 	}
 
-	fn build_regexp_atom(&mut self, e: &RegExpAtom) -> (State, State) {
+	fn build_regexp_atom(&mut self, grammar: &Grammar, e: &RegExpAtom) -> Result<(State, State), Loc<Error>> {
 		use RegExpAtom::*;
 		match e {
 			Ref(id) => {
-				panic!("TODO")
+				self.build(grammar, grammar.regexp(id)?)
 			},
 			CharSet(set) => {
 				let a = self.new_state();
 				let b = self.new_state();
-				self.aut.add_transitions(a.clone(), set.iter().cloned(), b.clone());
-				(a, b)
+				self.automaton.add(a.clone(), Some(set.clone()), b.clone());
+				Ok((a, b))
 			},
 			Literal(str, case_sensitive) => {
-				let mut aut = LexAutomaton::new();
 				let i = self.new_state();
 
 				let mut q = i.clone();
 				for c in str.chars() {
 					let next = self.new_state();
 					let set = crate::CharSet::from_char(c, *case_sensitive);
-					aut.add_transitions(q, set.iter().cloned(), next.clone());
+					self.automaton.add(q, Some(set.clone()), next.clone());
 					q = next;
 				}
 
-				(i, q)
+				Ok((i, q))
 			},
 			Repeat(atom, min, max) => {
 				let i = self.new_state();
 
 				let mut q = i.clone();
 				for _ in 0..*min {
-					let (ai, af) = self.build_regexp_atom(atom);
-					self.aut.add_epsilon_transition(q, ai);
+					let (ai, af) = self.build_regexp_atom(grammar, atom)?;
+					self.automaton.add(q, None, ai);
 					q = af;
 				}
 
 				if *max == usize::MAX {
-					let (ai, af) = self.build_regexp_atom(atom);
-					self.aut.add_epsilon_transition(q.clone(), ai);
-					self.aut.add_epsilon_transition(af, q.clone());
+					let (ai, af) = self.build_regexp_atom(grammar, atom)?;
+					self.automaton.add(q.clone(), None, ai);
+					self.automaton.add(af, None, q.clone());
 				} else {
 					let mut qi = q.clone();
 					for _ in 0..*max {
-						let (ai, af) = self.build_regexp_atom(atom);
-						self.aut.add_epsilon_transition(qi, ai);
-						self.aut.add_epsilon_transition(af.clone(), q.clone());
+						let (ai, af) = self.build_regexp_atom(grammar, atom)?;
+						self.automaton.add(qi, None, ai);
+						self.automaton.add(af.clone(), None, q.clone());
 						qi = af
 					}
 				}
 
-				(i, q)
+				Ok((i, q))
 			},
 			Or(regexps) => {
 				let i = self.new_state();
 				let f = self.new_state();
 
 				for regexp in regexps {
-					let (ei, ef) = self.build_regexp(regexp);
-					self.aut.add_epsilon_transition(i.clone(), ei);
-					self.aut.add_epsilon_transition(ef, f.clone());
+					let (ei, ef) = self.build_regexp(grammar, regexp)?;
+					self.automaton.add(i.clone(), None, ei);
+					self.automaton.add(ef, None, f.clone());
 				}
 
-				(i, f)
+				Ok((i, f))
 			},
 			Capture(regexp) => {
-				panic!("TODO")
+				self.build_regexp(grammar, regexp)
 			},
 			Group(regexp) => {
-				panic!("TODO")
+				self.build_regexp(grammar, regexp)
 			}
 		}
+	}
+
+	pub fn automaton(&self) -> &Automaton {
+		&self.automaton
 	}
 }

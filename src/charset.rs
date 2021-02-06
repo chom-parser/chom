@@ -64,7 +64,7 @@ fn fmt_char_range(range: &AnyRange<char>, f: &mut fmt::Formatter) -> fmt::Result
 	}
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub struct CharSet(RangeSet<char>);
 
 impl CharSet {
@@ -87,6 +87,10 @@ impl CharSet {
 		}
 
 		set
+	}
+
+	pub fn ranges(&self) -> impl Iterator<Item=&range_map::AnyRange<char>> {
+		self.0.iter()
 	}
 
 	pub fn negated(&self) -> CharSet {
