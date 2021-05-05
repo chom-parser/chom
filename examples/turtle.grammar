@@ -10,21 +10,21 @@ extern iri
 
 # Regular expressions.
 
-regexp IRIREF: iri								= 	'<' { ([^\x00-\x20<>\"{}|^`\\] | UCHAR)* } '>' # \x00=NULL \x01-\x1F=control codes \x20=space
+regexp IRIREF: iri								= '<' ([^\x00-\x20<>\"{}|^`\\] | UCHAR)* '>' # \x00=NULL \x01-\x1F=control codes \x20=space
 regexp PNAME_NS: string							= 	PN_PREFIX? ':'
 regexp PNAME_LN: string							= 	PNAME_NS PN_LOCAL
-regexp BLANK_NODE_LABEL: string					= 	'_:' { (PN_CHARS_U | [0-9]) ((PN_CHARS | '.')* PN_CHARS)? }
-regexp LANGTAG: lang_tag						= 	'@' { [a-zA-Z]+ ('-' [a-zA-Z0-9]+)* }
-regexp INTEGER: int								= 	{ [+\-]? [0-9]+ }
-regexp DECIMAL: float							= 	{ [+\-]? [0-9]* '.' [0-9]+ }
-regexp DOUBLE: double							= 	{ [+\-]? ([0-9]+ '.' [0-9]* EXPONENT | '.' [0-9]+ EXPONENT | [0-9]+ EXPONENT) }
+regexp BLANK_NODE_LABEL: string					= 	'_:' (PN_CHARS_U | [0-9]) ((PN_CHARS | '.')* PN_CHARS)?
+regexp LANGTAG: lang_tag						= 	'@' [a-zA-Z]+ ('-' [a-zA-Z0-9]+)*
+regexp INTEGER: int								= 	[+\-]? [0-9]+
+regexp DECIMAL: float							= 	[+\-]? [0-9]* '.' [0-9]+
+regexp DOUBLE: double							= 	[+\-]? ([0-9]+ '.' [0-9]* EXPONENT | '.' [0-9]+ EXPONENT | [0-9]+ EXPONENT)
 regexp EXPONENT: string							= 	[eE] [+\-]? [0-9]+
-regexp STRING_LITERAL_QUOTE: string				= 	'"' { ([^\x22\x5C\x0A\x0D] | ECHAR | UCHAR)* } '"' # \x22=" #x5C=\ # \x0A=new line \x0D=carriage return
-regexp STRING_LITERAL_SINGLE_QUOTE: string		= 	"'" { ([^\x27\x5C\x0A\x0D] | ECHAR | UCHAR)* } "'" # \x27=' #x5C=\ # \x0A=new line \x0D=carriage return
-regexp STRING_LITERAL_LONG_SINGLE_QUOTE: string	= 	"'''" { (("'" | "''")? ([^'\\] | ECHAR | UCHAR))* } "'''"
-regexp STRING_LITERAL_LONG_QUOTE: string		= 	"\"\"\"" { (('"' | "\"\"")? ([^\"\\] | ECHAR | UCHAR))* } "\"\"\""
-regexp UCHAR: char								= 	"\\u" { HEX HEX HEX HEX : hex } | "\\U" { HEX HEX HEX HEX HEX HEX HEX HEX : hex }
-regexp ECHAR: char								= 	'\\' { [tbnrf\"\'\\] : escape }
+regexp STRING_LITERAL_QUOTE: string				= 	'"' ([^\x22\x5C\x0A\x0D] | ECHAR | UCHAR)* '"' # \x22=" #x5C=\ # \x0A=new line \x0D=carriage return
+regexp STRING_LITERAL_SINGLE_QUOTE: string		= 	"'" ([^\x27\x5C\x0A\x0D] | ECHAR | UCHAR)* "'" # \x27=' #x5C=\ # \x0A=new line \x0D=carriage return
+regexp STRING_LITERAL_LONG_SINGLE_QUOTE: string	= 	"'''" (("'" | "''")? ([^'\\] | ECHAR | UCHAR))* "'''"
+regexp STRING_LITERAL_LONG_QUOTE: string		= 	"\"\"\"" (('"' | "\"\"")? ([^\"\\] | ECHAR | UCHAR))* "\"\"\""
+regexp UCHAR: char								= 	"\\u" HEX HEX HEX HEX | "\\U" HEX HEX HEX HEX HEX HEX HEX HEX
+regexp ECHAR: char								= 	'\\' [tbnrf\"\'\\]
 regexp WS										= 	'\x20' | '\x09' | '\x0D' | '\x0A' # \x20=space \x09=character tabulation \x0D=carriage return \x0A=new line
 regexp ANON										= 	'[' WS* ']'
 regexp PN_CHARS_BASE: char						= 	[A-Z] | [a-z] | [\u00C0-\u00D6] | [\u00D8-\u00F6] | [\u00F8-\u02FF] | [\u0370-\u037D] | [\u037F-\u1FFF] | [\u200C-\u200D] | [\u2070-\u218F] | [\u2C00-\u2FEF] | [\u3001-\uD7FF] | [\uF900-\uFDCF] | [\uFDF0-\uFFFD] | [\U00010000-\U000EFFFF]
@@ -35,7 +35,8 @@ regexp PN_LOCAL: string							= 	(PN_CHARS_U | ':' | [0-9] | PLX) ((PN_CHARS | '
 regexp PLX: string								= 	PERCENT | PN_LOCAL_ESC
 regexp PERCENT: string							= 	'%' HEX HEX
 regexp HEX: char								= 	[0-9] | [A-F] | [a-f]
-regexp PN_LOCAL_ESC: char						= 	'\\' { ('_' | '~' | '.' | '-' | '!' | '$' | '&' | "'" | '(' | ')' | '*' | '+' | ',' | ';' | '=' | '/' | '?' | '#' | '@' | '%') }
+regexp PN_LOCAL_ESC: char						= 	'\\' ('_' | '~' | '.' | '-' | '!' | '$' | '&' | "'" | '(' | ')' | '*' | '+' | ',' | ';' | '=' | '/' | '?' | '#' | '@' | '%')
+regexp STRING: string = STRING_LITERAL_QUOTE | STRING_LITERAL_SINGLE_QUOTE | STRING_LITERAL_LONG_SINGLE_QUOTE | STRING_LITERAL_LONG_QUOTE
 
 # Syntax rules
 
@@ -107,4 +108,4 @@ type boolean =
   | true:   'true'
   | false:  'false'
 
-type string = { STRING_LITERAL_QUOTE | STRING_LITERAL_SINGLE_QUOTE | STRING_LITERAL_LONG_SINGLE_QUOTE | STRING_LITERAL_LONG_QUOTE }
+type string = STRING

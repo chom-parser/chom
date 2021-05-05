@@ -21,6 +21,7 @@ use source_span::{
 };
 
 use grammar::{
+	out,
 	syntax::{
 		self,
 		Lexer,
@@ -50,13 +51,31 @@ fn main() -> io::Result<()> {
 		Ok(ast) => {
 			match ast.compile() {
 				Ok(grammar) => {
-					// ...
+					match grammar::lexing::Table::new(&grammar) {
+						Ok(lexing_table) => {
+							// let stdout = std::io::stdout();
+							// let mut out = stdout.lock();
+							// lexing_table.automaton().dot_write(&grammar, &mut out).unwrap();
+
+							// let code = grammar::gen::lexer::generate(&grammar, &lexing_table);
+							// println!("{}", code)
+						},
+						Err(e) => {
+							let mut block = out::Block::new(out::Type::Error, e.title());
+							block.highlights_mut().add(e.span(), None, Style::Error);
+							e.fill_block(&grammar, &mut block);
+							let span = e.span().aligned();
+							let formatted = block.render(buffer.iter_span(span), span, &metrics)?;
+							eprintln!("{}", formatted);
+						}
+					}
 				},
 				Err(e) => {
 					let mut fmt = Formatter::new();
 					fmt.add(e.span(), Some(format!("{}", e)), Style::Error);
+					e.format_notes(&mut fmt, Style::Note);
 					let formatted = fmt.render(buffer.iter(), buffer.span(), &metrics)?;
-					println!("{}", formatted);
+					eprintln!("{}", formatted);
 				}
 			}
 		},
@@ -64,7 +83,7 @@ fn main() -> io::Result<()> {
 			let mut fmt = Formatter::new();
 			fmt.add(e.span(), Some(format!("{}", e)), Style::Error);
 			let formatted = fmt.render(buffer.iter(), buffer.span(), &metrics)?;
-			println!("{}", formatted);
+			eprintln!("{}", formatted);
 		}
 	}
 

@@ -5,7 +5,7 @@ use std::{
 		DerefMut
 	}
 };
-use range_map::{
+use btree_range_map::{
 	RangeSet,
 	AnyRange
 };
@@ -48,19 +48,23 @@ impl<'a> fmt::Display for DisplayString<'a> {
 	}
 }
 
-fn fmt_char_range(range: &AnyRange<char>, f: &mut fmt::Formatter) -> fmt::Result {
-	if let Some(first) = range.first() {
-		let last = range.last().unwrap();
+pub struct DisplayCharRange<'a>(pub &'a AnyRange<char>);
 
-		if first == last {
-			fmt::Display::fmt(&DisplayChar(first), f)
-		} else if first as u32 + 1 == last as u32 { // Note: no risk of overflowing here with `char`.
-			write!(f, "{}{}", DisplayChar(first), DisplayChar(last))
+impl<'a> fmt::Display for DisplayCharRange<'a> {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		if let Some(first) = self.0.first() {
+			let last = self.0.last().unwrap();
+	
+			if first == last {
+				fmt::Display::fmt(&DisplayChar(first), f)
+			} else if first as u32 + 1 == last as u32 { // Note: no risk of overflowing here with `char`.
+				write!(f, "{}{}", DisplayChar(first), DisplayChar(last))
+			} else {
+				write!(f, "{}-{}", DisplayChar(first), DisplayChar(last))
+			}
 		} else {
-			write!(f, "{}-{}", DisplayChar(first), DisplayChar(last))
+			Ok(())
 		}
-	} else {
-		Ok(())
 	}
 }
 
@@ -89,7 +93,7 @@ impl CharSet {
 		set
 	}
 
-	pub fn ranges(&self) -> impl Iterator<Item=&range_map::AnyRange<char>> {
+	pub fn ranges(&self) -> impl Iterator<Item=&btree_range_map::AnyRange<char>> {
 		self.0.iter()
 	}
 
@@ -109,7 +113,7 @@ impl CharSet {
 impl fmt::Display for CharSet {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		for range in &self.0 {
-			fmt_char_range(range, f)?;
+			DisplayCharRange(range).fmt(f)?;
 		}
 
 		Ok(())

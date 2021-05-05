@@ -5,10 +5,11 @@ authors = ["Timothée Haudebourg <timothee.haudebourg@ens-rennes.fr>"]
 edition = "2018"
 
 [dependencies]
-source-span = "*"
+source-span = "^2.4"
 once_cell = "*"
 btree-slab = { path = "../../data-structures/btree-slab" }
-range-map = { path = "../../data-structures/range-map" }
+btree-range-map = { path = "../../data-structures/btree-range-map" }
+itertools = "*"
 
 proc-macro2 = "*"
 quote = "*"
@@ -16,4 +17,6 @@ quote = "*"
 utf8-decode = "*"
 stderrlog = "*"
 log = "*"
+
 clap = {version = "*", features = ["yaml"] }
+yansi = "*"

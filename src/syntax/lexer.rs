@@ -1,15 +1,12 @@
 use std::iter::Peekable;
-use std::collections::HashSet;
 use std::convert::TryFrom;
 use std::io;
 use std::fmt;
 use source_span::{
-	Position,
 	Span,
 	Loc,
 	Metrics
 };
-use crate::charset;
 use crate::charset::CharSet;
 
 pub enum Error {
@@ -199,7 +196,7 @@ impl<I: Iterator<Item = io::Result<char>>, M: Metrics> Lexer<I, M> {
 						return Err(Loc::new(Error::WrongCloser(delimiter, c), span))
 					}
 				},
-				Some(c) => {
+				Some(_) => {
 					let token = self.parse_token()?.unwrap();
 					span.append(token.span());
 					tokens.push(token);
@@ -212,7 +209,7 @@ impl<I: Iterator<Item = io::Result<char>>, M: Metrics> Lexer<I, M> {
 	fn parse_hex_char(&mut self, n: usize) -> Result<char> {
 		let mut codepoint = 0;
 
-		for i in 0..n {
+		for _ in 0..n {
 			if let Some(c) = self.consume()? {
 				if let Some(d) = c.to_digit(16) {
 					codepoint = (codepoint << 4) | d
@@ -292,7 +289,7 @@ impl<I: Iterator<Item = io::Result<char>>, M: Metrics> Lexer<I, M> {
 	fn parse_charset(&mut self) -> Result<Loc<Token>> {
 		self.consume()?;
 
-		let mut escape = false;
+		// let mut escape = false;
 		let mut set = CharSet::new();
 
 		let negate = if let Some('^') = self.peek()? {

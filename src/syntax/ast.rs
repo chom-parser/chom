@@ -39,7 +39,7 @@ pub enum Item {
 }
 
 pub enum Terminal {
-	RegExp(TypedRegExp)
+	RegExp(RegExp)
 }
 
 pub enum NonTerminal {
@@ -54,10 +54,6 @@ pub struct Separator {
 
 pub struct RegExpDefinition {
 	pub id: Loc<Ident>,
-	pub exp: TypedRegExp
-}
-
-pub struct TypedRegExp {
 	pub ty: Option<Loc<Ident>>,
 	pub exp: Loc<RegExp>
 }
@@ -65,11 +61,12 @@ pub struct TypedRegExp {
 pub struct RegExp(pub Vec<Loc<RegExpAtom>>);
 
 pub enum RegExpAtom {
-	Ident(Loc<Ident>),
+	Ident(Ident),
 	CharSet(CharSet, bool),
 	Literal(String, bool),
 	Repeat(Box<Loc<RegExpAtom>>, usize, usize),
 	Or(Vec<Loc<RegExp>>),
-	Capture(RegExp),
-	Group(RegExp)
+	// Capture(Loc<RegExp>),
+	Group(Loc<RegExp>),
+	// Cast(Loc<RegExp>, Loc<Ident>)
 }

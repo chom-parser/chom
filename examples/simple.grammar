@@ -1,0 +1,5 @@
+regexp INTEGER: int								= 	[+\-]? [0-9]+
+
+type expr =
+  | int: INTEGER
+  | add: <expr> '+' <expr>

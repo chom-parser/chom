@@ -1,6 +1,6 @@
 use proc_macro2::TokenStream;
 use quote::quote;
-use range_map::PartialEnum;
+use btree_range_map::util::PartialEnum;
 use std::{
 	collections::HashMap,
 	ops::{
@@ -8,16 +8,19 @@ use std::{
 		RangeBounds
 	}
 };
-use crate::lexing::{
-	State,
-	DetState,
-	Table
+use crate::{
+	Grammar,
+	lexing::{
+		State,
+		DetState,
+		Table
+	}
 };
 
-pub fn generate(table: &Table) -> TokenStream {
+pub fn generate(grammar: &Grammar, table: &Table) -> TokenStream {
 	let variants: Vec<TokenStream> = Vec::new();
 
-	let automaton = table.automaton().determinize();
+	let automaton = table.automaton();
 	let mut id_table = HashMap::new();
 
 	let init_id = state_id(&mut id_table, automaton.initial_state());
@@ -26,26 +29,30 @@ pub fn generate(table: &Table) -> TokenStream {
 		let id = state_id(&mut id_table, q);
 
 		let cases = transitions.iter().map(|(range, target)| {
-			let a = included_start_bound(range.start_bound());
-			let b = included_end_bound(range.end_bound());
+			let rust_range = rust_range(range);
 			let target_id = state_id(&mut id_table, target);
 
 			quote! {
-				#a ..= #b => {
+				#rust_range => {
 					state = #target_id
 				}
 			}
 		});
 
-		let default_case = if let Some(State::Final(token_id)) = q.iter().find(|q| q.is_final()) {
-			let variant_id = proc_macro2::Ident::new(&to_caml_case(token_id.as_str()), proc_macro2::Span::call_site());
+		let default_case = match q {
+			DetState::Final(token_id, _) => {
+				// let token = &grammar.terminals()[*token_id as usize].0;
+				// let variant_id = proc_macro2::Ident::new(&to_caml_case(token_id.as_str()), proc_macro2::Span::call_site());
 
-			quote! {
-				return Some(Ok(Token::#variant_id))
-			}
-		} else {
-			quote! {
-				return Some(Err(Error::Unexpected(c)))
+				// quote! {
+				// 	return Some(Ok(Token::#variant_id))
+				// }
+				panic!("TODO")
+			},
+			_ => {
+				quote! {
+					return Some(Err(Error::Unexpected(c)))
+				}
 			}
 		};
 
@@ -53,7 +60,7 @@ pub fn generate(table: &Table) -> TokenStream {
 			#id => {
 				match self.peek_char()? {
 					Some(c) => match c {
-						#(#cases)*,
+						#(#cases)*
 						_ => {
 							#default_case
 						}
@@ -125,7 +132,7 @@ fn included_start_bound(bound: Bound<&char>) -> char {
 	match bound {
 		Bound::Included(a) => *a,
 		Bound::Excluded(a) => a.succ().unwrap(),
-		Bound::Unbounded => range_map::PartialEnum::MIN
+		Bound::Unbounded => PartialEnum::MIN
 	}
 }
 
@@ -133,7 +140,18 @@ fn included_end_bound(bound: Bound<&char>) -> char {
 	match bound {
 		Bound::Included(a) => *a,
 		Bound::Excluded(a) => a.pred().unwrap(),
-		Bound::Unbounded => range_map::PartialEnum::MAX
+		Bound::Unbounded => PartialEnum::MAX
+	}
+}
+
+fn rust_range(range: &btree_range_map::AnyRange<char>) -> TokenStream {
+	let a = included_start_bound(range.start_bound());
+	let b = included_end_bound(range.end_bound());
+
+	if a == b {
+		quote! { #a }
+	} else {
+		quote! { #a ..= #b }
 	}
 }
 
