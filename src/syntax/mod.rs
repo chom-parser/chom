@@ -223,7 +223,7 @@ impl Parsable for ast::Item {
 		let token_span = token.span().clone();
 		let ast = match token.into_inner() {
 			lexer::Token::Ident(id) => {
-				let exp = RegExp(vec![Loc::new(RegExpAtom::Ident(Ident(id)), token_span)]);
+				let exp = RegExp(vec![Loc::new(RegExpAtom::Ref(Ident(id)), token_span)]);
 				ast::Item::Terminal(Terminal::RegExp(exp))
 			},
 			lexer::Token::String(s, case_sensitive) => {
@@ -351,11 +351,15 @@ impl Parsable for RegExp {
 				match token.into_inner() {
 					lexer::Token::Ident(id) => {
 						consume(lexer, &mut span)?;
-						atoms.push(Loc::new(RegExpAtom::Ident(Ident(id.clone())), token_span));
+						atoms.push(Loc::new(RegExpAtom::Ref(Ident(id.clone())), token_span));
 					},
-					lexer::Token::CharSet(set, negate) => {
+					lexer::Token::CharSet(set, false) => {
 						consume(lexer, &mut span)?;
-						atoms.push(Loc::new(RegExpAtom::CharSet(set.clone(), negate), token_span));
+						atoms.push(Loc::new(RegExpAtom::CharSet(set.clone()), token_span));
+					},
+					lexer::Token::CharSet(set, true) => {
+						consume(lexer, &mut span)?;
+						atoms.push(Loc::new(RegExpAtom::CharSet(set.negated()), token_span));
 					},
 					lexer::Token::String(str, case_sensitive) => {
 						consume(lexer, &mut span)?;

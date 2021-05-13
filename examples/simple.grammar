@@ -1,4 +1,6 @@
-regexp INTEGER: int								= 	[+\-]? [0-9]+
+extern int
+
+regexp INTEGER: int = [+\-]? [0-9]+
 
 type expr =
   | int: INTEGER

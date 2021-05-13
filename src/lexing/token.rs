@@ -1,150 +1,90 @@
-use std::fmt;
-use source_span::Loc;
 use crate::{
-	Ident,
-	CharSet
+	syntax::Ident,
+	Grammar,
+	grammar::ExternalType,
+	lexing::RegExp
 };
 
-#[derive(Clone, Hash, PartialEq, Eq)]
+mod operator;
+mod punct;
+mod delimiter;
+
+pub use operator::*;
+pub use punct::*;
+pub use delimiter::*;
+
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Convertion {
+	pub target: ExternalType,
+	pub from: Ident
+}
+
+impl Convertion {
+	pub fn new_opt(from: &Ident, target: &ExternalType) -> Option<Self> {
+		if *target == ExternalType::Unit {
+			None
+		} else {
+			Some(Self {
+				target: target.clone(),
+				from: from.clone()
+			})
+		}
+	}
+
+	pub fn from_regexp(grammar: &Grammar, e: &RegExp) -> Option<Self> {
+		e.as_reference().map(|i| {
+			let exp = grammar.regexp(i).unwrap();
+			Self::new_opt(&exp.id, &exp.ty)
+		}).flatten()
+	}
+}
+
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+/// Token classes.
+pub enum Class {
+	Anonymous(u32, Option<Convertion>),
+	Named(Ident, Option<Convertion>),
+	Composed(Vec<String>, Option<Convertion>),
+	Keyword,
+	Operator,
+	Punct,
+	Begin,
+	End
+}
+
+/// Lexing tokens.
+#[derive(Clone)]
 pub enum Token {
-	RegExp(RegExp)
+	Anonymous(u32, Option<Convertion>),
+	Named(Ident, Option<Convertion>),
+	Composed(Vec<String>, Option<Convertion>),
+	Keyword(String),
+	Operator(Operator),
+	Punct(Punct),
+	Begin(Delimiter),
+	End(Delimiter)
 }
 
-#[derive(Clone, Hash, PartialEq, Eq)]
-pub struct RegExp(pub Vec<RegExpAtom>);
-
-impl fmt::Display for RegExp {
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		use itertools::Itertools;
-		self.0.iter().format(" ").fmt(f)
-	}
-}
-
-#[derive(Clone, Hash, PartialEq, Eq)]
-pub struct LocRegExp(pub Vec<Loc<LocRegExpAtom>>);
-
-impl LocRegExp {
-	pub fn stripped(&self) -> RegExp {
-		RegExp(self.0.iter().map(|atom| atom.stripped()).collect())
-	}
-}
-
-impl fmt::Display for LocRegExp {
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		use itertools::Itertools;
-		self.0.iter().format(" ").fmt(f)
-	}
-}
-
-#[derive(Clone, Hash, PartialEq, Eq)]
-pub enum RegExpAtom {
-	Ref(Ident),
-	CharSet(CharSet),
-	Literal(String, bool),
-	Repeat(Box<RegExpAtom>, usize, usize),
-	Or(Vec<RegExp>),
-	// Capture(RegExp),
-	Group(RegExp),
-	// Cast(RegExp, Ident)
-}
-
-impl fmt::Display for RegExpAtom {
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+impl Token {
+	pub fn conversion(&self) -> Option<&Convertion> {
 		match self {
-			Self::Ref(id) => id.fmt(f),
-			Self::CharSet(set) => set.fmt(f),
-			Self::Literal(string, case_sensitive) => {
-				if *case_sensitive {
-					write!(f, "'{}'", string)
-				} else {
-					write!(f, "\"{}\"", string)
-				}
-			},
-			Self::Repeat(atom, min, max) => {
-				match (*min, *max) {
-					(0, usize::MAX) => write!(f, "{}*", atom),
-					(1, usize::MAX) => write!(f, "{}+", atom),
-					(0, 1) => write!(f, "{}?", atom),
-					_ => unimplemented!()
-				}
-			},
-			Self::Or(exps) => {
-				use itertools::Itertools;
-				exps.iter().format(" | ").fmt(f)
-			},
-			// Self::Capture(exp) => {
-			// 	write!(f, "{{ {} }}", exp)
-			// },
-			Self::Group(exp) => {
-				write!(f, "({})", exp)
-			},
-			// Self::Cast(exp, ty) => {
-			// 	write!(f, "{} : {}", exp, ty)
-			// }
+			Token::Anonymous(_, c) => c.as_ref(),
+			Token::Named(_, c) => c.as_ref(),
+			Token::Composed(_, c) => c.as_ref(),
+			_ => None
 		}
 	}
-}
 
-#[derive(Clone, Hash, PartialEq, Eq)]
-pub enum LocRegExpAtom {
-	Ref(Ident),
-	CharSet(CharSet),
-	Literal(String, bool),
-	Repeat(Box<Loc<LocRegExpAtom>>, usize, usize),
-	Or(Vec<Loc<LocRegExp>>),
-	// Capture(Loc<LocRegExp>),
-	Group(Loc<LocRegExp>),
-	// Cast(Loc<LocRegExp>, Loc<Ident>)
-}
-
-impl LocRegExpAtom {
-	fn stripped(&self) -> RegExpAtom {
+	pub fn class(&self) -> Class {
 		match self {
-			Self::Ref(id) => RegExpAtom::Ref(id.clone()),
-			Self::CharSet(set) => RegExpAtom::CharSet(set.clone()),
-			Self::Literal(lit, case_sensitive) => RegExpAtom::Literal(lit.clone(), *case_sensitive),
-			Self::Repeat(atom, min, max) => RegExpAtom::Repeat(Box::new(atom.stripped()), *min, *max),
-			Self::Or(exps) => RegExpAtom::Or(exps.iter().map(|exp| exp.stripped()).collect()),
-			// Self::Capture(exp) => RegExpAtom::Capture(exp.stripped()),
-			Self::Group(exp) => RegExpAtom::Group(exp.stripped()),
-			// Self::Cast(exp, ty) => RegExpAtom::Cast(exp.stripped(), ty.as_ref().clone())
-		}
-	}
-}
-
-impl fmt::Display for LocRegExpAtom {
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		match self {
-			Self::Ref(id) => id.fmt(f),
-			Self::CharSet(set) => set.fmt(f),
-			Self::Literal(string, case_sensitive) => {
-				if *case_sensitive {
-					write!(f, "'{}'", string)
-				} else {
-					write!(f, "\"{}\"", string)
-				}
-			},
-			Self::Repeat(atom, min, max) => {
-				match (*min, *max) {
-					(0, usize::MAX) => write!(f, "{}*", atom),
-					(1, usize::MAX) => write!(f, "{}+", atom),
-					(0, 1) => write!(f, "{}?", atom),
-					_ => unimplemented!()
-				}
-			},
-			Self::Or(exps) => {
-				use itertools::Itertools;
-				exps.iter().format(" | ").fmt(f)
-			},
-			// Self::Capture(exp) => {
-			// 	write!(f, "{{ {} }}", exp)
-			// },
-			Self::Group(exp) => {
-				write!(f, "({})", exp)
-			},
-			// Self::Cast(exp, ty) => {
-			// 	write!(f, "{} : {}", exp, ty)
-			// }
+			Token::Anonymous(i, ty) => Class::Anonymous(*i, ty.clone()),
+			Token::Named(id, ty) => Class::Named(id.clone(), ty.clone()),
+			Token::Composed(v, ty) => Class::Composed(v.clone(), ty.clone()),
+			Token::Keyword(_) => Class::Keyword,
+			Token::Operator(_) => Class::Operator,
+			Token::Punct(_) => Class::Punct,
+			Token::Begin(_) => Class::Begin,
+			Token::End(_) => Class::End
 		}
 	}
 }

@@ -1,179 +1,120 @@
-use std::collections::{
-	HashMap,
-	HashSet
-};
-use std::fmt;
+use std::collections::HashSet;
 use source_span::{
-	Loc
+	Loc,
+	Span
 };
 use crate::{
-	Ident,
+	syntax,
 	lexing::{
 		RegExp,
-		LocRegExp,
-		LocRegExpAtom
+		regexp
 	}
 };
 
+mod external;
+mod ty;
+pub mod terminal;
+pub mod rule;
+pub mod non_terminal;
 mod compile;
 
+pub use external::ExternalType;
+pub use ty::Type;
+pub use terminal::Terminal;
+pub use rule::Rule;
+pub use non_terminal::NonTerminal;
 pub use compile::Error;
 
 pub struct Grammar {
-	externs: Vec<Loc<Ident>>,
-	regexps: HashMap<Ident, Loc<RegExpDefinition>>,
-	types: HashMap<Ident, Loc<Type>>,
-	terminals: Vec<(Terminal, HashSet<Loc<LocTerminal>>)>
+	/// Extern types.
+	externs: Vec<(ExternalType, Option<Span>)>,
+
+	/// Regular expressions.
+	regexps: Vec<(regexp::Definition, Loc<syntax::RegExpDefinition>)>,
+	
+	/// Terminals.
+	terminals: Vec<(Terminal, HashSet<Loc<syntax::Terminal>>)>,
+
+	/// Types.
+	types: Vec<Loc<Type>>,
+
+	/// Non terminal.
+	non_terminals: Vec<(NonTerminal, HashSet<Span>)>,
+
+	/// Grammar rules.
+	rules: Vec<Loc<Rule>>
 }
 
 impl Grammar {
 	pub(crate) fn from_raw_parts(
-		externs: Vec<Loc<Ident>>,
-		regexps: HashMap<Ident, Loc<RegExpDefinition>>,
-		types: HashMap<Ident, Loc<Type>>,
-		terminals: Vec<(Terminal, HashSet<Loc<LocTerminal>>)>
+		externs: Vec<(ExternalType, Option<Span>)>,
+		regexps: Vec<(regexp::Definition, Loc<syntax::RegExpDefinition>)>,
+		terminals: Vec<(Terminal, HashSet<Loc<syntax::Terminal>>)>,
+		types: Vec<Loc<Type>>,
+		non_terminals: Vec<(NonTerminal, HashSet<Span>)>,
+		rules: Vec<Loc<Rule>>
 	) -> Self {
-		Self {
+		let g = Self {
 			externs,
 			regexps,
+			terminals,
 			types,
-			terminals
+			non_terminals,
+			rules
+		};
+
+		for (terminal, _) in &g.terminals {
+			terminal.init_token(&g)
 		}
+
+		g
 	}
 
-	pub fn extern_types(&self) -> &[Loc<Ident>] {
+	pub fn extern_types(&self) -> &[(ExternalType, Option<Span>)] {
 		&self.externs
 	}
 
-	pub fn regexps(&self) -> impl Iterator<Item = (&Ident, &Loc<RegExpDefinition>)> {
-		self.regexps.iter()
+	pub fn extern_type(&self, index: u32) -> Option<&ExternalType> {
+		self.externs.get(index as usize).map(|p| &p.0)
 	}
 
-	pub fn types(&self) -> impl Iterator<Item = (&Ident, &Loc<Type>)> {
-		self.types.iter()
+	pub fn regexps(&self) -> &[(regexp::Definition, Loc<syntax::RegExpDefinition>)] {
+		&self.regexps
 	}
 
-	pub fn regexp(&self, id: &Ident) -> Option<&Loc<RegExpDefinition>> {
-		self.regexps.get(id)
+	pub fn regexp(&self, index: u32) -> Option<&regexp::Definition> {
+		self.regexps.get(index as usize).map(|p| &p.0)
 	}
 
-	pub fn terminals(&self) -> &[(Terminal, HashSet<Loc<LocTerminal>>)] {
+	pub fn types(&self) -> &[Loc<Type>] {
+		&self.types
+	}
+
+	pub fn ty(&self, index: u32) -> Option<&Loc<Type>> {
+		self.types.get(index as usize)
+	}
+
+	pub fn terminals(&self) -> &[(Terminal, HashSet<Loc<syntax::Terminal>>)] {
 		&self.terminals
 	}
-}
 
-pub struct Type {
-	pub id: Loc<Ident>,
-	pub rules: Vec<Loc<Rule>>
-}
+	pub fn terminal(&self, index: u32) -> Option<&Terminal> {
+		self.terminals.get(index as usize).map(|t| &t.0)
+	}
 
-pub struct Rule {
-	pub id: Option<Loc<Ident>>,
-	pub items: Vec<Loc<Item>>
-}
+	pub fn non_terminals(&self) -> &[(NonTerminal, HashSet<Span>)] {
+		&self.non_terminals
+	}
 
-pub enum Item {
-	Terminal(u32),
-	NonTerminal(NonTerminal)
-}
+	pub fn non_terminal(&self, index: u32) -> Option<&NonTerminal> {
+		self.non_terminals.get(index as usize).map(|(nt, _)| nt)
+	}
 
-#[derive(Clone, Hash, PartialEq, Eq)]
-pub enum Terminal {
-	RegExp(RegExp)
-}
+	pub fn rules(&self) -> &[Loc<Rule>] {
+		&self.rules
+	}
 
-impl fmt::Display for Terminal {
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		match self {
-			Self::RegExp(exp) => exp.fmt(f)
-		}
+	pub fn rule(&self, index: u32) -> Option<&Loc<Rule>> {
+		self.rules.get(index as usize)
 	}
 }
-
-#[derive(Clone, Hash, PartialEq, Eq)]
-pub enum LocTerminal {
-	RegExp(LocRegExp)
-}
-
-impl LocTerminal {
-	pub fn stripped(&self) -> Terminal {
-		match self {
-			Self::RegExp(exp) => Terminal::RegExp(exp.stripped())
-		}
-	}
-}
-
-impl fmt::Display for LocTerminal {
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		match self {
-			Self::RegExp(exp) => exp.fmt(f)
-		}
-	}
-}
-
-pub enum NonTerminal {
-	Type(Loc<Ident>),
-	Repeat(Loc<Ident>, usize, usize, Option<Loc<Separator>>),
-}
-
-impl fmt::Display for NonTerminal {
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		match self {
-			Self::Type(ident) => write!(f, "<{}>", ident.as_ref()),
-			Self::Repeat(ident, min, max, sep) => {
-				match sep {
-					Some(sep) => {
-						match (*min, *max) {
-							(0, usize::MAX) => write!(f, "<{}*{}>", ident, sep),
-							(1, usize::MAX) => write!(f, "<{}+{}>", ident, sep),
-							_ => unimplemented!()
-						}
-					},
-					None => {
-						match (*min, *max) {
-							(0, usize::MAX) => write!(f, "<{}*>", ident),
-							(1, usize::MAX) => write!(f, "<{}+>", ident),
-							(0, 1) => write!(f, "<{}?>", ident),
-							_ => unimplemented!()
-						}
-					}
-				}
-			}
-		}
-	}
-}
-
-pub struct Separator {
-	/// If true, then every item of the list must be followed by a separator.
-	pub strong: bool,
-
-	/// Identifier of the temrinal used as separator.
-	pub terminal: Loc<u32>
-}
-
-impl fmt::Display for Separator {
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		if self.strong {
-			write!(f, "!")?;
-		}
-
-		self.terminal.as_ref().fmt(f)
-	}
-}
-
-pub struct RegExpDefinition {
-	pub id: Loc<Ident>,
-	pub ty: Option<Loc<Ident>>,
-	pub exp: Loc<LocRegExp>
-}
-
-impl fmt::Display for RegExpDefinition {
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		if let Some(ty) = &self.ty {
-			write!(f, "regexp {}: {} = {}", self.id.as_ref(), ty, self.exp)
-		} else {
-			write!(f, "regexp {} = {}", self.id.as_ref(), self.exp)
-		}
-	}
-}
-

@@ -68,12 +68,26 @@ impl<'a> fmt::Display for DisplayCharRange<'a> {
 	}
 }
 
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct CharSet(RangeSet<char>);
 
 impl CharSet {
 	pub fn new() -> CharSet {
 		CharSet(RangeSet::new())
+	}
+
+	/// Creates the charset of whitespaces.
+	/// 
+	/// TODO: for now, only ASCII whitespaces are included.
+	pub fn whitespace() -> CharSet {
+		let mut set = RangeSet::new();
+		set.insert(' ');
+		set.insert('\x09'..='\x0d');
+		CharSet(set)
+	}
+
+	pub fn len(&self) -> btree_range_map::util::Saturating<u32> {
+		self.0.len()
 	}
 
 	pub fn from_char(c: char, case_sensitive: bool) -> CharSet {
@@ -107,6 +121,10 @@ impl CharSet {
 		}
 
 		set
+	}
+
+	pub fn first(&self) -> Option<char> {
+		self.0.iter().next().map(|range| range.first()).flatten()
 	}
 }
 

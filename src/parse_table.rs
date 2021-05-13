@@ -1,7 +1,0 @@
-struct State {
-	// ...
-}
-
-struct ParseTable {
-	// ...
-}

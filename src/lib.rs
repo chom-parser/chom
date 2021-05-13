@@ -1,6 +1,7 @@
 #![feature(arbitrary_self_types)]
 extern crate source_span;
 
+pub mod util;
 pub mod out;
 pub mod charset;
 pub mod syntax;

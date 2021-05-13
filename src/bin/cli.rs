@@ -57,8 +57,8 @@ fn main() -> io::Result<()> {
 							// let mut out = stdout.lock();
 							// lexing_table.automaton().dot_write(&grammar, &mut out).unwrap();
 
-							// let code = grammar::gen::lexer::generate(&grammar, &lexing_table);
-							// println!("{}", code)
+							let code = grammar::gen::lexer::generate(&grammar, &lexing_table);
+							println!("{}", code)
 						},
 						Err(e) => {
 							let mut block = out::Block::new(out::Type::Error, e.title());
