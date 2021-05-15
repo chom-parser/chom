@@ -47,9 +47,9 @@ impl fmt::Display for Keyword {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		use self::Keyword::*;
 		match self {
-			Extern => write!(f, "@extern"),
-			RegExp => write!(f, "@regexp"),
-			Type => write!(f, "@type"),
+			Extern => write!(f, "extern"),
+			RegExp => write!(f, "regexp"),
+			Type => write!(f, "type"),
 		}
 	}
 }

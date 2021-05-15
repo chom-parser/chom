@@ -10,7 +10,7 @@ use crate::{
 		self,
 		Ident
 	},
-	grammar::ExternalType
+	poly::ExternalType
 };
 use super::Error;
 

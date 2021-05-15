@@ -5,20 +5,14 @@ use crate::CharSet;
 use super::Ident;
 
 #[derive(Clone)]
-pub struct RegExpDefinition {
+pub struct Definition {
 	pub id: Loc<Ident>,
 	pub ty: Option<Loc<Ident>>,
 	pub exp: Loc<RegExp>
 }
 
 #[derive(Clone, Hash, PartialEq, Eq)]
-pub struct RegExp(pub Vec<Loc<RegExpAtom>>);
-
-// impl RegExp {
-// 	pub fn compiled(&self) -> crate::lexing::RegExp {
-// 		crate::lexing::RegExp::new(self.0.iter().map(|atom| atom.compiled()).collect())
-// 	}
-// }
+pub struct RegExp(pub Vec<Loc<Atom>>);
 
 impl fmt::Display for RegExp {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -28,29 +22,16 @@ impl fmt::Display for RegExp {
 }
 
 #[derive(Clone, Hash, PartialEq, Eq)]
-pub enum RegExpAtom {
+pub enum Atom {
 	Ref(Ident),
 	CharSet(CharSet),
 	Literal(String, bool),
-	Repeat(Box<Loc<RegExpAtom>>, usize, usize),
+	Repeat(Box<Loc<Atom>>, usize, usize),
 	Or(Vec<Loc<RegExp>>),
 	Group(Loc<RegExp>)
 }
 
-// impl RegExpAtom {
-// 	fn compiled(&self) -> crate::lexing::RegExpAtom {
-// 		match self {
-// 			Self::Ref(id) => crate::lexing::RegExpAtom::Ref(id.clone()),
-// 			Self::CharSet(set) => crate::lexing::RegExpAtom::CharSet(set.clone()),
-// 			Self::Literal(lit, case_sensitive) => crate::lexing::RegExpAtom::Literal(lit.clone(), *case_sensitive),
-// 			Self::Repeat(atom, min, max) => crate::lexing::RegExpAtom::Repeat(Box::new(atom.compiled()), *min, *max),
-// 			Self::Or(exps) => crate::lexing::RegExpAtom::Or(exps.iter().map(|exp| exp.compiled()).collect()),
-// 			Self::Group(exp) => crate::lexing::RegExpAtom::Group(exp.compiled())
-// 		}
-// 	}
-// }
-
-impl fmt::Display for RegExpAtom {
+impl fmt::Display for Atom {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		match self {
 			Self::Ref(id) => id.fmt(f),

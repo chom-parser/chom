@@ -1,8 +1,10 @@
 use crate::{
 	syntax::Ident,
-	Grammar,
-	grammar::ExternalType,
-	lexing::RegExp
+	lexing::RegExp,
+	poly::{
+		Grammar,
+		ExternalType,
+	}
 };
 
 mod operator;

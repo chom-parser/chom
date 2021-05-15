@@ -51,7 +51,18 @@ impl Terminal {
 	}
 
 	pub fn format<'s, 'g>(&'s self, grammar: &'g Grammar) -> Formatted<'g, 's> {
-		Formatted(grammar, &self.desc)
+		Formatted(grammar, &self.desc, FormatStyle::Canonical)
+	}
+
+	pub fn format_with<'s, 'g>(&'s self, grammar: &'g Grammar, style: FormatStyle) -> Formatted<'g, 's> {
+		Formatted(grammar, &self.desc, style)
+	}
+
+	pub fn instance(&self, grammar: &Grammar) -> String {
+		match self.desc() {
+			Desc::RegExp(exp) => exp.instance(grammar),
+			Desc::Whitespace => " ".to_string()
+		}
 	}
 }
 
@@ -97,26 +108,41 @@ impl fmt::Display for Desc {
 	}
 }
 
-pub struct Formatted<'g, 'd>(&'g Grammar, &'d Desc);
+pub enum FormatStyle {
+	Canonical,
+	Human
+}
+
+pub struct Formatted<'g, 'd>(&'g Grammar, &'d Desc, FormatStyle);
 
 impl<'g, 'd> fmt::Display for Formatted<'g, 'd> {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		match self.1 {
-			Desc::RegExp(exp) => {
-				let atoms = exp.atoms();
-				if atoms.len() == 1 {
-					match &atoms[0] {
-						regexp::Atom::Ref(i) => {
-							let exp = self.0.regexp(*i).unwrap();
-							return exp.id.fmt(f)
-						},
-						_ => ()
-					}
+		match self.2 {
+			FormatStyle::Canonical => {
+				match self.1 {
+					Desc::RegExp(exp) => exp.format(self.0).fmt(f),
+					Desc::Whitespace => write!(f, "WS*")
 				}
-
-				write!(f, "terminal {}", exp)
 			},
-			Desc::Whitespace => write!(f, "whitespace")
+			FormatStyle::Human => {
+				match self.1 {
+					Desc::RegExp(exp) => {
+						let atoms = exp.atoms();
+						if atoms.len() == 1 {
+							match &atoms[0] {
+								regexp::Atom::Ref(i) => {
+									let exp = self.0.regexp(*i).unwrap();
+									return exp.id.fmt(f)
+								},
+								_ => ()
+							}
+						}
+		
+						write!(f, "terminal {}", exp)
+					},
+					Desc::Whitespace => write!(f, "whitespace")
+				}
+			}
 		}
 	}
 }

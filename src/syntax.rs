@@ -5,10 +5,12 @@ pub use source_span::{
 	Loc
 };
 
+mod caused;
 mod error;
 mod ast;
 pub mod lexer;
 
+pub use caused::Caused;
 pub use error::{
 	Error,
 	Result
@@ -129,7 +131,7 @@ impl Parsable for Grammar {
 							}
 							let exp = RegExp::parse(lexer)?;
 							let regexp_span = id.span().union(exp.span());
-							regexps.push(Loc::new(RegExpDefinition {
+							regexps.push(Loc::new(regexp::Definition {
 								id,
 								ty,
 								exp
@@ -148,25 +150,26 @@ impl Parsable for Grammar {
 								lexer::Token::Punct('|') => {
 									while try_peek_pipe(lexer, &span)? {
 										consume(lexer, &mut span)?;
-										let rule = Rule::parse(lexer)?;
+										let rule = Function::parse(lexer)?;
 										span.append(rule.span());
 										rules.push(rule);
 									}
 								},
 								_ => {
-									let items = Vec::<Loc<ast::Item>>::parse(lexer)?;
+									let items = Vec::<Loc<ty::Expr>>::parse(lexer)?;
 									let tokens_span = items.span();
 									span.append(tokens_span);
-									rules.push(Loc::new(Rule {
+									rules.push(Loc::new(Function {
 										id: None,
-										items: items.into_inner()
+										args: items.into_inner()
 									}, tokens_span));
 								}
 							}
 
-							types.push(Loc::new(Type {
+							types.push(Loc::new(ty::Definition {
 								id: id,
-								rules: rules
+								parameters: Vec::new(), // TODO
+								constructors: rules
 							}, span))
 						}
 					}
@@ -194,18 +197,18 @@ impl Parsable for Ident {
 	}
 }
 
-impl Parsable for Rule {
+impl Parsable for Function {
 	fn parse<L: Iterator<Item = lexer::Result<Loc<lexer::Token>>>>(lexer: &mut Peekable<L>) -> Result<Loc<Self>> {
-		let mut span = Span::default();
 		let id = Ident::parse(lexer)?;
+		let mut span = id.span();
 		let punct = expect_punct(lexer, &mut span)?;
 		match punct.as_ref() {
 			':' => (),
 			_ => return Err(Loc::new(Error::UnexpectedToken(lexer::Token::Punct(*punct.as_ref())), punct.span()))
 		}
-		let items = Vec::<Loc<ast::Item>>::parse(lexer)?;
+		let items = Vec::<Loc<ast::ty::Expr>>::parse(lexer)?;
 		span.append(items.span());
-		Ok(Loc::new(Rule { id: Some(id), items: items.into_inner() }, span))
+		Ok(Loc::new(Function { id: Some(id), args: items.into_inner() }, span))
 	}
 }
 
@@ -216,24 +219,24 @@ fn is_repeater(c: char) -> bool {
 	}
 }
 
-impl Parsable for ast::Item {
+impl Parsable for ast::ty::Expr {
 	fn parse<L: Iterator<Item = lexer::Result<Loc<lexer::Token>>>>(lexer: &mut Peekable<L>) -> Result<Loc<Self>> {
 		let mut span = Span::default();
 		let token = expect(lexer, &mut span)?;
 		let token_span = token.span().clone();
 		let ast = match token.into_inner() {
 			lexer::Token::Ident(id) => {
-				let exp = RegExp(vec![Loc::new(RegExpAtom::Ref(Ident(id)), token_span)]);
-				ast::Item::Terminal(Terminal::RegExp(exp))
+				let exp = RegExp(vec![Loc::new(regexp::Atom::Ref(Ident(id)), token_span)]);
+				ast::ty::Expr::Terminal(exp)
 			},
 			lexer::Token::String(s, case_sensitive) => {
-				let exp = RegExp(vec![Loc::new(RegExpAtom::Literal(s, case_sensitive), token_span)]);
-				ast::Item::Terminal(Terminal::RegExp(exp))
+				let exp = RegExp(vec![Loc::new(regexp::Atom::Literal(s, case_sensitive), token_span)]);
+				ast::ty::Expr::Terminal(exp)
 			},
 			lexer::Token::Group(Delimiter::Parenthesis, items) => {
 				let mut lexer = items.into_iter().map(safe_token).peekable();
 				let exp = RegExp::parse_only(&mut lexer)?;
-				ast::Item::Terminal(Terminal::RegExp(exp.into_inner()))
+				ast::ty::Expr::Terminal(exp.into_inner())
 			},
 			lexer::Token::Group(Delimiter::Angle, items) => {
 				let mut lexer = items.into_iter().map(safe_token).peekable();
@@ -246,58 +249,63 @@ impl Parsable for ast::Item {
 					}
 				};
 
-				let nt = if let Some(token) = peek(&mut lexer)? {
-					consume(&mut lexer, &mut span)?;
-					let token_span = token.span().clone();
-					let (min, max) = match token.into_inner() {
-						lexer::Token::Punct('*') => (0, std::usize::MAX),
-						lexer::Token::Punct('+') => (1, std::usize::MAX),
-						lexer::Token::Punct('?') => (0, 1),
-						unexpected => {
-							return Err(Loc::new(Error::UnexpectedToken(unexpected), token_span))
-						}
-					};
+				let mut args = Vec::new();
+				while peek(&mut lexer)?.is_some() {
+					args.push(ast::ty::Expr::parse(&mut lexer)?);
+				}
 
-					let sep = if let Some(mut token) = peek(&mut lexer)? {
-						consume(&mut lexer, &mut span)?;
-						let mut token_span = token.span().clone();
-						let mut sep_span = token_span;
+				// let nt = if let Some(token) = peek(&mut lexer)? {
+				// 	consume(&mut lexer, &mut span)?;
+				// 	let token_span = token.span().clone();
+				// 	let (min, max) = match token.into_inner() {
+				// 		lexer::Token::Punct('*') => (0, std::usize::MAX),
+				// 		lexer::Token::Punct('+') => (1, std::usize::MAX),
+				// 		lexer::Token::Punct('?') => (0, 1),
+				// 		unexpected => {
+				// 			return Err(Loc::new(Error::UnexpectedToken(unexpected), token_span))
+				// 		}
+				// 	};
 
-						let strong = if let lexer::Token::Punct('!') = token.as_ref() {
-							token = expect(&mut lexer, &mut span)?;
-							token_span = token.span().clone();
-							sep_span.append(token_span);
-							true
-						} else {
-							false
-						};
+				// 	let sep = if let Some(mut token) = peek(&mut lexer)? {
+				// 		consume(&mut lexer, &mut span)?;
+				// 		let mut token_span = token.span().clone();
+				// 		let mut sep_span = token_span;
 
-						let sep = match token.into_inner() {
-							lexer::Token::String(s, case_sensitive) => {
-								let exp = RegExp(vec![Loc::new(RegExpAtom::Literal(s, case_sensitive), token_span)]);
-								Terminal::RegExp(exp)
-							},
-							lexer::Token::Group(Delimiter::Parenthesis, items) => {
-								let mut lexer = items.into_iter().map(safe_token).peekable();
-								let exp = RegExp::parse_only(&mut lexer)?;
-								Terminal::RegExp(exp.into_inner())
-							},
-							unexpected => {
-								return Err(Loc::new(Error::UnexpectedToken(unexpected), token_span))
-							}
-						};
+				// 		let strong = if let lexer::Token::Punct('!') = token.as_ref() {
+				// 			token = expect(&mut lexer, &mut span)?;
+				// 			token_span = token.span().clone();
+				// 			sep_span.append(token_span);
+				// 			true
+				// 		} else {
+				// 			false
+				// 		};
 
-						Some(Loc::new(Separator { strong, terminal: Loc::new(sep, token_span) }, sep_span))
-					} else {
-						None
-					};
+				// 		let sep = match token.into_inner() {
+				// 			lexer::Token::String(s, case_sensitive) => {
+				// 				let exp = RegExp(vec![Loc::new(RegExpAtom::Literal(s, case_sensitive), token_span)]);
+				// 				Terminal::RegExp(exp)
+				// 			},
+				// 			lexer::Token::Group(Delimiter::Parenthesis, items) => {
+				// 				let mut lexer = items.into_iter().map(safe_token).peekable();
+				// 				let exp = RegExp::parse_only(&mut lexer)?;
+				// 				Terminal::RegExp(exp.into_inner())
+				// 			},
+				// 			unexpected => {
+				// 				return Err(Loc::new(Error::UnexpectedToken(unexpected), token_span))
+				// 			}
+				// 		};
 
-					NonTerminal::Repeat(id, min, max, sep)
-				} else {
-					NonTerminal::Type(id)
-				};
+				// 		Some(Loc::new(Separator { strong, terminal: Loc::new(sep, token_span) }, sep_span))
+				// 	} else {
+				// 		None
+				// 	};
 
-				ast::Item::NonTerminal(nt)
+				// 	NonTerminal::Repeat(id, min, max, sep)
+				// } else {
+				// 	NonTerminal::Type(id)
+				// };
+
+				ast::ty::Expr::NonTerminal(id, args)
 			},
 			unexpected => {
 				return Err(Loc::new(Error::UnexpectedToken(unexpected), token_span))
@@ -308,7 +316,7 @@ impl Parsable for ast::Item {
 	}
 }
 
-impl Parsable for Vec<Loc<ast::Item>> {
+impl Parsable for Vec<Loc<ast::ty::Expr>> {
 	fn parse<L: Iterator<Item = lexer::Result<Loc<lexer::Token>>>>(lexer: &mut Peekable<L>) -> Result<Loc<Self>> {
 		let mut span = Span::default();
 		let mut items = Vec::new();
@@ -319,7 +327,7 @@ impl Parsable for Vec<Loc<ast::Item>> {
 						break
 					},
 					_ => {
-						let token = ast::Item::parse(lexer)?;
+						let token = ast::ty::Expr::parse(lexer)?;
 						span.append(token.span());
 						items.push(token);
 					}
@@ -351,35 +359,27 @@ impl Parsable for RegExp {
 				match token.into_inner() {
 					lexer::Token::Ident(id) => {
 						consume(lexer, &mut span)?;
-						atoms.push(Loc::new(RegExpAtom::Ref(Ident(id.clone())), token_span));
+						atoms.push(Loc::new(regexp::Atom::Ref(Ident(id.clone())), token_span));
 					},
 					lexer::Token::CharSet(set, false) => {
 						consume(lexer, &mut span)?;
-						atoms.push(Loc::new(RegExpAtom::CharSet(set.clone()), token_span));
+						atoms.push(Loc::new(regexp::Atom::CharSet(set.clone()), token_span));
 					},
 					lexer::Token::CharSet(set, true) => {
 						consume(lexer, &mut span)?;
-						atoms.push(Loc::new(RegExpAtom::CharSet(set.negated()), token_span));
+						atoms.push(Loc::new(regexp::Atom::CharSet(set.negated()), token_span));
 					},
 					lexer::Token::String(str, case_sensitive) => {
 						consume(lexer, &mut span)?;
-						atoms.push(Loc::new(RegExpAtom::Literal(str.clone(), case_sensitive), token_span));
+						atoms.push(Loc::new(regexp::Atom::Literal(str.clone(), case_sensitive), token_span));
 					},
-					// lexer::Token::Group(Delimiter::Brace, items) => {
-					// 	consume(lexer, &mut span)?;
-					// 	let mut lexer = items.into_iter().map(safe_token).peekable();
-					// 	let exp = RegExp::parse_only(&mut lexer)?;
-					// 	let exp_span = exp.span();
-					// 	span.append(exp_span);
-					// 	atoms.push(Loc::new(RegExpAtom::Capture(exp), exp_span));
-					// },
 					lexer::Token::Group(Delimiter::Parenthesis, items) => {
 						consume(lexer, &mut span)?;
 						let mut lexer = items.into_iter().map(safe_token).peekable();
 						let exp = RegExp::parse_only(&mut lexer)?;
 						let exp_span = exp.span();
 						span.append(exp_span);
-						atoms.push(Loc::new(RegExpAtom::Group(exp), exp_span));
+						atoms.push(Loc::new(regexp::Atom::Group(exp), exp_span));
 					},
 					lexer::Token::Punct(c) if is_repeater(c) => {
 						consume(lexer, &mut span)?;
@@ -391,7 +391,7 @@ impl Parsable for RegExp {
 								_ => unreachable!()
 							};
 							let atom_span = atom.span().clone();
-							atoms.push(Loc::new(RegExpAtom::Repeat(Box::new(Loc::new(atom.into_inner(), atom_span)), min, max), atom_span))
+							atoms.push(Loc::new(regexp::Atom::Repeat(Box::new(Loc::new(atom.into_inner(), atom_span)), min, max), atom_span))
 						} else {
 							return Err(Loc::new(Error::UnexpectedToken(lexer::Token::Punct(c)), token_span))
 						}
@@ -401,13 +401,6 @@ impl Parsable for RegExp {
 						disjunction.push(atoms);
 						atoms = Vec::new();
 					},
-					// lexer::Token::Punct(':') => {
-					// 	inner_span = span;
-					// 	consume(lexer, &mut span)?;
-					// 	let ident = Ident::parse_only(lexer)?;
-					// 	span.append(ident.span());
-					// 	ty = Some(ident);
-					// }
 					lexer::Token::Keyword(_) => break,
 					unexpected => return Err(Loc::new(Error::UnexpectedToken(unexpected), token_span))
 				}
@@ -428,13 +421,9 @@ impl Parsable for RegExp {
 					let span = atoms.first().unwrap().span().union(atoms.last().unwrap().span());
 					Loc::new(RegExp(atoms), span)
 				}).collect();
-				RegExp(vec![Loc::new(RegExpAtom::Or(exps), span)])
+				RegExp(vec![Loc::new(regexp::Atom::Or(exps), span)])
 			}
 		};
-
-		// if let Some(ty) = ty {
-		// 	exp = RegExp(vec![Loc::new(RegExpAtom::Cast(Loc::new(exp, inner_span), ty), span)])
-		// }
 
 		Ok(Loc::new(exp, span))
 	}

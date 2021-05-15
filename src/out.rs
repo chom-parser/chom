@@ -5,6 +5,10 @@ use source_span::{
 };
 use yansi::Paint;
 
+mod ambiguity;
+
+pub use ambiguity::*;
+
 pub const WARNING: source_span::fmt::Style = source_span::fmt::Style::Warning;
 
 pub enum Type {

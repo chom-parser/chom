@@ -15,7 +15,7 @@ use source_span::{
 use crate::{
 	out,
 	CharSet,
-	grammar::{
+	poly::{
 		Grammar,
 		terminal,
 		Terminal

@@ -14,8 +14,10 @@ use once_cell::unsync::OnceCell;
 use crate::{
 	Ident,
 	CharSet,
-	Grammar,
-	grammar::ExternalType
+	poly::{
+		Grammar,
+		ExternalType
+	}
 };
 use super::{
 	Token,
@@ -122,6 +124,20 @@ impl RegExp {
 
 		Some(name)
 	}
+
+	pub fn format<'g>(&self, grammar: &'g Grammar) -> Formatted<'g, '_> {
+		Formatted(grammar, self)
+	}
+
+	pub fn instance(&self, grammar: &Grammar) -> String {
+		let mut string = String::new();
+
+		for atom in self.atoms() {
+			string.extend(atom.instance(grammar).chars())
+		}
+
+		string
+	}
 }
 
 impl fmt::Display for RegExp {
@@ -185,6 +201,40 @@ impl Atom {
 			},
 		}
 	}
+
+	pub fn format<'g>(&self, grammar: &'g Grammar) -> FormattedAtom<'g, '_> {
+		FormattedAtom(grammar, self)
+	}
+
+	pub fn instance(&self, grammar: &Grammar) -> String {
+		match self {
+			Self::Ref(i) => {
+				grammar.regexp(*i).unwrap().exp.instance(grammar)
+			},
+			Self::CharSet(set) => {
+				set.first().unwrap().to_string()
+			},
+			Self::Literal(string, _) => {
+				string.clone()
+			},
+			Self::Repeat(atom, min, _) => {
+				let mut string = String::new();
+
+				let inner = atom.instance(grammar);
+				for _ in 0..*min {
+					string.extend(inner.chars())
+				}
+
+				string
+			},
+			Self::Or(exps) => {
+				exps.first().unwrap().instance(grammar)
+			},
+			Self::Group(g) => {
+				g.instance(grammar)
+			}
+		}
+	}
 }
 
 fn char_as_token(c: char) -> Option<Token> {
@@ -226,6 +276,53 @@ impl fmt::Display for Atom {
 				exps.iter().format(" | ").fmt(f)
 			},
 			Self::Group(exp) => {
+				write!(f, "({})", exp)
+			}
+		}
+	}
+}
+
+pub struct Formatted<'g, 'e>(&'g Grammar, &'e RegExp);
+
+impl<'g, 'e> fmt::Display for Formatted<'g, 'e> {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		for atom in self.1.atoms() {
+			atom.format(self.0).fmt(f)?
+		}
+
+		Ok(())
+	}
+}
+
+pub struct FormattedAtom<'g, 'a>(&'g Grammar, &'a Atom);
+
+impl<'g, 'a> fmt::Display for FormattedAtom<'g, 'a> {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		match self.1 {
+			Atom::Ref(i) => {
+				self.0.regexp(*i).unwrap().id.fmt(f)
+			},
+			Atom::CharSet(set) => set.fmt(f),
+			Atom::Literal(string, case_sensitive) => {
+				if *case_sensitive {
+					write!(f, "'{}'", string)
+				} else {
+					write!(f, "\"{}\"", string)
+				}
+			},
+			Atom::Repeat(atom, min, max) => {
+				match (*min, *max) {
+					(0, usize::MAX) => write!(f, "{}*", atom),
+					(1, usize::MAX) => write!(f, "{}+", atom),
+					(0, 1) => write!(f, "{}?", atom),
+					_ => unimplemented!()
+				}
+			},
+			Atom::Or(exps) => {
+				use itertools::Itertools;
+				exps.iter().format(" | ").fmt(f)
+			},
+			Atom::Group(exp) => {
 				write!(f, "({})", exp)
 			}
 		}

@@ -19,7 +19,7 @@ use super::{
 
 pub struct RegExps {
 	/// List of regular expressions.
-	list: Vec<(Option<regexp::Definition>, u32, Loc<syntax::RegExpDefinition>)>,
+	list: Vec<(Option<regexp::Definition>, u32, Loc<syntax::regexp::Definition>)>,
 
 	/// Associate each expect identifier to a pair containing
 	/// in first argument the index of the regexp definition in `self.list` and
@@ -28,7 +28,7 @@ pub struct RegExps {
 }
 
 impl RegExps {
-	pub fn new(external_types: &ExternalTypes, ast: &[Loc<syntax::RegExpDefinition>]) -> Result<Self, Loc<Error>> {
+	pub fn new(external_types: &ExternalTypes, ast: &[Loc<syntax::regexp::Definition>]) -> Result<Self, Loc<Error>> {
 		let mut list = Vec::new();
 		let mut map = BTreeMap::new();
 
@@ -56,7 +56,7 @@ impl RegExps {
 		})
 	}
 
-	pub fn into_vec(self) -> Vec<(regexp::Definition, Loc<syntax::RegExpDefinition>)> {
+	pub fn into_vec(self) -> Vec<(regexp::Definition, Loc<syntax::regexp::Definition>)> {
 		self.list.into_iter().map(|(def, _, ast)| (def.unwrap(), ast)).collect()
 	}
 
@@ -65,7 +65,7 @@ impl RegExps {
 		Ok(())
 	}
 
-	pub fn ast(&self, index: u32) -> &Loc<syntax::RegExpDefinition> {
+	pub fn ast(&self, index: u32) -> &Loc<syntax::regexp::Definition> {
 		&self.list[index as usize].2
 	}
 

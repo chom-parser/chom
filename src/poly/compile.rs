@@ -1,13 +1,16 @@
 use std::collections::HashSet;
 use source_span::Loc;
-use crate::syntax;
+use crate::syntax::{
+	self,
+	Ident,
+	Caused
+};
 use super::{
 	terminal,
 	Terminal,
-	non_terminal,
-	NonTerminal,
-	rule,
-	Rule,
+	ty,
+	function,
+	Function,
 	Grammar,
 	regexp,
 	RegExp,
@@ -19,16 +22,16 @@ mod externals;
 mod regexps;
 mod terminals;
 mod types;
-mod non_terminals;
-mod rules;
+// mod non_terminals;
+mod functions;
 
 pub use error::Error;
 use externals::*;
 use regexps::*;
 use terminals::*;
 use types::*;
-use non_terminals::*;
-use rules::*;
+// use non_terminals::*;
+use functions::*;
 
 fn compile_loc_regexp(regexps: &RegExps, ast: Loc<syntax::RegExp>) -> Result<RegExp, Loc<Error>> {
 	let ast = ast.into_inner();
@@ -44,26 +47,26 @@ fn compile_regexp(regexps: &RegExps, ast: syntax::RegExp) -> Result<RegExp, Loc<
 	Ok(RegExp::new(atoms))
 }
 
-fn compile_regexp_atom(regexps: &RegExps, ast: Loc<syntax::RegExpAtom>) -> Result<regexp::Atom, Loc<Error>> {
+fn compile_regexp_atom(regexps: &RegExps, ast: Loc<syntax::regexp::Atom>) -> Result<regexp::Atom, Loc<Error>> {
 	let (ast, span) = ast.into_raw_parts();
 	let exp = match ast {
-		syntax::RegExpAtom::Ref(id) => {
+		syntax::regexp::Atom::Ref(id) => {
 			let index = regexps.get(&id, span)?;
 			regexp::Atom::Ref(index)
 		},
-		syntax::RegExpAtom::CharSet(set) => regexp::Atom::CharSet(set),
-		syntax::RegExpAtom::Literal(str, case_sensitive) => regexp::Atom::Literal(str, case_sensitive),
-		syntax::RegExpAtom::Repeat(atom, min, max) => {
+		syntax::regexp::Atom::CharSet(set) => regexp::Atom::CharSet(set),
+		syntax::regexp::Atom::Literal(str, case_sensitive) => regexp::Atom::Literal(str, case_sensitive),
+		syntax::regexp::Atom::Repeat(atom, min, max) => {
 			regexp::Atom::Repeat(Box::new(compile_regexp_atom(regexps, *atom)?), min, max)
 		},
-		syntax::RegExpAtom::Or(exps) => {
+		syntax::regexp::Atom::Or(exps) => {
 			let mut compiled_exps = Vec::new();
 			for e in exps.into_iter() {
 				compiled_exps.push(compile_loc_regexp(regexps, e)?);
 			}
 			regexp::Atom::Or(compiled_exps)
 		}
-		syntax::RegExpAtom::Group(exp) => {
+		syntax::regexp::Atom::Group(exp) => {
 			regexp::Atom::Group(compile_loc_regexp(regexps, exp)?)
 		}
 	};
@@ -71,67 +74,54 @@ fn compile_regexp_atom(regexps: &RegExps, ast: Loc<syntax::RegExpAtom>) -> Resul
 	Ok(exp)
 }
 
-fn compile_loc_terminal(regexps: &RegExps, terminals: &mut Terminals, ast: Loc<syntax::Terminal>) -> Result<u32, Loc<Error>> {
+fn compile_loc_terminal(regexps: &RegExps, terminals: &mut Terminals, ast: Loc<syntax::RegExp>) -> Result<u32, Loc<Error>> {
 	let t_ast = ast.clone().into_inner();
-
-	let desc = match t_ast {
-		syntax::Terminal::RegExp(exp) => {
-			terminal::Desc::RegExp(compile_regexp(regexps, exp)?)
-		}
-	};
-
+	let desc = terminal::Desc::RegExp(compile_regexp(regexps, t_ast)?);
 	Ok(terminals.id(desc, ast))
 }
 
-fn compile_item(regexps: &RegExps, types: &Types, terminals: &mut Terminals, non_terminals: &mut NonTerminals, ast: Loc<syntax::Item>) -> Result<Loc<rule::Item>, Loc<Error>> {
+fn compile_ty_expr(regexps: &RegExps, types: &mut Types, terminals: &mut Terminals, ast: Loc<syntax::ty::Expr>) -> Result<ty::Expr, Loc<Error>> {
 	let span = ast.span();
-	let t = match ast.into_inner() {
-		syntax::Item::Terminal(t) => {
-			rule::Item::Terminal(compile_loc_terminal(regexps, terminals, Loc::new(t, span))?)
+	match ast.into_inner() {
+		syntax::ty::Expr::Terminal(t) => {
+			Ok(ty::Expr::Terminal(compile_loc_terminal(regexps, terminals, Loc::new(t, span))?))
 		},
-		syntax::Item::NonTerminal(nt) => {
-			let nt = match nt {
-				syntax::NonTerminal::Type(id) => {
-					NonTerminal::Type(types.get(&id)?)
-				},
-				syntax::NonTerminal::Repeat(id, min, max, sep) => {
-					let index = types.get(&id)?;
-					let sep = match sep {
-						Some(s) => {
-							let s = s.into_inner();
-							Some(non_terminal::Separator {
-								strong: s.strong,
-								terminal: compile_loc_terminal(regexps, terminals, s.terminal)?
-							})
-						},
-						None => None
-					};
-					NonTerminal::Repeat(index, min, max, sep)
-				}
-			};
-			rule::Item::NonTerminal(non_terminals.id(nt, span))
-		}
-	};
+		syntax::ty::Expr::NonTerminal(id, args) => {
+			let index = types.get_by_id(&id)?;
 
-	Ok(Loc::new(t, span))
+			let mut compiled_args = Vec::with_capacity(args.len());
+			for a in args {
+				compiled_args.push(compile_ty_expr(regexps, types, terminals, a)?)
+			}
+
+			Ok(ty::Expr::Type(index, compiled_args))
+		}
+	}
 }
 
-fn compile_rule(ty: u32, regexps: &RegExps, types: &Types, terminals: &mut Terminals, non_terminals: &mut NonTerminals, rules: &mut Rules, ast: Loc<syntax::Rule>) -> Result<u32, Loc<Error>> {
+fn compile_function_id(id: Option<Loc<Ident>>) -> Result<function::Id, Loc<Error>> {
+	match id {
+		Some(id) => Ok(function::Id::Defined(id.into_inner())),
+		None => Ok(function::Id::Cast)
+	}
+}
+
+fn compile_rule(ty: u32, regexps: &RegExps, types: &mut Types, terminals: &mut Terminals, functions: &mut Functions, ast: Loc<syntax::Function>) -> Result<u32, Loc<Error>> {
 	let span = ast.span();
 	let ast = ast.into_inner();
-	let mut items = Vec::new();
-	for item in ast.items.into_iter() {
-		items.push(compile_item(regexps, types, terminals, non_terminals, item)?);
+	let mut args = Vec::new();
+	for a in ast.args.into_iter() {
+		args.push(compile_ty_expr(regexps, types, terminals, a)?);
 	}
 
-	let rule = Rule {
-		id: ast.id.clone(),
+	let fun = Function::new(
+		compile_function_id(ast.id)?,
 		ty,
-		items
-	};
+		args
+	);
 
-	let i = rules.len();
-	rules.push(Loc::new(rule, span));
+	let i = functions.len();
+	functions.push(Caused::explicit(fun, span));
 
 	Ok(i as u32)
 }
@@ -146,8 +136,7 @@ impl syntax::Grammar {
 		let mut regexps = RegExps::new(&external_types, &ast.regexps)?;
 		let mut types = Types::new(&ast.types)?;
 		let mut terminals = Terminals::new();
-		let mut non_terminals = NonTerminals::new();
-		let mut rules = Rules::new();
+		let mut functions = Functions::new();
 
 		for ast in ast.regexps.into_iter() {
 			let id = ast.id.clone();
@@ -164,17 +153,20 @@ impl syntax::Grammar {
 
 		for ast in ast.types.into_iter() {
 			let id = ast.id.clone();
-			let i = types.get(&id).unwrap();
+			let i = types.get_by_id(&id).unwrap();
 
 			let ast = ast.into_inner();
 
-			for rule in ast.rules {
-				types.add_rule(i, compile_rule(i, &regexps, &types, &mut terminals, &mut non_terminals, &mut rules, rule)?)
+			for f in ast.constructors {
+				let compiled_f = compile_rule(i, &regexps, &mut types, &mut terminals, &mut functions, f)?;
+				types.add_constructor(i, compiled_f)
 			}
 		}
 
+		// Check terminals well-formedness.
 		terminals.check(&regexps)?;
 
+		// Add special terminals.
 		let mut terminals = terminals.into_vec();
 		terminals.push((Terminal::whitespace(), HashSet::new()));
 
@@ -183,8 +175,7 @@ impl syntax::Grammar {
 			regexps.into_vec(),
 			terminals,
 			types.into_vec(),
-			non_terminals.into_vec(),
-			rules
+			functions
 		);
 
 		Ok(Loc::new(g, span))
