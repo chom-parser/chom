@@ -25,6 +25,18 @@ impl Terminal {
 		}
 	}
 
+	pub fn as_regexp_ref(&self) -> Option<u32> {
+		if let Desc::RegExp(exp) = &self.desc {
+			if exp.atoms().len() == 1 {
+				if let regexp::Atom::Ref(ty) = exp.atoms().first().unwrap() {
+					return Some(*ty)
+				}
+			}
+		}
+
+		None
+	}
+
 	pub fn whitespace() -> Self {
 		Self::new(Desc::Whitespace)
 	}

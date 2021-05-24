@@ -9,7 +9,7 @@ pub mod poly;
 pub mod mono;
 pub mod lexing;
 pub mod parsing;
-// pub mod gen;
+pub mod gen;
 
 pub use syntax::Ident;
 pub use charset::CharSet;

@@ -4,6 +4,9 @@ use source_span::{
 };
 use yansi::Paint;
 
+const LINE_CHAR: char = '-';
+const INTER_CHAR: char = '+';
+
 pub fn format_ambiguity_example<A: AsRef<str>, B: AsRef<str>>(content: &str, a_span: Span, a_label: A, b_span: Span, b_label: B) -> String {
 	let a_label = a_label.as_ref();
 	let b_label = b_label.as_ref();
@@ -17,28 +20,36 @@ pub fn format_ambiguity_example<A: AsRef<str>, B: AsRef<str>>(content: &str, a_s
 	let mut b_before = true;
 	let mut offset = 0;
 
+	let intersection = a_span.inter(b_span);
+
 	for c in content.chars() {
+		let in_both = pos >= intersection.start() && pos < intersection.end();
+
 		if pos < a_span.start() {
 			down.push(' ')
-		} else if pos == a_span.start() && a_before {
-			let len = a_label.len() + 1;
-			down.clear();
-			if len >= pos.column {
-				offset = len - pos.column;
-			} else {
-				for _ in 0..(pos.column - len) {
-					down.push(' ')
-				}
-			}
-			down.push_str(a_label);
-			down.push(' ');
-			b_before = false;
 		} else if pos < a_span.end() {
-			down.push('^');
-		} else if pos == a_span.end() {
-			if a_before {
-				down.push('^');
+			if pos == a_span.start() && a_before {
+				let len = a_label.len() + 1;
+				down.clear();
+				if len >= pos.column {
+					offset = len - pos.column;
+				} else {
+					for _ in 0..(pos.column - len) {
+						down.push(' ')
+					}
+				}
+				down.push_str(a_label);
+				down.push(' ');
+				b_before = false;
+			}
+
+			if in_both {
+				down.push(INTER_CHAR)
 			} else {
+				down.push(LINE_CHAR)
+			}
+
+			if pos == a_span.last() && !a_before {
 				down.push(' ');
 				down.push_str(a_label)
 			}
@@ -46,41 +57,35 @@ pub fn format_ambiguity_example<A: AsRef<str>, B: AsRef<str>>(content: &str, a_s
 
 		if pos < b_span.start() {
 			up.push(' ')
-		} else if pos == b_span.start() && b_before {
-			let len = b_label.len() + 1;
-			up.clear();
-			if len >= pos.column {
-				offset = len - pos.column;
-			} else {
-				for _ in 0..(pos.column - len) {
-					up.push(' ')
-				}
-			}
-			up.push_str(b_label);
-			up.push(' ');
-			a_before = false;
 		} else if pos < b_span.end() {
-			up.push('.');
-		} else if pos == b_span.end() {
-			if b_before {
-				up.push('.');
+			if pos == b_span.start() && b_before {
+				let len = b_label.len() + 1;
+				up.clear();
+				if len >= pos.column {
+					offset = len - pos.column;
+				} else {
+					for _ in 0..(pos.column - len) {
+						up.push(' ')
+					}
+				}
+				up.push_str(b_label);
+				up.push(' ');
+				a_before = false;
+			}
+
+			if in_both {
+				up.push(INTER_CHAR)
 			} else {
+				up.push(LINE_CHAR)
+			}
+
+			if pos == b_span.last() && !b_before {
 				up.push(' ');
 				up.push_str(b_label)
-			}
+			}	
 		}
 
 		pos = pos.next(c, &source_span::DEFAULT_METRICS);
-	}
-
-	if pos == a_span.end() {
-		down.push(' ');
-		down.push_str(a_label)
-	}
-
-	if pos == b_span.end() {
-		up.push(' ');
-		up.push_str(b_label)
 	}
 
 	let mut margin_str = String::new();

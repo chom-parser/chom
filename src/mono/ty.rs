@@ -5,6 +5,8 @@ use super::Grammar;
 /// Type instance identifier.
 pub type Instance = u32;
 
+pub use poly::ty::Id;
+
 /// Monomorphic type.
 pub struct Type<'a> {
 	poly: &'a poly::Type,
@@ -19,6 +21,10 @@ impl<'a> Type<'a> {
 			instance,
 			parameters_instances: params
 		}
+	}
+
+	pub fn id(&self) -> &Id {
+		self.poly.id()
 	}
 
 	pub fn parameter(&self, i: u32) -> Option<&Expr> {

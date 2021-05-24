@@ -14,8 +14,8 @@ use std::{
 };
 use crate::{
 	util,
-	Grammar,
-	grammar::{
+	mono::{
+		Grammar,
 		terminal,
 		ExternalType
 	},

@@ -1,0 +1,3 @@
+pub fn generate(&self) -> rust_codegen::module::Ref {
+	// ...
+}

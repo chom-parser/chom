@@ -147,6 +147,7 @@ impl Automaton {
 					if let Some(label) = label {
 						for range in label.ranges() {
 							debug_assert!(!range.is_empty());
+
 							map.update(range.clone(), |current_target_states_opt : Option<&BTreeSet<State>>| {
 								let mut current_target_states = match current_target_states_opt {
 									Some(current_target_states) => current_target_states.clone(),

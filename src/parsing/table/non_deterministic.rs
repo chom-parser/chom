@@ -1,3 +1,4 @@
+use source_span::Loc;
 use std::{
 	collections::{
 		HashSet,
@@ -90,11 +91,11 @@ impl NonDeterministic {
 		}
 
 		while let Some((a, item_set)) = stack.pop() {
-			for (symbol, next_item_set) in item_set.shift(grammar) {
+			for (t, next_item_set) in item_set.shift(grammar) {
 				let b = state_id(&mut stack, &mut states, &mut map, next_item_set);
 				
-				states[a as usize].transitions.insert(symbol, b);
-				states[b as usize].add_predecessor(symbol, a);
+				states[a as usize].transitions.insert(t, b);
+				states[b as usize].add_predecessor(t, a);
 			}
 		}
 

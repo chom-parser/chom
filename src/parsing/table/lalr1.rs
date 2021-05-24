@@ -10,25 +10,25 @@ use source_span::{
 use yansi::Paint;
 use crate::{
 	out,
-	parsing::Error,
 	mono::{
 		Index,
 		Grammar,
 		Function,
 		ty
-	}
+	},
+	parsing::FirstAndFollowGraph
 };
 use super::{
 	Item,
-	NonDeterministic
+	NonDeterministic,
+	lr0
 };
 
+/// LALR1 ambiguity.
 pub enum Ambiguity {
 	/// Shift reduce conflict.
-	/// 
-	/// The second parameter is the shifting item, the third is the reducing rule. 
-	ShiftReduce(Vec<ty::Expr>, Item, Index),
-	ReduceReduce(Vec<ty::Expr>, Index, Index)
+	ShiftReduce(Vec<ty::Expr>, u32, Item, Index),
+	ReduceReduce(Vec<ty::Expr>, u32, Index, Index)
 }
 
 fn format_path(grammar: &Grammar, path: &[ty::Expr]) -> String {
@@ -44,36 +44,6 @@ fn format_path(grammar: &Grammar, path: &[ty::Expr]) -> String {
 
 	string
 }
-
-// fn format_rule_instance<R: std::ops::RangeBounds<usize>>(
-// 	fmt: &mut source_span::fmt::Formatter,
-// 	content: &mut String,
-// 	from: Position,
-// 	grammar: &Grammar,
-// 	rule: &Function,
-// 	range: R
-// ) -> Position where [ty::Expr]: std::ops::Index<R, Output=[ty::Expr]> {
-// 	let metrics = source_span::DEFAULT_METRICS;
-// 	let mut span: Span = from.into();
-
-// 	for symbol in &rule.arguments()[range] {
-// 		if !content.is_empty() {
-// 			content.push(' ');
-// 			span.push(' ', &metrics);
-// 			span.clear();
-// 		}
-
-// 		let instance = symbol.instance(grammar);
-// 		for c in instance.chars() {
-// 			content.push(c);
-// 			span.push(c, &metrics);
-// 			fmt.add(span, Some(format!("{}", symbol.format(grammar))), source_span::fmt::Style::Help)
-// 		}
-// 	}
-
-// 	// format!("{}", fmt.render(content.chars().map(infaible_char), span.aligned(), &metrics).unwrap())
-// 	span.end()
-// }
 
 fn build_ambiguity_example(
 	grammar: &Grammar,
@@ -143,24 +113,18 @@ fn build_ambiguity_example(
 	(content, a_span, b_span)
 }
 
-
-
-// fn infaible_char(c: char) -> Result<char, std::convert::Infallible> {
-// 	Ok(c)
-// }
-
 impl Ambiguity {
 	pub fn title(&self) -> &str {
 		match self {
-			Self::ShiftReduce(_, _, _) => "LL0 shift/reduce conflict",
-			Self::ReduceReduce(_, _, _) => "LL0 reduce/reduce conflict"
+			Self::ShiftReduce(_, _, _, _) => "LL0 shift/reduce conflict",
+			Self::ReduceReduce(_, _, _, _) => "LL0 reduce/reduce conflict"
 		}
 	}
 
 	pub fn self_conflict(&self) -> bool {
 		match self {
-			Self::ShiftReduce(_, shift_item, reduce_rule) => shift_item.function == *reduce_rule,
-			Self::ReduceReduce(_, rule_a, rule_b) => rule_a == rule_b
+			Self::ShiftReduce(_, _, shift_item, reduce_rule) => shift_item.function == *reduce_rule,
+			Self::ReduceReduce(_, _, rule_a, rule_b) => rule_a == rule_b
 		}
 	}
 
@@ -174,7 +138,7 @@ impl Ambiguity {
 
 	pub fn fill_block(&self, grammar: &Grammar, block: &mut out::Block) {
 		match self {
-			Ambiguity::ShiftReduce(_path, shift_item, reduce_rule_index) => {
+			Ambiguity::ShiftReduce(_path, _, shift_item, reduce_rule_index) => {
 				let shift_rule = grammar.function(shift_item.function).unwrap();
 				let reduce_rule = grammar.function(*reduce_rule_index).unwrap();
 
@@ -206,15 +170,15 @@ impl Ambiguity {
 				let formatted_example = out::format_ambiguity_example(
 					&example,
 					shift_span,
-					format!("shift `{}` <{}>", shift_rule.id().as_str(), shift_target.format(grammar)),
+					format!("shift {} `{}`", shift_target.id().name(), shift_rule.id().as_str()),
 					reduce_span,
-					format!("reduce `{}` <{}>", reduce_rule.id().as_str(), reduce_target.format(grammar))
+					format!("reduce {} `{}`", reduce_target.id().name(), reduce_rule.id().as_str())
 				);
 
 				block.add_note(out::NoteType::Note, format!("the following phrase is ambiguous: {}", Paint::new(example).bold()));
 				block.add_note(out::NoteType::Note, format!("it has the following two conflicting decompositions:\n\n{}", formatted_example))
 			},
-			Ambiguity::ReduceReduce(path, _rule_a, rule_b) => {
+			Ambiguity::ReduceReduce(path, _, _rule_a, rule_b) => {
 				if !self.self_conflict() {
 					let rule_b = grammar.function(*rule_b).unwrap();
 				
@@ -240,73 +204,179 @@ impl Ambiguity {
 impl fmt::Display for Ambiguity {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		match self {
-			Self::ShiftReduce(_, _, _) => write!(f, "shift/reduce conflict"),
-			Self::ReduceReduce(_, _, _) => write!(f, "reduce/reduce conflict")
+			Self::ShiftReduce(_, _, _, _) => write!(f, "shift/reduce conflict"),
+			Self::ReduceReduce(_, _, _, _) => write!(f, "reduce/reduce conflict")
 		}
 	}
 }
 
 pub enum State {
-	Shift(BTreeMap<ty::Expr, u32>),
+	LALR1 {
+		action: BTreeMap<u32, Action>,
+		goto: BTreeMap<Index, u32>
+	},
+	LR0(lr0::State)
+}
+
+pub enum Action {
+	Shift(u32),
 	Reduce(Index)
 }
 
-/// LL0 parsing table.
-pub struct LL0 {
+pub enum ReduceAction {
+	Direct(Index),
+	Lookahead(BTreeMap<u32, Index>)
+}
+
+impl ReduceAction {
+	pub fn into_map(self, grammar: &Grammar, lookahead: &FirstAndFollowGraph) -> BTreeMap<u32, Index> {
+		match self {
+			ReduceAction::Direct(f_index) => {
+				let f = grammar.function(f_index).unwrap();
+				let target_ty = f.return_ty();
+				let mut map = BTreeMap::new();
+				for &t in lookahead.follow(target_ty) {
+					map.insert(t, f_index);
+				}
+				map
+			},
+			ReduceAction::Lookahead(map) => map
+		}
+	}
+}
+
+/// LALR1 parsing table.
+pub struct LALR1 {
 	states: Vec<State>
 }
 
-impl LL0 {
+impl LALR1 {
 	pub fn from_non_deterministic(grammar: &Grammar, nd_table: &NonDeterministic) -> Result<Self, Loc<Ambiguity>> {
+		let lookahead = FirstAndFollowGraph::new(grammar);
+
 		let mut states = Vec::new();
 		
 		for (q, state) in nd_table.states().iter().enumerate() {
-			let mut reduce = None;
+			let mut reduce: Option<ReduceAction> = None;
 
 			for item in &state.items {
-				let rule = grammar.function(item.function).unwrap();
-				if item.offset >= rule.arity() {
-					if let Some(old_reduce) = reduce.replace(item.function) {
-						// reduce/reduce conflict
-						let path: Vec<_> = nd_table.path_to(q as u32).into_iter().map(|(_, symbol)| symbol).collect();
-						
-						let span = rule.span().unwrap_or_else(|| {
-							grammar.ty(rule.return_ty()).unwrap().span().expect("no span")
-						});
-						
-						return Err(Loc::new(Ambiguity::ReduceReduce(path, item.function, old_reduce), span))
-					}
+				let f = grammar.function(item.function).unwrap();
+				if item.offset >= f.arity() {
+					reduce = Some(match reduce {
+						Some(other_reduce) => { // potential reduce/reduce conflict
+							let mut map = other_reduce.into_map(grammar, &lookahead);
+
+							let target_ty = f.return_ty();
+							for &t in lookahead.follow(target_ty) {
+								use std::collections::btree_map::Entry;
+								match map.entry(t) {
+									Entry::Vacant(entry) => {
+										entry.insert(item.function);
+									},
+									Entry::Occupied(entry) => { // confirmed reduce/reduce conflict
+										let other_function = *entry.get();
+
+										let path: Vec<_> = nd_table.path_to(q as u32).into_iter().map(|(_, symbol)| symbol).collect();
+										let span = f.span().unwrap_or_else(|| {
+											grammar.ty(f.return_ty()).unwrap().span().expect("no span")
+										});
+										
+										return Err(Loc::new(Ambiguity::ReduceReduce(path, t, item.function, other_function), span))
+									}
+								}
+							}
+
+							ReduceAction::Lookahead(map)
+						},
+						None => ReduceAction::Direct(item.function)
+					})
 				}
 			}
 
-			let ll0_state = match reduce {
+			let lalr0_state = match reduce {
 				Some(reduce) => {
+					let reduce_actions = reduce.into_map(&grammar, &lookahead);
+
+					// search for shift/reduce conflicts.
 					for item in &state.items {
-						let rule = grammar.function(item.function).unwrap();
-						if item.offset < rule.arity() {
-							// shift/reduce conflict
-							let path: Vec<_> = nd_table.path_to(q as u32).into_iter().map(|(_, symbol)| symbol).collect();
-
-							let span = rule.span().unwrap_or_else(|| {
-								grammar.ty(rule.return_ty()).unwrap().span().expect("no span")
-							});
-
-							return Err(Loc::new(Ambiguity::ShiftReduce(path, *item, reduce), span))
+						let f = grammar.function(item.function).unwrap();
+						if let Some(symbol) = f.argument(item.offset) {
+							let firsts = match symbol {
+								ty::Expr::Terminal(t) => Firsts::Terminal(Some(t)),
+								ty::Expr::Type(ty) => Firsts::Type(lookahead.first(ty).iter())
+							};
+	
+							for t in firsts {
+								if let Some(reduce_target) = reduce_actions.get(&t) { // confirmed shift/reduce conflict
+									let path: Vec<_> = nd_table.path_to(q as u32).into_iter().map(|(_, symbol)| symbol).collect();
+									let span = f.span().unwrap_or_else(|| {
+										grammar.ty(f.return_ty()).unwrap().span().expect("no span")
+									});
+									
+									return Err(Loc::new(Ambiguity::ShiftReduce(path, t, *item, *reduce_target), span))
+								}
+							}
 						}
 					}
 
-					State::Reduce(reduce)
+					let mut action = BTreeMap::new();
+					let mut goto = BTreeMap::new();
+
+					for (t, reduce_target) in reduce_actions {
+						action.insert(t, Action::Reduce(reduce_target));
+					}
+
+					for (t, shift_target) in &state.transitions {
+						match t {
+							ty::Expr::Terminal(t) => { action.insert(*t, Action::Shift(*shift_target)); },
+							ty::Expr::Type(ty) => { goto.insert(*ty, *shift_target); }
+						}
+					}
+
+					State::LALR1 {
+						action,
+						goto
+					}
 				},
 				None => {
-					State::Shift(state.transitions.clone())
+					let mut action = BTreeMap::new();
+					let mut goto = BTreeMap::new();
+
+					for (t, shift_target) in &state.transitions {
+						match t {
+							ty::Expr::Terminal(t) => { action.insert(*t, *shift_target); },
+							ty::Expr::Type(ty) => { goto.insert(*ty, *shift_target); }
+						}
+					}
+
+					State::LR0(lr0::State::Shift {
+						action,
+						goto
+					})
 				}
 			};
 
-			states.push(ll0_state)
+			states.push(lalr0_state)
 		}
 
 		Ok(Self {
 			states
 		})
+	}
+}
+
+pub enum Firsts<'a> {
+	Terminal(Option<u32>),
+	Type(std::collections::btree_set::Iter<'a, u32>)
+}
+
+impl<'a> Iterator for Firsts<'a> {
+	type Item = u32;
+
+	fn next(&mut self) -> Option<u32> {
+		match self {
+			Self::Terminal(t) => t.take(),
+			Self::Type(inner) => inner.next().cloned() 
+		}
 	}
 }

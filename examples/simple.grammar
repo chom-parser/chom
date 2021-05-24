@@ -1,5 +1,7 @@
 extern int
+extern string
 
+regexp IDENT: string = [a-zA-Z][a-zA-Z0-9]*
 regexp INTEGER: int = [+\-]? [0-9]+
 
 type expr =

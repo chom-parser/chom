@@ -5,7 +5,7 @@ authors = ["Timothée Haudebourg <timothee.haudebourg@ens-rennes.fr>"]
 edition = "2018"
 
 [dependencies]
-source-span = "^2.4"
+source-span = "^2.5.1"
 once_cell = "*"
 btree-slab = { path = "../../data-structures/btree-slab" }
 btree-range-map = { path = "../../data-structures/btree-range-map" }
@@ -13,6 +13,7 @@ itertools = "*"
 
 proc-macro2 = "*"
 quote = "*"
+rust-codegen = { path = "../../rust/rust-codegen" }
 
 utf8-decode = "*"
 stderrlog = "*"

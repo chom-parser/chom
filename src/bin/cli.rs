@@ -65,32 +65,36 @@ fn main() -> io::Result<()> {
 							let mut block = out::Block::new(out::Type::Error, e.title());
 							block.highlights_mut().add(e.span(), None, Style::Error);
 							e.fill_block(&grammar, &mut block);
-							let span = e.span().aligned();
-							let formatted = block.render(buffer.iter_span(span), span, &metrics)?;
+							let formatted = block.render(buffer.iter_span(block.span()), &metrics)?;
 							eprintln!("{}", formatted);
 						}
 					}
 
 					let mono_grammar = mono::Grammar::new(&grammar);
+
+					let stdout = std::io::stdout();
+					let mut out = stdout.lock();
+					let tokens = grammar::gen::target::rust::ast::generate(&mono_grammar);
+					write!(out, "{}", tokens)?;
+
 					let parsing_table = grammar::parsing::table::NonDeterministic::new(&mono_grammar);
 
 					// let stdout = std::io::stdout();
 					// let mut out = stdout.lock();
 					// parsing_table.dot_write(&grammar, &mut out).unwrap();
 
-					match grammar::parsing::table::LL0::from_non_deterministic(&mono_grammar, &parsing_table) {
-						Ok(ll0_table) => {
-							// ...
-						},
-						Err(e) => {
-							let mut block = out::Block::new(out::Type::Error, e.title());
-							block.highlights_mut().add(e.span(), e.label(), Style::Error);
-							e.fill_block(&mono_grammar, &mut block);
-							let span = e.span().aligned();
-							let formatted = block.render(buffer.iter_span(span), span, &metrics)?;
-							eprintln!("{}", formatted);
-						}
-					}
+					// match grammar::parsing::table::LR0::from_non_deterministic(&mono_grammar, &parsing_table) {
+					// 	Ok(lr0_table) => {
+					// 		// ...
+					// 	},
+					// 	Err(e) => {
+					// 		let mut block = out::Block::new(out::Type::Error, e.title());
+					// 		block.highlights_mut().add(e.span(), e.label(), Style::Error);
+					// 		e.fill_block(&mono_grammar, &mut block);
+					// 		let formatted = block.render(buffer.iter_span(block.span()), &metrics)?;
+					// 		eprintln!("{}", formatted);
+					// 	}
+					// }
 				},
 				Err(e) => {
 					let mut fmt = Formatter::new();

@@ -1,3 +1,4 @@
+use source_span::Loc;
 use std::{
 	fmt,
 	collections::{
@@ -6,15 +7,18 @@ use std::{
 	}
 };
 use crate::mono::{
+	Index,
 	Grammar,
 	ty
 };
 
 mod non_deterministic;
-mod ll0;
+mod lr0;
+mod lalr1;
 
 pub use non_deterministic::NonDeterministic;
-pub use ll0::LL0;
+pub use lr0::LR0;
+pub use lalr1::LALR1;
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct Item {
@@ -143,14 +147,26 @@ impl ItemSet {
 		map
 	}
 
-	// pub fn reduce(&self) -> Option<u32> {
+	// pub fn reduce(&self, grammar: &Grammar) -> Result<Option<Index>, Loc<Ambiguity>> {
+	// 	let mut target = None;
+
 	// 	for item in &self.items {
-	// 		if let Some(target) = item.reduce() {
-	// 			return Some(target)
+	// 		let f = grammar.function(item.function).unwrap();
+	// 		if item.offset >= f.arity() {
+	// 			target = Some(match target {
+	// 				Some(other_target) => {
+	// 					let span = f.span().unwrap_or_else(|| {
+	// 						grammar.ty(f.return_ty()).unwrap().span().expect("no span")
+	// 					});
+						
+	// 					return Err(Loc::new(Ambiguity::ReduceReduce(item.function, other_target), span))
+	// 				},
+	// 				None => item.function
+	// 			})
 	// 		}
 	// 	}
 
-	// 	// ...
+	// 	Ok(target)
 	// }
 
 	pub fn format<'a, 'g>(&self, grammar: &'g Grammar<'a>) -> FormattedItemSet<'a, 'g, '_> {

@@ -25,6 +25,7 @@ pub type Index = (u32, ty::Instance);
 
 pub use poly::{
 	ExternalType,
+	terminal,
 	Terminal,
 };
 

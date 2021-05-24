@@ -63,7 +63,12 @@ impl Block {
 		})
 	}
 
-	pub fn render<E, I: Iterator<Item = Result<char, E>>, M: Metrics>(&self, input: I, span: Span, metrics: &M) -> Result<Formatted, E> {
+	pub fn span(&self) -> Span {
+		self.highlights.span().unwrap().aligned()
+	}
+
+	pub fn render<E, I: Iterator<Item = Result<char, E>>, M: Metrics>(&self, input: I, metrics: &M) -> Result<Formatted, E> {
+		let span = self.span();
 		let margin_len = self.highlights.margin_len(&span);
 		
 		Ok(Formatted {
