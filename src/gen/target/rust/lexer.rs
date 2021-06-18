@@ -26,6 +26,36 @@ use crate::{
 		Table,
 	}
 };
+use super::ExternModule;
+
+pub struct Module {
+	inner: rust_codegen::module::Ref,
+	token_enum: rust_codegen::enm::Ref
+}
+
+impl Module {
+	pub fn new(
+		grammar: &Grammar,
+		extern_mod: &ExternModule,
+		module_ref: rust_codegen::module::Ref
+	) -> Self {
+		let token_enum;
+
+		{
+			let mut module = module_ref.borrow_mut();
+			token_enum = module.add_enum("Token");
+		}
+
+		Self {
+			inner: module_ref,
+			token_enum
+		}
+	}
+
+	pub fn token_ty(&self) -> &rust_codegen::enm::Ref {
+		&self.token_enum
+	}
+}
 
 fn token_class_name(class: &token::Class) -> String {
 	match class {
@@ -200,7 +230,8 @@ pub fn generate(grammar: &Grammar, table: &Table) -> TokenStream {
 
 	let mut converters: Vec<TokenStream> = Vec::new();
 	for (def, _) in grammar.regexps() {
-		if let Some(c) = token::Convertion::new_opt(&def.id, &def.ty) {
+		let ty = grammar.extern_type(def.ty).unwrap();
+		if let Some(c) = token::Convertion::new_opt(&def.id, ty) {
 			let id = converter_ident(&c);
 			let target_ty = external_type(&c.target);
 			converters.push(quote! {

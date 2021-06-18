@@ -1,6 +1,9 @@
 use std::{
 	fmt,
-	collections::BTreeMap
+	collections::{
+		BTreeMap,
+		HashMap
+	}
 };
 use source_span::{
 	Loc,
@@ -250,14 +253,19 @@ pub enum State {
 
 /// LR0 parsing table.
 pub struct LR0 {
-	states: Vec<State>
+	states: Vec<State>,
+	initial_states: HashMap<u32, Index>,
+	entries: HashMap<Index, u32>
 }
 
 impl LR0 {
 	pub fn from_non_deterministic(grammar: &Grammar, nd_table: &NonDeterministic) -> Result<Self, Loc<Ambiguity>> {
 		let mut states = Vec::new();
+		let mut initial_states = HashMap::new();
+		let mut entries = HashMap::new();
 		
 		for (q, state) in nd_table.states().iter().enumerate() {
+			let q = q as u32;
 			let mut reduce = None;
 
 			for item in &state.items {
@@ -265,7 +273,7 @@ impl LR0 {
 				if item.offset >= rule.arity() {
 					if let Some(old_reduce) = reduce.replace(item.function) {
 						// reduce/reduce conflict
-						let path: Vec<_> = nd_table.path_to(q as u32).into_iter().map(|(_, symbol)| symbol).collect();
+						let path: Vec<_> = nd_table.path_to(q).into_iter().map(|(_, symbol)| symbol).collect();
 						
 						let span = rule.span().unwrap_or_else(|| {
 							grammar.ty(rule.return_ty()).unwrap().span().expect("no span")
@@ -282,7 +290,7 @@ impl LR0 {
 						let rule = grammar.function(item.function).unwrap();
 						if item.offset < rule.arity() {
 							// shift/reduce conflict
-							let path: Vec<_> = nd_table.path_to(q as u32).into_iter().map(|(_, symbol)| symbol).collect();
+							let path: Vec<_> = nd_table.path_to(q).into_iter().map(|(_, symbol)| symbol).collect();
 
 							let span = rule.span().unwrap_or_else(|| {
 								grammar.ty(rule.return_ty()).unwrap().span().expect("no span")
@@ -312,11 +320,42 @@ impl LR0 {
 				}
 			};
 
+			if let Some(ty_index) = nd_table.state_type(q) {
+				initial_states.insert(states.len() as u32, ty_index);
+				entries.insert(ty_index, states.len() as u32);
+			}
+
 			states.push(lr0_state)
 		}
 
 		Ok(Self {
-			states
+			states,
+			initial_states,
+			entries
 		})
+	}
+
+	pub fn states(&self) -> &[State] {
+		&self.states
+	}
+
+	pub fn state(&self, i: u32) -> Option<&State> {
+		self.states.get(i as usize)
+	}
+
+	pub fn initial_states(&self) -> impl '_ + Iterator<Item=(u32, Index)> {
+		self.initial_states.iter().map(|(a, b)| (*a, *b))
+	}
+
+	pub fn entries(&self) -> impl '_ + Iterator<Item=(Index, u32)> {
+		self.entries.iter().map(|(a, b)| (*a, *b))
+	}
+
+	pub fn is_initial(&self, q: u32) -> bool {
+		self.initial_states.contains_key(&q)
+	}
+
+	pub fn state_type(&self, q: u32) -> Option<Index> {
+		self.initial_states.get(&q).cloned()
 	}
 }

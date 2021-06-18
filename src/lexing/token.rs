@@ -36,7 +36,8 @@ impl Convertion {
 	pub fn from_regexp(grammar: &Grammar, e: &RegExp) -> Option<Self> {
 		e.as_reference().map(|i| {
 			let exp = grammar.regexp(i).unwrap();
-			Self::new_opt(&exp.id, &exp.ty)
+			let ty = grammar.extern_type(exp.ty).unwrap();
+			Self::new_opt(&exp.id, ty)
 		}).flatten()
 	}
 }

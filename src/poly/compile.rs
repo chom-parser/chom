@@ -142,9 +142,10 @@ impl syntax::Grammar {
 			let id = ast.id.clone();
 			regexps.assert_defined(id.as_ref(), id.span())?;
 			let def_ast = ast.clone().into_inner();
+
 			let def = regexp::Definition {
 				id: def_ast.id.into_inner(),
-				ty: def_ast.ty.map(|ty| ExternalType::from_ident(ty.as_ref())).unwrap_or_default(),
+				ty: external_types.get(def_ast.ty.as_ref())?,
 				exp: compile_loc_regexp(&regexps, def_ast.exp)?
 			};
 

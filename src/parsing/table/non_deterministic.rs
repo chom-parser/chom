@@ -11,6 +11,7 @@ use std::{
 };
 use crate::{
 	mono::{
+		Index,
 		Grammar,
 		ty
 	},
@@ -25,8 +26,13 @@ use super::{
 };
 
 pub struct State {
+	/// Items in th state.
 	pub items: ItemSet,
+
+	/// Successors.
 	pub transitions: BTreeMap<ty::Expr, u32>,
+	
+	/// Predecessors.
 	pub predecessors: HashMap<ty::Expr, HashSet<u32>>
 }
 
@@ -52,12 +58,27 @@ impl State {
 
 /// Parsing table.
 pub struct NonDeterministic {
-	states: Vec<State>
+	/// States.
+	states: Vec<State>,
+
+	/// Initial states of the table.
+	/// 
+	/// Associates a (initial) state to a type.
+	initial_states: HashMap<u32, Index>,
+
+	/// Entry points of the table (the types that can be recognized, and by which state).
+	/// 
+	/// Associates a type to a (initial) state.
+	/// The reverse of `initial_states`.
+	entries: HashMap<Index, u32>
 }
 
 impl NonDeterministic {
+	/// Build a non-deterministic parsing table from a grammar.
 	pub fn new(grammar: &Grammar) -> Self {
 		let mut states = Vec::new();
+		let mut initial_states = HashMap::new();
+		let mut entries = HashMap::new();
 		let mut map = HashMap::new();
 
 		fn state_id(stack: &mut Vec<(u32, ItemSet)>, states: &mut Vec<State>, map: &mut HashMap<ItemSet, u32>, item_set: ItemSet) -> u32 {
@@ -79,7 +100,7 @@ impl NonDeterministic {
 		}
 
 		let mut stack = Vec::new();
-		for ty in grammar.types() {
+		for (ty_index, ty) in grammar.enumerate_types() {
 			let mut item_set = ItemSet::new();
 
 			for f in ty.constructors() {
@@ -87,7 +108,9 @@ impl NonDeterministic {
 			}
 
 			item_set.close(grammar);
-			state_id(&mut stack, &mut states, &mut map, item_set);
+			let id = state_id(&mut stack, &mut states, &mut map, item_set);
+			initial_states.insert(id, ty_index);
+			entries.insert(ty_index, id);
 		}
 
 		while let Some((a, item_set)) = stack.pop() {
@@ -100,12 +123,30 @@ impl NonDeterministic {
 		}
 
 		Self {
-			states
+			states,
+			initial_states,
+			entries
 		}
 	}
 
 	pub fn states(&self) -> &[State] {
 		&self.states
+	}
+
+	pub fn initial_states(&self) -> impl '_ + Iterator<Item=(u32, Index)> {
+		self.initial_states.iter().map(|(a, b)| (*a, *b))
+	}
+
+	pub fn entries(&self) -> impl '_ + Iterator<Item=(Index, u32)> {
+		self.entries.iter().map(|(a, b)| (*a, *b))
+	}
+
+	pub fn is_initial(&self, q: u32) -> bool {
+		self.initial_states.contains_key(&q)
+	}
+
+	pub fn state_type(&self, q: u32) -> Option<Index> {
+		self.initial_states.get(&q).cloned()
 	}
 
 	pub fn transitions_for(&self, q: u32) -> impl '_ + Iterator<Item=(ty::Expr, u32)> {

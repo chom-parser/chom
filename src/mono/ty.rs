@@ -23,6 +23,10 @@ impl<'a> Type<'a> {
 		}
 	}
 
+	pub fn poly(&self) -> &'a poly::Type {
+		self.poly
+	}
+
 	pub fn id(&self) -> &Id {
 		self.poly.id()
 	}

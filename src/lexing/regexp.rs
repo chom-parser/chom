@@ -26,22 +26,25 @@ use super::{
 
 pub struct Definition {
 	pub id: Ident,
-	pub ty: ExternalType,
+	pub ty: u32,
 	pub exp: RegExp
 }
 
 impl Definition {
-	// pub fn as_token(&self) -> &Token {
-	// 	self.exp.as_token()
-	// }
+	pub fn format<'g>(&self, grammar: &'g Grammar) -> FormattedDefinition<'g, '_> {
+		FormattedDefinition(grammar, self)
+	}
 }
 
-impl fmt::Display for Definition {
+pub struct FormattedDefinition<'g, 'd>(&'g Grammar, &'d Definition);
+
+impl<'g, 'd> fmt::Display for FormattedDefinition<'g, 'd> {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		if self.ty != ExternalType::Unit {
-			write!(f, "regexp {}: {} = {}", self.id, self.ty, self.exp)
+		let ty = self.0.extern_type(self.1.ty).unwrap();
+		if *ty != ExternalType::Unit {
+			write!(f, "regexp {}: {} = {}", self.1.id, ty, self.1.exp)
 		} else {
-			write!(f, "regexp {} = {}", self.id, self.exp)
+			write!(f, "regexp {} = {}", self.1.id, self.1.exp)
 		}
 	}
 }
@@ -173,7 +176,8 @@ impl Atom {
 		 match self {
 			Self::Ref(i) => {
 				let exp = grammar.regexp(*i).unwrap();
-				Some(Token::Named(exp.id.clone(), token::Convertion::new_opt(&exp.id, &exp.ty)))
+				let ty = grammar.extern_type(exp.ty).unwrap();
+				Some(Token::Named(exp.id.clone(), token::Convertion::new_opt(&exp.id, ty)))
 			},
 			Self::CharSet(set) => {
 				if set.len() == 1usize {
