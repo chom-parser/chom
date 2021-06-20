@@ -21,7 +21,7 @@ fn type_name(ty: &poly::Type) -> String {
 	util::to_caml_case(ty.id().name())
 }
 
-fn variant_name(f: &poly::Function) -> String {
+pub fn variant_name(f: &poly::Function) -> String {
 	util::to_caml_case(f.id().as_str())
 }
 
@@ -33,12 +33,20 @@ impl Module {
 	pub fn ty_instance(&self, i: Index) ->  Option<rust_codegen::ty::Instance> {
 		self.instances.get(&i).cloned()
 	}
+
+	pub fn write<W: std::io::Write>(&self, out: &mut W) -> std::io::Result<()> {
+		let inner = self.inner();
+		write!(out, "{}", quote::quote!{ #inner })
+	}
 	
 	pub fn new(
+		context: &rust_codegen::Context,
 		grammar: &Grammar,
 		extern_mod: &ExternModule,
-		module_ref: rust_codegen::module::Ref
+		path: &[String]
 	) -> Self {
+		let module_ref = super::declare_module(context, path);
+
 		let mut types = HashMap::new();
 		let mut instances = HashMap::new();
 
@@ -170,6 +178,10 @@ impl Module {
 			types,
 			instances
 		}
+	}
+
+	pub fn inner(&self) -> rust_codegen::module::Inner {
+		self.inner.inner()
 	}
 }
 

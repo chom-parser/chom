@@ -31,6 +31,10 @@ impl<'a> Function<'a> {
 		}
 	}
 
+	pub fn poly(&self) -> &'a poly::Function {
+		self.poly
+	}
+
 	pub fn id(&self) -> &Id {
 		self.poly.id()
 	}

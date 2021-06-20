@@ -176,8 +176,7 @@ impl Atom {
 		 match self {
 			Self::Ref(i) => {
 				let exp = grammar.regexp(*i).unwrap();
-				let ty = grammar.extern_type(exp.ty).unwrap();
-				Some(Token::Named(exp.id.clone(), token::Convertion::new_opt(&exp.id, ty)))
+				Some(Token::Named(exp.id.clone(), token::Convertion::new_opt(grammar, &exp.id, exp.ty)))
 			},
 			Self::CharSet(set) => {
 				if set.len() == 1usize {

@@ -12,9 +12,9 @@ use crate::mono::{
 	ty
 };
 
-mod non_deterministic;
-mod lr0;
-mod lalr1;
+pub mod non_deterministic;
+pub mod lr0;
+pub mod lalr1;
 
 pub use non_deterministic::NonDeterministic;
 pub use lr0::LR0;

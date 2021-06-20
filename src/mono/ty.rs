@@ -35,6 +35,10 @@ impl<'a> Type<'a> {
 		self.parameters_instances.get(i as usize)
 	}
 
+	pub fn parameters(&self) -> &[Expr] {
+		&self.parameters_instances
+	}
+
 	pub fn constructors(&self) -> impl '_ + Iterator<Item=(u32, Instance)> {
 		self.poly.constructors().iter().map(move |i| (*i, self.instance))
 	}

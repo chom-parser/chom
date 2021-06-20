@@ -17,17 +17,18 @@ pub use delimiter::*;
 
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Convertion {
-	pub target: ExternalType,
+	pub target: u32,
 	pub from: Ident
 }
 
 impl Convertion {
-	pub fn new_opt(from: &Ident, target: &ExternalType) -> Option<Self> {
-		if *target == ExternalType::Unit {
+	pub fn new_opt(grammar: &Grammar, from: &Ident, target: u32) -> Option<Self> {
+		let ty = grammar.extern_type(target).unwrap();
+		if *ty == ExternalType::Unit {
 			None
 		} else {
 			Some(Self {
-				target: target.clone(),
+				target,
 				from: from.clone()
 			})
 		}
@@ -36,8 +37,7 @@ impl Convertion {
 	pub fn from_regexp(grammar: &Grammar, e: &RegExp) -> Option<Self> {
 		e.as_reference().map(|i| {
 			let exp = grammar.regexp(i).unwrap();
-			let ty = grammar.extern_type(exp.ty).unwrap();
-			Self::new_opt(&exp.id, ty)
+			Self::new_opt(grammar, &exp.id, exp.ty)
 		}).flatten()
 	}
 }
@@ -53,6 +53,15 @@ pub enum Class {
 	Punct,
 	Begin,
 	End
+}
+
+impl Class {
+	pub fn has_parameter(&self) -> bool {
+		match self {
+			Self::Anonymous(_, c) | Self::Named(_, c) | Self::Composed(_, c) => c.is_some(),
+			_ => true
+		}
+	}
 }
 
 /// Lexing tokens.
@@ -71,10 +80,15 @@ pub enum Token {
 impl Token {
 	pub fn conversion(&self) -> Option<&Convertion> {
 		match self {
-			Token::Anonymous(_, c) => c.as_ref(),
-			Token::Named(_, c) => c.as_ref(),
-			Token::Composed(_, c) => c.as_ref(),
+			Self::Anonymous(_, c) | Self::Named(_, c) | Self::Composed(_, c) => c.as_ref(),
 			_ => None
+		}
+	}
+
+	pub fn has_parameter(&self) -> bool {
+		match self {
+			Self::Anonymous(_, c) | Self::Named(_, c) | Self::Composed(_, c) => c.is_some(),
+			_ => true
 		}
 	}
 
