@@ -1,30 +1,21 @@
-use std::collections::HashSet;
-use source_span::{
-	Loc,
-	Span
-};
 use crate::{
-	syntax::{
-		self,
-		Caused
-	},
-	lexing::{
-		RegExp,
-		regexp
-	}
+	lexing::{regexp, RegExp},
+	syntax::{self, Caused},
 };
+use source_span::{Loc, Span};
+use std::collections::HashSet;
 
-mod external;
-pub mod ty;
-pub mod terminal;
-pub mod function;
 mod compile;
+mod external;
+pub mod function;
+pub mod terminal;
+pub mod ty;
 
-pub use external::ExternalType;
-pub use ty::Type;
-pub use terminal::Terminal;
-pub use function::Function;
 pub use compile::Error;
+pub use external::ExternalType;
+pub use function::Function;
+pub use terminal::Terminal;
+pub use ty::Type;
 
 pub struct Grammar {
 	/// Extern types.
@@ -32,7 +23,7 @@ pub struct Grammar {
 
 	/// Regular expressions.
 	regexps: Vec<(regexp::Definition, Loc<syntax::regexp::Definition>)>,
-	
+
 	/// Terminals.
 	terminals: Vec<(Terminal, HashSet<Loc<syntax::RegExp>>)>,
 
@@ -40,7 +31,7 @@ pub struct Grammar {
 	types: Vec<Caused<Type>>,
 
 	/// Functions.
-	functions: Vec<Caused<Function>>
+	functions: Vec<Caused<Function>>,
 }
 
 impl Grammar {
@@ -49,14 +40,14 @@ impl Grammar {
 		regexps: Vec<(regexp::Definition, Loc<syntax::regexp::Definition>)>,
 		terminals: Vec<(Terminal, HashSet<Loc<syntax::RegExp>>)>,
 		types: Vec<Caused<Type>>,
-		functions: Vec<Caused<Function>>
+		functions: Vec<Caused<Function>>,
 	) -> Self {
 		let g = Self {
 			externs,
 			regexps,
 			terminals,
 			types,
-			functions
+			functions,
 		};
 
 		for (terminal, _) in &g.terminals {

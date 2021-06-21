@@ -16,7 +16,7 @@ macro_rules! operator {
 					_ => return None
 				})
 			}
-			
+
 			pub fn name(&self) -> &'static str {
 				match self {
 					$(

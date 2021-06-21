@@ -1,25 +1,18 @@
-use source_span::{
-	Span,
-	Loc
-};
-use std::collections::{
-	BTreeMap
-};
+use super::{Error, ExternalTypes};
 use crate::{
-	syntax::{
-		self,
-		Ident
-	},
 	lexing::regexp,
+	syntax::{self, Ident},
 };
-use super::{
-	Error,
-	ExternalTypes
-};
+use source_span::{Loc, Span};
+use std::collections::BTreeMap;
 
 pub struct RegExps {
 	/// List of regular expressions.
-	list: Vec<(Option<regexp::Definition>, u32, Loc<syntax::regexp::Definition>)>,
+	list: Vec<(
+		Option<regexp::Definition>,
+		u32,
+		Loc<syntax::regexp::Definition>,
+	)>,
 
 	/// Associate each expect identifier to a pair containing
 	/// in first argument the index of the regexp definition in `self.list` and
@@ -28,36 +21,42 @@ pub struct RegExps {
 }
 
 impl RegExps {
-	pub fn new(external_types: &ExternalTypes, ast: &[Loc<syntax::regexp::Definition>]) -> Result<Self, Loc<Error>> {
+	pub fn new(
+		external_types: &ExternalTypes,
+		ast: &[Loc<syntax::regexp::Definition>],
+	) -> Result<Self, Loc<Error>> {
 		let mut list = Vec::new();
 		let mut map = BTreeMap::new();
 
 		for def in ast {
 			let ty = external_types.get(def.ty.as_ref())?;
-			
+
 			use std::collections::btree_map::Entry;
 			match map.entry(def.id.as_ref().clone()) {
 				Entry::Vacant(entry) => {
 					let i = list.len() as u32;
 					list.push((None, ty, def.clone()));
 					entry.insert(i);
-				},
+				}
 				Entry::Occupied(entry) => {
 					let old_index = entry.get();
 					let old_def = &list[*old_index as usize].2;
-					return Err(Loc::new(Error::AlreadyDefinedRegExp(def.id.as_ref().clone(), old_def.span()), def.id.span()))
+					return Err(Loc::new(
+						Error::AlreadyDefinedRegExp(def.id.as_ref().clone(), old_def.span()),
+						def.id.span(),
+					));
 				}
 			}
 		}
 
-		Ok(Self {
-			list,
-			map
-		})
+		Ok(Self { list, map })
 	}
 
 	pub fn into_vec(self) -> Vec<(regexp::Definition, Loc<syntax::regexp::Definition>)> {
-		self.list.into_iter().map(|(def, _, ast)| (def.unwrap(), ast)).collect()
+		self.list
+			.into_iter()
+			.map(|(def, _, ast)| (def.unwrap(), ast))
+			.collect()
 	}
 
 	pub fn assert_defined(&self, id: &Ident, span: Span) -> Result<(), Loc<Error>> {
@@ -70,7 +69,10 @@ impl RegExps {
 	}
 
 	pub fn get(&self, id: &Ident, span: Span) -> Result<u32, Loc<Error>> {
-		Ok(*self.map.get(id).ok_or_else(|| Loc::new(Error::UndefinedRegExp(id.clone()), span))?)
+		Ok(*self
+			.map
+			.get(id)
+			.ok_or_else(|| Loc::new(Error::UndefinedRegExp(id.clone()), span))?)
 	}
 
 	pub fn define(&mut self, id: &Ident, def: regexp::Definition) {

@@ -1,6 +1,6 @@
-use std::fmt;
+use super::{Grammar, Index};
 use crate::poly;
-use super::Grammar;
+use std::fmt;
 
 /// Type instance identifier.
 pub type Instance = u32;
@@ -11,7 +11,7 @@ pub use poly::ty::Id;
 pub struct Type<'a> {
 	poly: &'a poly::Type,
 	instance: Instance,
-	parameters_instances: Vec<Expr>
+	parameters_instances: Vec<Expr>,
 }
 
 impl<'a> Type<'a> {
@@ -19,7 +19,7 @@ impl<'a> Type<'a> {
 		Self {
 			poly,
 			instance,
-			parameters_instances: params
+			parameters_instances: params,
 		}
 	}
 
@@ -39,12 +39,17 @@ impl<'a> Type<'a> {
 		&self.parameters_instances
 	}
 
-	pub fn constructors(&self) -> impl '_ + Iterator<Item=(u32, Instance)> {
-		self.poly.constructors().iter().map(move |i| (*i, self.instance))
+	pub fn constructors(&self) -> impl '_ + Iterator<Item = (u32, Instance)> {
+		self.poly
+			.constructors()
+			.iter()
+			.map(move |i| (*i, self.instance))
 	}
 
 	pub fn instance(&self, grammar: &Grammar) -> String {
-		let constructor = grammar.function(self.constructors().next().unwrap()).unwrap();
+		let constructor = grammar
+			.function(self.constructors().next().unwrap())
+			.unwrap();
 		constructor.instance(grammar)
 	}
 
@@ -58,11 +63,11 @@ pub struct FormattedType<'a, 'g, 'e>(&'g Grammar<'a>, &'e Type<'a>);
 impl<'a, 'g, 'e> fmt::Display for FormattedType<'a, 'g, 'e> {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		self.1.poly.name().fmt(f)?;
-		
+
 		for e in &self.1.parameters_instances {
 			write!(f, " {}", e.format(self.0))?;
 		}
-		
+
 		Ok(())
 	}
 }
@@ -71,10 +76,21 @@ impl<'a, 'g, 'e> fmt::Display for FormattedType<'a, 'g, 'e> {
 #[derive(Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum Expr {
 	Terminal(u32),
-	Type((u32, Instance))
+	Type(Index),
 }
 
 impl Expr {
+	pub fn depends_on(&self, grammar: &Grammar, other: Expr) -> bool {
+		if *self == other {
+			true
+		} else if let Self::Type(i) = self {
+			let ty = grammar.ty(*i).unwrap();
+			ty.parameters().iter().any(|p| p.depends_on(grammar, other))
+		} else {
+			false
+		}
+	}
+
 	pub fn format<'a, 'g>(&self, grammar: &'g Grammar<'a>) -> FormattedExpr<'a, 'g, '_> {
 		FormattedExpr(grammar, self)
 	}
@@ -82,7 +98,7 @@ impl Expr {
 	pub fn instance(&self, grammar: &Grammar) -> String {
 		match self {
 			Self::Terminal(i) => grammar.terminal(*i).unwrap().instance(grammar.poly()),
-			Self::Type(i) => grammar.ty(*i).unwrap().instance(grammar)
+			Self::Type(i) => grammar.ty(*i).unwrap().instance(grammar),
 		}
 	}
 }
@@ -95,7 +111,7 @@ impl<'a, 'g, 'e> fmt::Display for FormattedExpr<'a, 'g, 'e> {
 			Expr::Terminal(t) => {
 				let t = self.0.terminal(*t).unwrap();
 				t.format(self.0.poly()).fmt(f)
-			},
+			}
 			Expr::Type(nt) => {
 				let ty = self.0.ty(*nt).unwrap();
 				ty.format(self.0).fmt(f)
@@ -105,39 +121,77 @@ impl<'a, 'g, 'e> fmt::Display for FormattedExpr<'a, 'g, 'e> {
 }
 
 pub struct Map<T> {
-	data: Vec<Vec<T>>
+	data: Vec<Vec<T>>,
 }
 
 impl<T> Map<T> {
-	pub fn new<'a, F>(grammar: &Grammar<'a>, f: F) -> Self where F: Fn(((u32, Instance), &Type<'a>)) -> T {
+	pub fn new<'a, F>(grammar: &Grammar<'a>, f: F) -> Self
+	where
+		F: Fn(((u32, Instance), &Type<'a>)) -> T,
+	{
 		Self {
-			data: grammar.poly().types().iter().enumerate().map(|(ty, _)| {
-				grammar.mono_types(ty as u32).unwrap().iter().enumerate().map(|(i, key)| {
-					f(((ty as u32, i as Instance), key))
-				}).collect()
-			}).collect()
+			data: grammar
+				.poly()
+				.types()
+				.iter()
+				.enumerate()
+				.map(|(ty, _)| {
+					grammar
+						.mono_types(ty as u32)
+						.unwrap()
+						.iter()
+						.enumerate()
+						.map(|(i, key)| f(((ty as u32, i as Instance), key)))
+						.collect()
+				})
+				.collect(),
 		}
 	}
 
 	pub fn get(&self, (ty, instance): (u32, Instance)) -> Option<&T> {
-		self.data.get(ty as usize).map(|inner| inner.get(instance as usize)).flatten()
+		self.data
+			.get(ty as usize)
+			.map(|inner| inner.get(instance as usize))
+			.flatten()
 	}
 
 	pub fn get_mut(&mut self, (ty, instance): (u32, Instance)) -> Option<&mut T> {
-		self.data.get_mut(ty as usize).map(|inner| inner.get_mut(instance as usize)).flatten()
+		self.data
+			.get_mut(ty as usize)
+			.map(|inner| inner.get_mut(instance as usize))
+			.flatten()
 	}
 
-	pub fn enumerate(&self) -> impl '_ + Iterator<Item=((u32, Instance), &T)> {
-		self.data.iter().enumerate().map(|(ty, inner)| inner.iter().enumerate().map(move |(i, t)| ((ty as u32, i as Instance), t))).flatten()
+	pub fn enumerate(&self) -> impl '_ + Iterator<Item = ((u32, Instance), &T)> {
+		self.data
+			.iter()
+			.enumerate()
+			.map(|(ty, inner)| {
+				inner
+					.iter()
+					.enumerate()
+					.map(move |(i, t)| ((ty as u32, i as Instance), t))
+			})
+			.flatten()
 	}
 
-	pub fn map<F, U>(&self, f: F) -> Map<U> where F: Fn(((u32, Instance), &T)) -> U {
+	pub fn map<F, U>(&self, f: F) -> Map<U>
+	where
+		F: Fn(((u32, Instance), &T)) -> U,
+	{
 		Map {
-			data: self.data.iter().enumerate().map(|(ty, inner)| {
-				inner.iter().enumerate().map(|(i, key)| {
-					f(((ty as u32, i as Instance), key))
-				}).collect()
-			}).collect()
+			data: self
+				.data
+				.iter()
+				.enumerate()
+				.map(|(ty, inner)| {
+					inner
+						.iter()
+						.enumerate()
+						.map(|(i, key)| f(((ty as u32, i as Instance), key)))
+						.collect()
+				})
+				.collect(),
 		}
 	}
 }

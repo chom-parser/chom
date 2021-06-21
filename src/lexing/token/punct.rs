@@ -16,7 +16,7 @@ macro_rules! punct {
 					_ => return None
 				})
 			}
-			
+
 			pub fn name(&self) -> &'static str {
 				match self {
 					$(

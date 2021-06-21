@@ -1,27 +1,18 @@
-use std::{
-	fmt,
-	cmp::Ordering
-};
-use once_cell::unsync::OnceCell;
-use crate::{
-	lexing::{
-		Token,
-		RegExp,
-		regexp
-	}
-};
 use super::Grammar;
+use crate::lexing::{regexp, RegExp, Token};
+use once_cell::unsync::OnceCell;
+use std::{cmp::Ordering, fmt};
 
 pub struct Terminal {
 	desc: Desc,
-	token: OnceCell<Token>
+	token: OnceCell<Token>,
 }
 
 impl Terminal {
 	pub fn new(desc: Desc) -> Self {
 		Self {
 			desc,
-			token: OnceCell::new()
+			token: OnceCell::new(),
 		}
 	}
 
@@ -29,7 +20,7 @@ impl Terminal {
 		if let Desc::RegExp(exp) = &self.desc {
 			if exp.atoms().len() == 1 {
 				if let regexp::Atom::Ref(ty) = exp.atoms().first().unwrap() {
-					return Some(*ty)
+					return Some(*ty);
 				}
 			}
 		}
@@ -55,10 +46,8 @@ impl Terminal {
 
 	pub fn init_token(&self, grammar: &Grammar) {
 		match &self.desc {
-			Desc::RegExp(exp) => {
-				self.token.set(exp.token(grammar)).ok().unwrap()
-			},
-			Desc::Whitespace => ()
+			Desc::RegExp(exp) => self.token.set(exp.token(grammar)).ok().unwrap(),
+			Desc::Whitespace => (),
 		}
 	}
 
@@ -66,14 +55,18 @@ impl Terminal {
 		Formatted(grammar, &self.desc, FormatStyle::Canonical)
 	}
 
-	pub fn format_with<'s, 'g>(&'s self, grammar: &'g Grammar, style: FormatStyle) -> Formatted<'g, 's> {
+	pub fn format_with<'s, 'g>(
+		&'s self,
+		grammar: &'g Grammar,
+		style: FormatStyle,
+	) -> Formatted<'g, 's> {
 		Formatted(grammar, &self.desc, style)
 	}
 
 	pub fn instance(&self, grammar: &Grammar) -> String {
 		match self.desc() {
 			Desc::RegExp(exp) => exp.instance(grammar),
-			Desc::Whitespace => " ".to_string()
+			Desc::Whitespace => " ".to_string(),
 		}
 	}
 }
@@ -108,21 +101,21 @@ impl Ord for Terminal {
 /// Terminal description.
 pub enum Desc {
 	RegExp(RegExp),
-	Whitespace
+	Whitespace,
 }
 
 impl fmt::Display for Desc {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		match self {
 			Self::RegExp(exp) => exp.fmt(f),
-			Self::Whitespace => write!(f, "WS*")
+			Self::Whitespace => write!(f, "WS*"),
 		}
 	}
 }
 
 pub enum FormatStyle {
 	Canonical,
-	Human
+	Human,
 }
 
 pub struct Formatted<'g, 'd>(&'g Grammar, &'d Desc, FormatStyle);
@@ -130,31 +123,27 @@ pub struct Formatted<'g, 'd>(&'g Grammar, &'d Desc, FormatStyle);
 impl<'g, 'd> fmt::Display for Formatted<'g, 'd> {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		match self.2 {
-			FormatStyle::Canonical => {
-				match self.1 {
-					Desc::RegExp(exp) => exp.format(self.0).fmt(f),
-					Desc::Whitespace => write!(f, "WS*")
-				}
+			FormatStyle::Canonical => match self.1 {
+				Desc::RegExp(exp) => exp.format(self.0).fmt(f),
+				Desc::Whitespace => write!(f, "WS*"),
 			},
-			FormatStyle::Human => {
-				match self.1 {
-					Desc::RegExp(exp) => {
-						let atoms = exp.atoms();
-						if atoms.len() == 1 {
-							match &atoms[0] {
-								regexp::Atom::Ref(i) => {
-									let exp = self.0.regexp(*i).unwrap();
-									return exp.id.fmt(f)
-								},
-								_ => ()
+			FormatStyle::Human => match self.1 {
+				Desc::RegExp(exp) => {
+					let atoms = exp.atoms();
+					if atoms.len() == 1 {
+						match &atoms[0] {
+							regexp::Atom::Ref(i) => {
+								let exp = self.0.regexp(*i).unwrap();
+								return exp.id.fmt(f);
 							}
+							_ => (),
 						}
-		
-						write!(f, "terminal {}", exp)
-					},
-					Desc::Whitespace => write!(f, "whitespace")
+					}
+
+					write!(f, "terminal {}", exp)
 				}
-			}
+				Desc::Whitespace => write!(f, "whitespace"),
+			},
 		}
 	}
 }

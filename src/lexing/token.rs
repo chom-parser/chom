@@ -1,24 +1,21 @@
 use crate::{
-	syntax::Ident,
 	lexing::RegExp,
-	poly::{
-		Grammar,
-		ExternalType,
-	}
+	poly::{ExternalType, Grammar},
+	syntax::Ident,
 };
 
+mod delimiter;
 mod operator;
 mod punct;
-mod delimiter;
 
+pub use delimiter::*;
 pub use operator::*;
 pub use punct::*;
-pub use delimiter::*;
 
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Convertion {
 	pub target: u32,
-	pub from: Ident
+	pub from: Ident,
 }
 
 impl Convertion {
@@ -29,16 +26,18 @@ impl Convertion {
 		} else {
 			Some(Self {
 				target,
-				from: from.clone()
+				from: from.clone(),
 			})
 		}
 	}
 
 	pub fn from_regexp(grammar: &Grammar, e: &RegExp) -> Option<Self> {
-		e.as_reference().map(|i| {
-			let exp = grammar.regexp(i).unwrap();
-			Self::new_opt(grammar, &exp.id, exp.ty)
-		}).flatten()
+		e.as_reference()
+			.map(|i| {
+				let exp = grammar.regexp(i).unwrap();
+				Self::new_opt(grammar, &exp.id, exp.ty)
+			})
+			.flatten()
 	}
 }
 
@@ -52,14 +51,14 @@ pub enum Class {
 	Operator,
 	Punct,
 	Begin,
-	End
+	End,
 }
 
 impl Class {
 	pub fn has_parameter(&self) -> bool {
 		match self {
 			Self::Anonymous(_, c) | Self::Named(_, c) | Self::Composed(_, c) => c.is_some(),
-			_ => true
+			_ => true,
 		}
 	}
 }
@@ -74,21 +73,21 @@ pub enum Token {
 	Operator(Operator),
 	Punct(Punct),
 	Begin(Delimiter),
-	End(Delimiter)
+	End(Delimiter),
 }
 
 impl Token {
 	pub fn conversion(&self) -> Option<&Convertion> {
 		match self {
 			Self::Anonymous(_, c) | Self::Named(_, c) | Self::Composed(_, c) => c.as_ref(),
-			_ => None
+			_ => None,
 		}
 	}
 
 	pub fn has_parameter(&self) -> bool {
 		match self {
 			Self::Anonymous(_, c) | Self::Named(_, c) | Self::Composed(_, c) => c.is_some(),
-			_ => true
+			_ => false,
 		}
 	}
 
@@ -101,7 +100,7 @@ impl Token {
 			Token::Operator(_) => Class::Operator,
 			Token::Punct(_) => Class::Punct,
 			Token::Begin(_) => Class::Begin,
-			Token::End(_) => Class::End
+			Token::End(_) => Class::End,
 		}
 	}
 }

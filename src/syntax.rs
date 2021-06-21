@@ -1,51 +1,53 @@
+pub use source_span::{Loc, Position, Span};
 use std::iter::Peekable;
-pub use source_span::{
-	Span,
-	Position,
-	Loc
-};
 
+mod ast;
 mod caused;
 mod error;
-mod ast;
 pub mod lexer;
 
-pub use caused::Caused;
-pub use error::{
-	Error,
-	Result
-};
 pub use ast::*;
+pub use caused::Caused;
+pub use error::{Error, Result};
+use lexer::Delimiter;
 pub use lexer::Lexer;
-use lexer::{Delimiter};
 
 pub trait Parsable: Sized {
-	fn parse<L: Iterator<Item = lexer::Result<Loc<lexer::Token>>>>(lexer: &mut Peekable<L>) -> Result<Loc<Self>>;
+	fn parse<L: Iterator<Item = lexer::Result<Loc<lexer::Token>>>>(
+		lexer: &mut Peekable<L>,
+	) -> Result<Loc<Self>>;
 
-	fn parse_only<L: Iterator<Item = lexer::Result<Loc<lexer::Token>>>>(lexer: &mut Peekable<L>) -> Result<Loc<Self>> {
+	fn parse_only<L: Iterator<Item = lexer::Result<Loc<lexer::Token>>>>(
+		lexer: &mut Peekable<L>,
+	) -> Result<Loc<Self>> {
 		let value = Self::parse(lexer)?;
 
 		if let Some(unexpected) = lexer.next().transpose().map_err(|e| e.inner_into())? {
 			let (unexpected, span) = unexpected.into_raw_parts();
-			return Err(Loc::new(Error::UnexpectedToken(unexpected), span))
+			return Err(Loc::new(Error::UnexpectedToken(unexpected), span));
 		}
 
 		Ok(value)
 	}
 }
 
-fn peek<L: Iterator<Item = lexer::Result<Loc<lexer::Token>>>>(lexer: &mut Peekable<L>) -> Result<Option<Loc<lexer::Token>>> {
+fn peek<L: Iterator<Item = lexer::Result<Loc<lexer::Token>>>>(
+	lexer: &mut Peekable<L>,
+) -> Result<Option<Loc<lexer::Token>>> {
 	match lexer.peek() {
 		Some(Ok(token)) => Ok(Some(token.clone())),
 		Some(Err(_)) => {
 			let mut dummy_span = Span::default();
 			consume(lexer, &mut dummy_span)
-		},
-		None => Ok(None)
+		}
+		None => Ok(None),
 	}
 }
 
-fn peek_token<L: Iterator<Item = lexer::Result<Loc<lexer::Token>>>>(lexer: &mut Peekable<L>, span: &Span) -> Result<Loc<lexer::Token>> {
+fn peek_token<L: Iterator<Item = lexer::Result<Loc<lexer::Token>>>>(
+	lexer: &mut Peekable<L>,
+	span: &Span,
+) -> Result<Loc<lexer::Token>> {
 	if let Some(token) = peek(lexer)? {
 		Ok(token)
 	} else {
@@ -53,18 +55,26 @@ fn peek_token<L: Iterator<Item = lexer::Result<Loc<lexer::Token>>>>(lexer: &mut 
 	}
 }
 
-fn try_peek_pipe<L: Iterator<Item = lexer::Result<Loc<lexer::Token>>>>(lexer: &mut Peekable<L>, _span: &Span) -> Result<bool> {
+fn try_peek_pipe<L: Iterator<Item = lexer::Result<Loc<lexer::Token>>>>(
+	lexer: &mut Peekable<L>,
+	_span: &Span,
+) -> Result<bool> {
 	Ok(match peek(lexer)? {
-		Some(token) => if let lexer::Token::Punct('|') = token.as_ref() {
-			true
-		} else {
-			false
-		},
-		None => false
+		Some(token) => {
+			if let lexer::Token::Punct('|') = token.as_ref() {
+				true
+			} else {
+				false
+			}
+		}
+		None => false,
 	})
 }
 
-fn consume<L: Iterator<Item = lexer::Result<Loc<lexer::Token>>>>(lexer: &mut Peekable<L>, span: &mut Span) -> Result<Option<Loc<lexer::Token>>> {
+fn consume<L: Iterator<Item = lexer::Result<Loc<lexer::Token>>>>(
+	lexer: &mut Peekable<L>,
+	span: &mut Span,
+) -> Result<Option<Loc<lexer::Token>>> {
 	match lexer.next() {
 		Some(Ok(token)) => {
 			if span.is_empty() {
@@ -73,13 +83,16 @@ fn consume<L: Iterator<Item = lexer::Result<Loc<lexer::Token>>>>(lexer: &mut Pee
 				span.append(token.span());
 			}
 			Ok(Some(token.clone()))
-		},
+		}
 		Some(Err(e)) => Err(e.inner_into()),
-		None => Ok(None)
+		None => Ok(None),
 	}
 }
 
-fn expect<L: Iterator<Item = lexer::Result<Loc<lexer::Token>>>>(lexer: &mut Peekable<L>, span: &mut Span) -> Result<Loc<lexer::Token>> {
+fn expect<L: Iterator<Item = lexer::Result<Loc<lexer::Token>>>>(
+	lexer: &mut Peekable<L>,
+	span: &mut Span,
+) -> Result<Loc<lexer::Token>> {
 	if let Some(token) = consume(lexer, span)? {
 		Ok(token)
 	} else {
@@ -87,18 +100,26 @@ fn expect<L: Iterator<Item = lexer::Result<Loc<lexer::Token>>>>(lexer: &mut Peek
 	}
 }
 
-fn expect_punct<L: Iterator<Item = lexer::Result<Loc<lexer::Token>>>>(lexer: &mut Peekable<L>, span: &mut Span) -> Result<Loc<char>> {
+fn expect_punct<L: Iterator<Item = lexer::Result<Loc<lexer::Token>>>>(
+	lexer: &mut Peekable<L>,
+	span: &mut Span,
+) -> Result<Loc<char>> {
 	let token = expect(lexer, span)?;
 
 	if let lexer::Token::Punct(p) = token.as_ref() {
 		Ok(Loc::new(*p, token.span()))
 	} else {
-		Err(Loc::new(Error::UnexpectedToken(token.as_ref().clone()), token.span()))
+		Err(Loc::new(
+			Error::UnexpectedToken(token.as_ref().clone()),
+			token.span(),
+		))
 	}
 }
 
 impl Parsable for Grammar {
-	fn parse<L: Iterator<Item = lexer::Result<Loc<lexer::Token>>>>(lexer: &mut Peekable<L>) -> Result<Loc<Self>> {
+	fn parse<L: Iterator<Item = lexer::Result<Loc<lexer::Token>>>>(
+		lexer: &mut Peekable<L>,
+	) -> Result<Loc<Self>> {
 		let mut span = Span::default();
 		let mut externs = Vec::new();
 		let mut regexps = Vec::new();
@@ -112,7 +133,7 @@ impl Parsable for Grammar {
 						lexer::Keyword::Extern => {
 							let id = Ident::parse(lexer)?;
 							externs.push(id);
-						},
+						}
 						lexer::Keyword::RegExp => {
 							let id = Ident::parse(lexer)?;
 							let mut ty = None;
@@ -123,27 +144,44 @@ impl Parsable for Grammar {
 									let punct = expect_punct(lexer, &mut span)?;
 									match punct.as_ref() {
 										'=' => (),
-										_ => return Err(Loc::new(Error::UnexpectedToken(lexer::Token::Punct(*punct.as_ref())), punct.span()))
+										_ => {
+											return Err(Loc::new(
+												Error::UnexpectedToken(lexer::Token::Punct(
+													*punct.as_ref(),
+												)),
+												punct.span(),
+											))
+										}
 									}
-								},
+								}
 								'=' => (),
-								_ => return Err(Loc::new(Error::UnexpectedToken(lexer::Token::Punct(*punct.as_ref())), punct.span()))
+								_ => {
+									return Err(Loc::new(
+										Error::UnexpectedToken(lexer::Token::Punct(
+											*punct.as_ref(),
+										)),
+										punct.span(),
+									))
+								}
 							}
 							let exp = RegExp::parse(lexer)?;
 							let regexp_span = id.span().union(exp.span());
-							regexps.push(Loc::new(regexp::Definition {
-								id,
-								ty,
-								exp
-							}, regexp_span))
-						},
+							regexps.push(Loc::new(regexp::Definition { id, ty, exp }, regexp_span))
+						}
 						lexer::Keyword::Type => {
 							let id = Ident::parse(lexer)?;
 							let mut rules = Vec::new();
 							let punct = expect_punct(lexer, &mut span)?;
 							match punct.as_ref() {
 								'=' => (),
-								_ => return Err(Loc::new(Error::UnexpectedToken(lexer::Token::Punct(*punct.as_ref())), punct.span()))
+								_ => {
+									return Err(Loc::new(
+										Error::UnexpectedToken(lexer::Token::Punct(
+											*punct.as_ref(),
+										)),
+										punct.span(),
+									))
+								}
 							}
 							let token = peek_token(lexer, &span)?;
 							match token.as_ref() {
@@ -154,73 +192,109 @@ impl Parsable for Grammar {
 										span.append(rule.span());
 										rules.push(rule);
 									}
-								},
+								}
 								_ => {
 									let items = Vec::<Loc<ty::Expr>>::parse(lexer)?;
 									let tokens_span = items.span();
 									span.append(tokens_span);
-									rules.push(Loc::new(Function {
-										id: None,
-										args: items.into_inner()
-									}, tokens_span));
+									rules.push(Loc::new(
+										Function {
+											id: None,
+											args: items.into_inner(),
+										},
+										tokens_span,
+									));
 								}
 							}
 
-							types.push(Loc::new(ty::Definition {
-								id: id,
-								parameters: Vec::new(), // TODO
-								constructors: rules
-							}, span))
+							types.push(Loc::new(
+								ty::Definition {
+									id: id,
+									parameters: Vec::new(), // TODO
+									constructors: rules,
+								},
+								span,
+							))
 						}
 					}
-				},
-				_ => return Err(Loc::new(Error::UnexpectedToken(token.as_ref().clone()), token.span()))
+				}
+				_ => {
+					return Err(Loc::new(
+						Error::UnexpectedToken(token.as_ref().clone()),
+						token.span(),
+					))
+				}
 			}
 		}
 
-		Ok(Loc::new(Grammar {
-			externs,
-			regexps,
-			types
-		}, span))
+		Ok(Loc::new(
+			Grammar {
+				externs,
+				regexps,
+				types,
+			},
+			span,
+		))
 	}
 }
 
 impl Parsable for Ident {
-	fn parse<L: Iterator<Item = lexer::Result<Loc<lexer::Token>>>>(lexer: &mut Peekable<L>) -> Result<Loc<Self>> {
+	fn parse<L: Iterator<Item = lexer::Result<Loc<lexer::Token>>>>(
+		lexer: &mut Peekable<L>,
+	) -> Result<Loc<Self>> {
 		let mut span = Span::default();
 		let token = expect(lexer, &mut span)?;
 		match token.as_ref() {
 			lexer::Token::Ident(name) => Ok(Loc::new(Ident(name.clone()), token.span())),
-			_ => return Err(Loc::new(Error::UnexpectedToken(token.as_ref().clone()), token.span()))
+			_ => {
+				return Err(Loc::new(
+					Error::UnexpectedToken(token.as_ref().clone()),
+					token.span(),
+				))
+			}
 		}
 	}
 }
 
 impl Parsable for Function {
-	fn parse<L: Iterator<Item = lexer::Result<Loc<lexer::Token>>>>(lexer: &mut Peekable<L>) -> Result<Loc<Self>> {
+	fn parse<L: Iterator<Item = lexer::Result<Loc<lexer::Token>>>>(
+		lexer: &mut Peekable<L>,
+	) -> Result<Loc<Self>> {
 		let id = Ident::parse(lexer)?;
 		let mut span = id.span();
 		let punct = expect_punct(lexer, &mut span)?;
 		match punct.as_ref() {
 			':' => (),
-			_ => return Err(Loc::new(Error::UnexpectedToken(lexer::Token::Punct(*punct.as_ref())), punct.span()))
+			_ => {
+				return Err(Loc::new(
+					Error::UnexpectedToken(lexer::Token::Punct(*punct.as_ref())),
+					punct.span(),
+				))
+			}
 		}
 		let items = Vec::<Loc<ast::ty::Expr>>::parse(lexer)?;
 		span.append(items.span());
-		Ok(Loc::new(Function { id: Some(id), args: items.into_inner() }, span))
+		Ok(Loc::new(
+			Function {
+				id: Some(id),
+				args: items.into_inner(),
+			},
+			span,
+		))
 	}
 }
 
 fn is_repeater(c: char) -> bool {
 	match c {
 		'+' | '*' | '?' => true,
-		_ => false
+		_ => false,
 	}
 }
 
 impl Parsable for ast::ty::Expr {
-	fn parse<L: Iterator<Item = lexer::Result<Loc<lexer::Token>>>>(lexer: &mut Peekable<L>) -> Result<Loc<Self>> {
+	fn parse<L: Iterator<Item = lexer::Result<Loc<lexer::Token>>>>(
+		lexer: &mut Peekable<L>,
+	) -> Result<Loc<Self>> {
 		let mut span = Span::default();
 		let token = expect(lexer, &mut span)?;
 		let token_span = token.span().clone();
@@ -228,16 +302,19 @@ impl Parsable for ast::ty::Expr {
 			lexer::Token::Ident(id) => {
 				let exp = RegExp(vec![Loc::new(regexp::Atom::Ref(Ident(id)), token_span)]);
 				ast::ty::Expr::Terminal(exp)
-			},
+			}
 			lexer::Token::String(s, case_sensitive) => {
-				let exp = RegExp(vec![Loc::new(regexp::Atom::Literal(s, case_sensitive), token_span)]);
+				let exp = RegExp(vec![Loc::new(
+					regexp::Atom::Literal(s, case_sensitive),
+					token_span,
+				)]);
 				ast::ty::Expr::Terminal(exp)
-			},
+			}
 			lexer::Token::Group(Delimiter::Parenthesis, items) => {
 				let mut lexer = items.into_iter().map(safe_token).peekable();
 				let exp = RegExp::parse_only(&mut lexer)?;
 				ast::ty::Expr::Terminal(exp.into_inner())
-			},
+			}
 			lexer::Token::Group(Delimiter::Angle, items) => {
 				let mut lexer = items.into_iter().map(safe_token).peekable();
 				let token = expect(&mut lexer, &mut span)?;
@@ -306,10 +383,8 @@ impl Parsable for ast::ty::Expr {
 				// };
 
 				ast::ty::Expr::NonTerminal(id, args)
-			},
-			unexpected => {
-				return Err(Loc::new(Error::UnexpectedToken(unexpected), token_span))
 			}
+			unexpected => return Err(Loc::new(Error::UnexpectedToken(unexpected), token_span)),
 		};
 
 		Ok(Loc::new(ast, span))
@@ -317,15 +392,15 @@ impl Parsable for ast::ty::Expr {
 }
 
 impl Parsable for Vec<Loc<ast::ty::Expr>> {
-	fn parse<L: Iterator<Item = lexer::Result<Loc<lexer::Token>>>>(lexer: &mut Peekable<L>) -> Result<Loc<Self>> {
+	fn parse<L: Iterator<Item = lexer::Result<Loc<lexer::Token>>>>(
+		lexer: &mut Peekable<L>,
+	) -> Result<Loc<Self>> {
 		let mut span = Span::default();
 		let mut items = Vec::new();
 		loop {
 			if let Some(token) = peek(lexer)? {
 				match token.as_ref() {
-					lexer::Token::Punct('|') | lexer::Token::Keyword(_) => {
-						break
-					},
+					lexer::Token::Punct('|') | lexer::Token::Keyword(_) => break,
 					_ => {
 						let token = ast::ty::Expr::parse(lexer)?;
 						span.append(token.span());
@@ -333,7 +408,7 @@ impl Parsable for Vec<Loc<ast::ty::Expr>> {
 					}
 				}
 			} else {
-				break
+				break;
 			}
 		}
 
@@ -346,7 +421,9 @@ fn safe_token(token: Loc<lexer::Token>) -> lexer::Result<Loc<lexer::Token>> {
 }
 
 impl Parsable for RegExp {
-	fn parse<L: Iterator<Item = lexer::Result<Loc<lexer::Token>>>>(lexer: &mut Peekable<L>) -> Result<Loc<Self>> {
+	fn parse<L: Iterator<Item = lexer::Result<Loc<lexer::Token>>>>(
+		lexer: &mut Peekable<L>,
+	) -> Result<Loc<Self>> {
 		let mut span = Span::default();
 		// let mut inner_span = span;
 
@@ -360,19 +437,22 @@ impl Parsable for RegExp {
 					lexer::Token::Ident(id) => {
 						consume(lexer, &mut span)?;
 						atoms.push(Loc::new(regexp::Atom::Ref(Ident(id.clone())), token_span));
-					},
+					}
 					lexer::Token::CharSet(set, false) => {
 						consume(lexer, &mut span)?;
 						atoms.push(Loc::new(regexp::Atom::CharSet(set.clone()), token_span));
-					},
+					}
 					lexer::Token::CharSet(set, true) => {
 						consume(lexer, &mut span)?;
 						atoms.push(Loc::new(regexp::Atom::CharSet(set.negated()), token_span));
-					},
+					}
 					lexer::Token::String(str, case_sensitive) => {
 						consume(lexer, &mut span)?;
-						atoms.push(Loc::new(regexp::Atom::Literal(str.clone(), case_sensitive), token_span));
-					},
+						atoms.push(Loc::new(
+							regexp::Atom::Literal(str.clone(), case_sensitive),
+							token_span,
+						));
+					}
 					lexer::Token::Group(Delimiter::Parenthesis, items) => {
 						consume(lexer, &mut span)?;
 						let mut lexer = items.into_iter().map(safe_token).peekable();
@@ -380,7 +460,7 @@ impl Parsable for RegExp {
 						let exp_span = exp.span();
 						span.append(exp_span);
 						atoms.push(Loc::new(regexp::Atom::Group(exp), exp_span));
-					},
+					}
 					lexer::Token::Punct(c) if is_repeater(c) => {
 						consume(lexer, &mut span)?;
 						if let Some(atom) = atoms.pop() {
@@ -388,24 +468,36 @@ impl Parsable for RegExp {
 								'*' => (0, std::usize::MAX),
 								'+' => (1, std::usize::MAX),
 								'?' => (0, 1),
-								_ => unreachable!()
+								_ => unreachable!(),
 							};
 							let atom_span = atom.span().clone();
-							atoms.push(Loc::new(regexp::Atom::Repeat(Box::new(Loc::new(atom.into_inner(), atom_span)), min, max), atom_span))
+							atoms.push(Loc::new(
+								regexp::Atom::Repeat(
+									Box::new(Loc::new(atom.into_inner(), atom_span)),
+									min,
+									max,
+								),
+								atom_span,
+							))
 						} else {
-							return Err(Loc::new(Error::UnexpectedToken(lexer::Token::Punct(c)), token_span))
+							return Err(Loc::new(
+								Error::UnexpectedToken(lexer::Token::Punct(c)),
+								token_span,
+							));
 						}
-					},
+					}
 					lexer::Token::Punct('|') => {
 						consume(lexer, &mut span)?;
 						disjunction.push(atoms);
 						atoms = Vec::new();
-					},
+					}
 					lexer::Token::Keyword(_) => break,
-					unexpected => return Err(Loc::new(Error::UnexpectedToken(unexpected), token_span))
+					unexpected => {
+						return Err(Loc::new(Error::UnexpectedToken(unexpected), token_span))
+					}
 				}
 			} else {
-				break
+				break;
 			}
 		}
 
@@ -417,10 +509,17 @@ impl Parsable for RegExp {
 			0 => return Err(Loc::new(Error::EmptyRegExp, span)),
 			1 => RegExp(disjunction.pop().unwrap()),
 			_ => {
-				let exps = disjunction.into_iter().map(|atoms| {
-					let span = atoms.first().unwrap().span().union(atoms.last().unwrap().span());
-					Loc::new(RegExp(atoms), span)
-				}).collect();
+				let exps = disjunction
+					.into_iter()
+					.map(|atoms| {
+						let span = atoms
+							.first()
+							.unwrap()
+							.span()
+							.union(atoms.last().unwrap().span());
+						Loc::new(RegExp(atoms), span)
+					})
+					.collect();
 				RegExp(vec![Loc::new(regexp::Atom::Or(exps), span)])
 			}
 		};

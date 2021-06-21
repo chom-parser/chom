@@ -1,47 +1,217 @@
+use crate::mono::{function, ty, Function, Grammar, Index};
 use source_span::Loc;
 use std::{
+	collections::{BTreeMap, BTreeSet},
 	fmt,
-	collections::{
-		BTreeMap,
-		BTreeSet
-	}
-};
-use crate::mono::{
-	Index,
-	Grammar,
-	ty
 };
 
-pub mod non_deterministic;
-pub mod lr0;
 pub mod lalr1;
+pub mod lr0;
+pub mod non_deterministic;
 
-pub use non_deterministic::NonDeterministic;
-pub use lr0::LR0;
 pub use lalr1::LALR1;
+pub use lr0::LR0;
+pub use non_deterministic::NonDeterministic;
+
+/// Item rule.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub enum Rule {
+	Initial(Index),
+	Function(Index),
+}
+
+pub enum RuleId<'a> {
+	Initial(&'a ty::Id),
+	Function(&'a function::Id),
+}
+
+impl<'a> RuleId<'a> {
+	pub fn as_str(&self) -> &str {
+		match self {
+			Self::Initial(id) => id.name(),
+			Self::Function(id) => id.as_str(),
+		}
+	}
+}
+
+impl Rule {
+	pub fn len(&self, grammar: &Grammar) -> u32 {
+		match self {
+			Self::Initial(_) => 2,
+			Self::Function(index) => {
+				let f = grammar.function(*index).unwrap();
+				f.arity()
+			}
+		}
+	}
+
+	pub fn is_initial(&self) -> bool {
+		match self {
+			Self::Initial(_) => true,
+			_ => false,
+		}
+	}
+
+	pub fn id<'a>(&self, grammar: &'a Grammar) -> RuleId<'a> {
+		match self {
+			Self::Initial(index) => RuleId::Initial(grammar.ty(*index).unwrap().id()),
+			Self::Function(index) => RuleId::Function(grammar.function(*index).unwrap().id()),
+		}
+	}
+
+	pub fn span(&self, grammar: &Grammar) -> Option<source_span::Span> {
+		match self {
+			Self::Initial(index) => grammar.ty(*index).unwrap().span(),
+			Self::Function(index) => grammar.function(*index).unwrap().span(),
+		}
+	}
+
+	pub fn return_ty(&self, grammar: &Grammar) -> Index {
+		match self {
+			Self::Initial(index) => *index,
+			Self::Function(index) => {
+				let f = grammar.function(*index).unwrap();
+				f.return_ty()
+			}
+		}
+	}
+
+	pub fn symbol(&self, grammar: &Grammar, i: u32) -> Option<Symbol> {
+		match self {
+			Self::Initial(index) => match i {
+				0 => Some(Symbol::Expr(ty::Expr::Type(*index))),
+				1 => Some(Symbol::EndOfStream),
+				_ => None,
+			},
+			Self::Function(index) => {
+				let f = grammar.function(*index).unwrap();
+				f.argument(i).map(Symbol::Expr)
+			}
+		}
+	}
+
+	pub fn symbols<'g, 'p>(&self, grammar: &'g Grammar<'p>) -> Symbols<'g, 'p> {
+		match self {
+			Self::Initial(index) => Symbols::Initial(*index, 0),
+			Self::Function(index) => {
+				let f = grammar.function(*index).unwrap();
+				Symbols::Function(&f, 0)
+			}
+		}
+	}
+}
+
+pub enum Symbols<'g, 'p> {
+	Initial(Index, u8),
+	Function(&'g Function<'p>, u32),
+}
+
+impl<'g, 'p> Iterator for Symbols<'g, 'p> {
+	type Item = Symbol;
+
+	fn next(&mut self) -> Option<Self::Item> {
+		match self {
+			Self::Initial(index, i) => match *i {
+				0 => {
+					*i += 1;
+					Some(Symbol::Expr(ty::Expr::Type(*index)))
+				}
+				1 => {
+					*i += 1;
+					Some(Symbol::EndOfStream)
+				}
+				_ => None,
+			},
+			Self::Function(f, i) => match f.argument(*i) {
+				Some(a) => {
+					*i += 1;
+					Some(Symbol::Expr(a))
+				}
+				None => None,
+			},
+		}
+	}
+}
+
+// Rule symbol.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub enum Symbol {
+	Expr(ty::Expr),
+	EndOfStream,
+}
+
+impl Symbol {
+	pub fn format<'a, 'g>(&self, grammar: &'g Grammar<'a>) -> FormattedSymbol<'a, 'g, '_> {
+		match self {
+			Self::Expr(e) => FormattedSymbol::Expr(e.format(grammar)),
+			Self::EndOfStream => FormattedSymbol::EndOfStream,
+		}
+	}
+
+	pub fn instance(&self, grammar: &Grammar) -> String {
+		match self {
+			Self::Expr(e) => e.instance(grammar),
+			Self::EndOfStream => String::new(),
+		}
+	}
+}
+
+pub enum FormattedSymbol<'a, 'g, 's> {
+	Expr(ty::FormattedExpr<'a, 'g, 's>),
+	EndOfStream,
+}
+
+impl<'a, 'g, 's> fmt::Display for FormattedSymbol<'a, 'g, 's> {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		match self {
+			Self::Expr(e) => e.fmt(f),
+			Self::EndOfStream => write!(f, "EOS"),
+		}
+	}
+}
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct Item {
-	/// Function index.
-	pub function: (u32, ty::Instance),
+	/// Rule.
+	pub rule: Rule,
 
 	/// Offset in the rule.
-	pub offset: u32
+	pub offset: u32,
 }
 
 impl Item {
-	pub fn from_rule(function: (u32, ty::Instance)) -> Self {
+	pub fn initial(ty: Index) -> Self {
 		Self {
-			function,
-			offset: 0
+			rule: Rule::Initial(ty),
+			offset: 0,
 		}
 	}
 
-	pub fn shifted(&self) -> Self {
+	pub fn from_rule(function: Index) -> Self {
 		Self {
-			function: self.function,
-			offset: self.offset + 1
+			rule: Rule::Function(function),
+			offset: 0,
 		}
+	}
+
+	pub fn is_initial(&self) -> bool {
+		self.rule.is_initial()
+	}
+
+	pub fn current_symbol(&self, grammar: &Grammar) -> Option<Symbol> {
+		self.rule.symbol(grammar, self.offset)
+	}
+
+	pub fn shifted(&self, grammar: &Grammar) -> Option<(Symbol, Self)> {
+		self.rule.symbol(grammar, self.offset).map(|symbol| {
+			(
+				symbol,
+				Self {
+					rule: self.rule,
+					offset: self.offset + 1,
+				},
+			)
+		})
 	}
 
 	pub fn format<'a, 'g>(&self, grammar: &'g Grammar<'a>) -> FormattedItem<'a, 'g, '_> {
@@ -53,17 +223,26 @@ pub struct FormattedItem<'a, 'g, 'i>(&'g Grammar<'a>, &'i Item);
 
 impl<'a, 'g, 'i> fmt::Display for FormattedItem<'a, 'g, 'i> {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		let fun = self.0.function(self.1.function).unwrap();
-		for (i, arg) in fun.arguments().iter().enumerate() {
+		for (i, arg) in self.1.rule.symbols(self.0).enumerate() {
 			if i as u32 == self.1.offset {
-				write!(f, "•")?
+				if i == 0 {
+					write!(f, "• ")?
+				} else {
+					write!(f, " • ")?
+				}
+			} else if i > 0 {
+				write!(f, " ")?
 			}
 
 			arg.format(self.0).fmt(f)?
 		}
 
-		if self.1.offset == fun.arity() {
-			write!(f, "•")?
+		if self.1.offset == self.1.rule.len(self.0) {
+			if self.1.offset == 0 {
+				write!(f, "•")?
+			} else {
+				write!(f, " •")?
+			}
 		}
 
 		Ok(())
@@ -72,13 +251,13 @@ impl<'a, 'g, 'i> fmt::Display for FormattedItem<'a, 'g, 'i> {
 
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct ItemSet {
-	items: BTreeSet<Item>
+	items: BTreeSet<Item>,
 }
 
 impl ItemSet {
 	pub fn new() -> Self {
 		Self {
-			items: BTreeSet::new()
+			items: BTreeSet::new(),
 		}
 	}
 
@@ -98,16 +277,13 @@ impl ItemSet {
 		let mut stack: Vec<_> = self.items.iter().cloned().collect();
 
 		while let Some(item) = stack.pop() {
-			let f = grammar.function(item.function).unwrap();
-			
-			if let Some(arg) = f.argument(item.offset) {
+			if let Some(arg) = item.current_symbol(grammar) {
 				match arg {
-					ty::Expr::Terminal(_) => (),
-					ty::Expr::Type(ty) => {
+					Symbol::Expr(ty::Expr::Type(ty)) => {
 						for ty_cons in grammar.ty(ty).unwrap().constructors() {
 							let ty_item = Item {
-								function: ty_cons,
-								offset: 0
+								rule: Rule::Function(ty_cons),
+								offset: 0,
 							};
 
 							if self.items.insert(ty_item) {
@@ -115,25 +291,23 @@ impl ItemSet {
 							}
 						}
 					}
+					_ => (),
 				}
 			}
 		}
 	}
 
-	pub fn shift(&self, grammar: &Grammar) -> BTreeMap<ty::Expr, ItemSet> {
-		let mut map: BTreeMap<ty::Expr, ItemSet> = BTreeMap::new();
-		
+	pub fn shift(&self, grammar: &Grammar) -> BTreeMap<Symbol, ItemSet> {
+		let mut map: BTreeMap<Symbol, ItemSet> = BTreeMap::new();
+
 		for item in &self.items {
-			let f = grammar.function(item.function).unwrap();
-			if let Some(symbol) = f.argument(item.offset) {
+			if let Some((symbol, shifted_item)) = item.shifted(grammar) {
 				use std::collections::btree_map::Entry;
 				match map.entry(symbol) {
-					Entry::Occupied(mut entry) => {
-						entry.get_mut().insert(item.shifted())
-					},
+					Entry::Occupied(mut entry) => entry.get_mut().insert(shifted_item),
 					Entry::Vacant(entry) => {
 						let mut set = ItemSet::new();
-						set.insert(item.shifted());
+						set.insert(shifted_item);
 						entry.insert(set);
 					}
 				}
@@ -143,7 +317,7 @@ impl ItemSet {
 		for (_, set) in &mut map {
 			set.close(grammar)
 		}
-		
+
 		map
 	}
 
@@ -158,7 +332,7 @@ impl ItemSet {
 	// 					let span = f.span().unwrap_or_else(|| {
 	// 						grammar.ty(f.return_ty()).unwrap().span().expect("no span")
 	// 					});
-						
+
 	// 					return Err(Loc::new(Ambiguity::ReduceReduce(item.function, other_target), span))
 	// 				},
 	// 				None => item.function

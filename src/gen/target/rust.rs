@@ -1,22 +1,19 @@
-use std::collections::HashMap;
 use crate::{
+	lexing,
+	mono::{ExternalType, Grammar},
 	util,
-	mono::{
-		Grammar,
-		ExternalType
-	},
-	lexing
 };
+use std::collections::HashMap;
 
-pub mod lexer;
 pub mod ast;
+pub mod lexer;
 pub mod lr0;
 
 pub struct Target {
 	context: rust_codegen::Context,
 	std_crate: StdCrate,
 	source_span_crate: SourceSpanCrate,
-	extern_mod: ExternModule
+	extern_mod: ExternModule,
 }
 
 impl Target {
@@ -31,20 +28,56 @@ impl Target {
 			context,
 			std_crate,
 			source_span_crate,
-			extern_mod
+			extern_mod,
 		}
 	}
 
 	pub fn generate_ast(&self, grammar: &Grammar, path: &[String]) -> ast::Module {
-		ast::Module::new(&self.context, grammar, &self.extern_mod, path)
+		ast::Module::new(
+			&self.context,
+			grammar,
+			&self.std_crate,
+			&self.extern_mod,
+			path,
+		)
 	}
 
-	pub fn generate_lexer(&self, grammar: &Grammar, lexing_table: &lexing::Table, path: &[String]) -> lexer::Module {
-		lexer::Module::new(&self.context, grammar, lexing_table, &self.std_crate, &self.source_span_crate, &self.extern_mod, path)
+	pub fn generate_lexer(
+		&self,
+		grammar: &Grammar,
+		lexing_table: &lexing::Table,
+		path: &[String],
+	) -> lexer::Module {
+		lexer::Module::new(
+			&self.context,
+			grammar,
+			lexing_table,
+			&self.std_crate,
+			&self.source_span_crate,
+			&self.extern_mod,
+			path,
+		)
 	}
 
-	pub fn generate_lr0_parser(&self, grammar: &Grammar, ast_mod: &ast::Module, lexer_mod: &lexer::Module, table: &crate::parsing::table::LR0, path: &[String]) -> lr0::Module {
-		lr0::Module::new(&self.context, &self.std_crate, &self.source_span_crate, lexer_mod, ast_mod, grammar, table, path)
+	pub fn generate_lr0_parser(
+		&self,
+		grammar: &Grammar,
+		ast_mod: &ast::Module,
+		lexer_mod: &lexer::Module,
+		table: &crate::parsing::table::LR0,
+		path: &[String],
+	) -> lr0::Module {
+		lr0::Module::new(
+			&self.context,
+			&self.std_crate,
+			&self.source_span_crate,
+			&self.extern_mod,
+			lexer_mod,
+			ast_mod,
+			grammar,
+			table,
+			path,
+		)
 	}
 }
 
@@ -66,29 +99,34 @@ fn declare_module(context: &rust_codegen::Context, path: &[String]) -> rust_code
 }
 
 pub struct StdCrate {
+	pub from_trait: rust_codegen::tr::Ref,
 	pub into_trait: rust_codegen::tr::Ref,
 	pub iterator_trait: rust_codegen::tr::Ref,
 	pub peekable_struct: rust_codegen::strct::Ref,
 	pub option_enum: rust_codegen::enm::Ref,
 	pub result_enum: rust_codegen::enm::Ref,
+	pub box_struct: rust_codegen::strct::Ref,
 	pub string_struct: rust_codegen::strct::Ref,
 }
 
 impl StdCrate {
 	fn new(context: &mut rust_codegen::Context) -> Self {
+		let from_trait;
 		let into_trait;
 		let iterator_trait;
 		let peekable_struct;
 		let result_enum;
 		let option_enum;
+		let box_struct;
 		let string_struct;
 		let crte_ref = context.add_extern_crate("std");
-		
+
 		{
 			let mut crte = crte_ref.borrow_mut();
 
 			let std_convert_mod_ref = crte.add_module("convert");
 			let mut std_convert_mod = std_convert_mod_ref.borrow_mut();
+			from_trait = std_convert_mod.add_trait("From");
 			into_trait = std_convert_mod.add_trait("Into");
 
 			let std_iter_mod_ref = crte.add_module("iter");
@@ -106,18 +144,24 @@ impl StdCrate {
 			let mut std_result_mod = std_result_mod_ref.borrow_mut();
 			result_enum = std_result_mod.add_enum("Result");
 
+			let std_boxed_mod_ref = crte.add_module("boxed");
+			let mut std_boxed_mod = std_boxed_mod_ref.borrow_mut();
+			box_struct = std_boxed_mod.add_struct("Box");
+
 			let std_string_mod_ref = crte.add_module("string");
 			let mut std_string_mod = std_string_mod_ref.borrow_mut();
 			string_struct = std_string_mod.add_struct("String");
 		}
 
 		Self {
+			from_trait,
 			into_trait,
 			iterator_trait,
 			peekable_struct,
 			result_enum,
 			option_enum,
-			string_struct
+			box_struct,
+			string_struct,
 		}
 	}
 }
@@ -125,7 +169,7 @@ impl StdCrate {
 pub struct SourceSpanCrate {
 	pub span_struct: rust_codegen::strct::Ref,
 	pub loc_struct: rust_codegen::strct::Ref,
-	pub metrics_trait: rust_codegen::tr::Ref
+	pub metrics_trait: rust_codegen::tr::Ref,
 }
 
 impl SourceSpanCrate {
@@ -134,7 +178,7 @@ impl SourceSpanCrate {
 		let loc_struct;
 		let metrics_trait;
 		let crte_ref = context.add_extern_crate("source_span");
-		
+
 		{
 			let mut crte = crte_ref.borrow_mut();
 			span_struct = crte.add_struct("Span");
@@ -145,7 +189,7 @@ impl SourceSpanCrate {
 		Self {
 			span_struct,
 			loc_struct,
-			metrics_trait
+			metrics_trait,
 		}
 	}
 }
@@ -154,7 +198,7 @@ impl SourceSpanCrate {
 pub struct ExternModule {
 	inner: rust_codegen::module::Ref,
 	types: HashMap<u32, rust_codegen::strct::Ref>,
-	error_type: rust_codegen::strct::Ref
+	error_type: rust_codegen::strct::Ref,
 }
 
 fn converter_name(c: &lexing::token::Convertion) -> String {
@@ -186,7 +230,8 @@ impl ExternModule {
 			}
 
 			for (def, _) in grammar.regexps() {
-				if let Some(c) = lexing::token::Convertion::new_opt(grammar.poly(), &def.id, def.ty) {
+				if let Some(c) = lexing::token::Convertion::new_opt(grammar.poly(), &def.id, def.ty)
+				{
 					let id = converter_name(&c);
 					let ty = types.get(&def.ty).unwrap();
 					let sig = rust_codegen::func::Signature::new(id, ty.instanciate());
@@ -200,7 +245,7 @@ impl ExternModule {
 		Self {
 			inner: module_ref,
 			types,
-			error_type
+			error_type,
 		}
 	}
 
@@ -217,9 +262,13 @@ impl ExternModule {
 		self.inner.path(scope)
 	}
 
-	pub fn converter_path(&self, scope: &rust_codegen::Scope, c: &lexing::token::Convertion) -> proc_macro2::TokenStream {
+	pub fn converter_path(
+		&self,
+		scope: &rust_codegen::Scope,
+		c: &lexing::token::Convertion,
+	) -> proc_macro2::TokenStream {
 		let path = self.path(scope);
 		let id = converter_ident(c);
-		quote::quote!{ #path::#id }
+		quote::quote! { #path::#id }
 	}
 }

@@ -1,10 +1,10 @@
-use std::fmt;
 use crate::syntax::Ident;
+use std::fmt;
 
 #[derive(Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum ExternalType {
 	Unit,
-	Custom(Ident)
+	Custom(Ident),
 }
 
 impl Default for ExternalType {
@@ -25,7 +25,7 @@ impl ExternalType {
 	pub fn name(&self) -> &str {
 		match self {
 			Self::Unit => "unit",
-			Self::Custom(id) => id.as_str()
+			Self::Custom(id) => id.as_str(),
 		}
 	}
 }

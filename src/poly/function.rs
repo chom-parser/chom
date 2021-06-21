@@ -1,17 +1,14 @@
-use std::fmt;
-use source_span::Loc;
+use super::{ty, Grammar};
 use crate::syntax::Ident;
-use super::{
-	Grammar,
-	ty
-};
+use source_span::Loc;
+use std::fmt;
 
 /// Primitive type constructor.
 pub enum Primitive {
 	None,
 	Some,
 	Nil,
-	Cons
+	Cons,
 }
 
 impl Primitive {
@@ -20,7 +17,7 @@ impl Primitive {
 			Self::None => "none",
 			Self::Some => "some",
 			Self::Nil => "nil",
-			Self::Cons => "cons"
+			Self::Cons => "cons",
 		}
 	}
 }
@@ -29,7 +26,7 @@ impl Primitive {
 pub enum Id {
 	Defined(Ident),
 	Primitive(Primitive),
-	Cast
+	Cast,
 }
 
 impl Id {
@@ -37,7 +34,7 @@ impl Id {
 		match self {
 			Self::Defined(id) => id.as_str(),
 			Self::Primitive(p) => p.as_str(),
-			Self::Cast => "cast"
+			Self::Cast => "cast",
 		}
 	}
 }
@@ -51,7 +48,7 @@ pub struct Function {
 	return_ty: u32,
 
 	/// Arguments.
-	args: Vec<ty::Expr>
+	args: Vec<ty::Expr>,
 }
 
 impl Function {
@@ -59,14 +56,14 @@ impl Function {
 		Function {
 			id,
 			return_ty,
-			args
+			args,
 		}
 	}
 
 	pub fn id(&self) -> &Id {
 		&self.id
 	}
-	
+
 	pub fn return_ty(&self) -> u32 {
 		self.return_ty
 	}

@@ -1,33 +1,19 @@
-use std::{
-	fmt,
-	hash::{
-		Hash,
-		Hasher
-	},
-	cmp::{
-		PartialOrd,
-		Ord,
-		Ordering
-	}
+use super::{token, Token};
+use crate::{
+	poly::{ExternalType, Grammar},
+	CharSet, Ident,
 };
 use once_cell::unsync::OnceCell;
-use crate::{
-	Ident,
-	CharSet,
-	poly::{
-		Grammar,
-		ExternalType
-	}
-};
-use super::{
-	Token,
-	token
+use std::{
+	cmp::{Ord, Ordering, PartialOrd},
+	fmt,
+	hash::{Hash, Hasher},
 };
 
 pub struct Definition {
 	pub id: Ident,
 	pub ty: u32,
-	pub exp: RegExp
+	pub exp: RegExp,
 }
 
 impl Definition {
@@ -102,12 +88,12 @@ impl RegExp {
 	pub fn token(&self, grammar: &Grammar) -> Token {
 		if self.len() == 1 {
 			if let Some(token) = self.0.first().unwrap().token(grammar) {
-				return token
+				return token;
 			}
 		}
 
 		if let Some(name) = self.composite_name(grammar) {
-			return Token::Composed(name, token::Convertion::from_regexp(grammar, self))
+			return Token::Composed(name, token::Convertion::from_regexp(grammar, self));
 		}
 
 		Token::Anonymous(0, token::Convertion::from_regexp(grammar, self))
@@ -115,13 +101,13 @@ impl RegExp {
 
 	fn composite_name(&self, grammar: &Grammar) -> Option<Vec<String>> {
 		let mut name = Vec::new();
-	
+
 		for atom in &self.0 {
 			match atom.token(grammar) {
 				Some(Token::Named(n, _)) => name.push(n.as_str().to_string()),
 				Some(Token::Keyword(k)) => name.push(k.clone()),
 				Some(Token::Composed(n, _)) => name.extend(n.iter().cloned()),
-				_ => return None
+				_ => return None,
 			}
 		}
 
@@ -153,7 +139,7 @@ impl fmt::Display for RegExp {
 #[derive(Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Atom {
 	/// Defined regexp reference.
-	/// 
+	///
 	/// The first parameter is the index of the regexp definition in the grammar.
 	Ref(u32),
 	CharSet(CharSet),
@@ -168,40 +154,39 @@ impl Atom {
 		match self {
 			Self::Ref(i) => Some(*i),
 			Self::Group(g) => g.as_reference(),
-			_ => None
+			_ => None,
 		}
 	}
 
 	pub fn token(&self, grammar: &Grammar) -> Option<Token> {
-		 match self {
+		match self {
 			Self::Ref(i) => {
 				let exp = grammar.regexp(*i).unwrap();
-				Some(Token::Named(exp.id.clone(), token::Convertion::new_opt(grammar, &exp.id, exp.ty)))
-			},
+				Some(Token::Named(
+					exp.id.clone(),
+					token::Convertion::new_opt(grammar, &exp.id, exp.ty),
+				))
+			}
 			Self::CharSet(set) => {
 				if set.len() == 1usize {
 					char_as_token(set.first().unwrap())
 				} else {
 					None
 				}
-			},
+			}
 			Self::Literal(string, true) => {
 				if string.len() == 1 {
 					if let Some(token) = char_as_token(string.chars().next().unwrap()) {
-						return Some(token)
+						return Some(token);
 					}
 				}
 
 				Some(Token::Keyword(string.clone()))
-			},
-			Self::Literal(string, false) => {
-				Some(Token::Keyword(string.clone()))
-			},
+			}
+			Self::Literal(string, false) => Some(Token::Keyword(string.clone())),
 			Self::Repeat(_, _, _) => None,
 			Self::Or(_) => None,
-			Self::Group(g) => {
-				Some(g.token(grammar).clone())
-			},
+			Self::Group(g) => Some(g.token(grammar).clone()),
 		}
 	}
 
@@ -211,15 +196,9 @@ impl Atom {
 
 	pub fn instance(&self, grammar: &Grammar) -> String {
 		match self {
-			Self::Ref(i) => {
-				grammar.regexp(*i).unwrap().exp.instance(grammar)
-			},
-			Self::CharSet(set) => {
-				set.first().unwrap().to_string()
-			},
-			Self::Literal(string, _) => {
-				string.clone()
-			},
+			Self::Ref(i) => grammar.regexp(*i).unwrap().exp.instance(grammar),
+			Self::CharSet(set) => set.first().unwrap().to_string(),
+			Self::Literal(string, _) => string.clone(),
 			Self::Repeat(atom, min, _) => {
 				let mut string = String::new();
 
@@ -229,13 +208,9 @@ impl Atom {
 				}
 
 				string
-			},
-			Self::Or(exps) => {
-				exps.first().unwrap().instance(grammar)
-			},
-			Self::Group(g) => {
-				g.instance(grammar)
 			}
+			Self::Or(exps) => exps.first().unwrap().instance(grammar),
+			Self::Group(g) => g.instance(grammar),
 		}
 	}
 }
@@ -265,19 +240,17 @@ impl fmt::Display for Atom {
 				} else {
 					write!(f, "\"{}\"", string)
 				}
-			},
-			Self::Repeat(atom, min, max) => {
-				match (*min, *max) {
-					(0, usize::MAX) => write!(f, "{}*", atom),
-					(1, usize::MAX) => write!(f, "{}+", atom),
-					(0, 1) => write!(f, "{}?", atom),
-					_ => unimplemented!()
-				}
+			}
+			Self::Repeat(atom, min, max) => match (*min, *max) {
+				(0, usize::MAX) => write!(f, "{}*", atom),
+				(1, usize::MAX) => write!(f, "{}+", atom),
+				(0, 1) => write!(f, "{}?", atom),
+				_ => unimplemented!(),
 			},
 			Self::Or(exps) => {
 				use itertools::Itertools;
 				exps.iter().format(" | ").fmt(f)
-			},
+			}
 			Self::Group(exp) => {
 				write!(f, "({})", exp)
 			}
@@ -302,9 +275,7 @@ pub struct FormattedAtom<'g, 'a>(&'g Grammar, &'a Atom);
 impl<'g, 'a> fmt::Display for FormattedAtom<'g, 'a> {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		match self.1 {
-			Atom::Ref(i) => {
-				self.0.regexp(*i).unwrap().id.fmt(f)
-			},
+			Atom::Ref(i) => self.0.regexp(*i).unwrap().id.fmt(f),
 			Atom::CharSet(set) => set.fmt(f),
 			Atom::Literal(string, case_sensitive) => {
 				if *case_sensitive {
@@ -312,19 +283,17 @@ impl<'g, 'a> fmt::Display for FormattedAtom<'g, 'a> {
 				} else {
 					write!(f, "\"{}\"", string)
 				}
-			},
-			Atom::Repeat(atom, min, max) => {
-				match (*min, *max) {
-					(0, usize::MAX) => write!(f, "{}*", atom),
-					(1, usize::MAX) => write!(f, "{}+", atom),
-					(0, 1) => write!(f, "{}?", atom),
-					_ => unimplemented!()
-				}
+			}
+			Atom::Repeat(atom, min, max) => match (*min, *max) {
+				(0, usize::MAX) => write!(f, "{}*", atom),
+				(1, usize::MAX) => write!(f, "{}+", atom),
+				(0, 1) => write!(f, "{}?", atom),
+				_ => unimplemented!(),
 			},
 			Atom::Or(exps) => {
 				use itertools::Itertools;
 				exps.iter().format(" | ").fmt(f)
-			},
+			}
 			Atom::Group(exp) => {
 				write!(f, "({})", exp)
 			}

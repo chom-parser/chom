@@ -1,52 +1,41 @@
-use std::collections::{
-	BTreeMap
-};
-use source_span::{
-	Loc,
-	Span
-};
+use super::{Error, Functions};
 use crate::{
-	syntax::{
-		self,
-		Ident,
-		Caused
-	},
-	poly::{
-		ty,
-		Type,
-		function,
-		Function
-	}
+	poly::{function, ty, Function, Type},
+	syntax::{self, Caused, Ident},
 };
-use super::{
-	Error,
-	Functions
-};
+use source_span::{Loc, Span};
+use std::collections::BTreeMap;
 
 pub struct Types {
 	list: Vec<Caused<Type>>,
 
 	id_map: BTreeMap<Ident, u32>,
-	desc_map: BTreeMap<ty::Id, u32>
+	desc_map: BTreeMap<ty::Id, u32>,
 }
 
 impl Types {
 	pub fn new(ast: &[Loc<syntax::ty::Definition>]) -> Result<Self, Loc<Error>> {
 		let mut list = Vec::new();
 		let mut map = BTreeMap::new();
-		
+
 		for def in ast {
 			use std::collections::btree_map::Entry;
 			match map.entry(def.id.as_ref().clone()) {
 				Entry::Vacant(entry) => {
 					let i = list.len() as u32;
-					list.push(Caused::explicit(Type::defined(def.id.as_ref().clone()), def.id.span()));
+					list.push(Caused::explicit(
+						Type::defined(def.id.as_ref().clone()),
+						def.id.span(),
+					));
 					entry.insert(i);
-				},
+				}
 				Entry::Occupied(entry) => {
 					let old_def_index = entry.get();
 					let old_def_span = list[*old_def_index as usize].span().unwrap();
-					return Err(Loc::new(Error::AlreadyDefinedType(def.id.as_ref().clone(), old_def_span), def.id.span()))
+					return Err(Loc::new(
+						Error::AlreadyDefinedType(def.id.as_ref().clone(), old_def_span),
+						def.id.span(),
+					));
 				}
 			}
 		}
@@ -54,7 +43,7 @@ impl Types {
 		Ok(Self {
 			list,
 			id_map: map,
-			desc_map: BTreeMap::new()
+			desc_map: BTreeMap::new(),
 		})
 	}
 
@@ -63,14 +52,15 @@ impl Types {
 	}
 
 	pub fn get_by_id(&mut self, id: &Loc<Ident>) -> Result<u32, Loc<Error>> {
-		self.id_map.get(id.as_ref()).cloned().ok_or_else(|| Loc::new(Error::UndefinedType(id.as_ref().clone()), id.span()))
+		self.id_map
+			.get(id.as_ref())
+			.cloned()
+			.ok_or_else(|| Loc::new(Error::UndefinedType(id.as_ref().clone()), id.span()))
 	}
 
 	pub fn get_by_desc(&mut self, id: ty::Id, span: Span) -> u32 {
 		match id {
-			ty::Id::Defined(id) => {
-				self.id_map.get(&id).cloned().unwrap()
-			},
+			ty::Id::Defined(id) => self.id_map.get(&id).cloned().unwrap(),
 			_ => {
 				use std::collections::btree_map::Entry;
 				match self.desc_map.entry(id.clone()) {
@@ -79,10 +69,8 @@ impl Types {
 						self.list.push(Caused::explicit(Type::new(id), span));
 						entry.insert(i);
 						i
-					},
-					Entry::Occupied(entry) => {
-						*entry.get()
 					}
+					Entry::Occupied(entry) => *entry.get(),
 				}
 			}
 		}
@@ -99,10 +87,8 @@ impl Types {
 						self.list.push(Caused::explicit(Type::new(id), span));
 						entry.insert(i);
 						(i, true)
-					},
-					Entry::Occupied(entry) => {
-						(*entry.get(), false)
 					}
+					Entry::Occupied(entry) => (*entry.get(), false),
 				}
 			}
 		}
@@ -150,7 +136,7 @@ impl Types {
 	// 				} else {
 	// 					None
 	// 				};
-					
+
 	// 				let cons_rule = {
 	// 					let mut symbols = vec![MaybeLoc::new(rule::Symbol::NonTerminal(inner_ty), None)];
 

@@ -1,13 +1,7 @@
+use btree_range_map::{AnyRange, RangeSet};
 use std::{
 	fmt,
-	ops::{
-		Deref,
-		DerefMut
-	}
-};
-use btree_range_map::{
-	RangeSet,
-	AnyRange
+	ops::{Deref, DerefMut},
 };
 
 pub struct DisplayChar(pub char);
@@ -30,8 +24,8 @@ impl fmt::Display for DisplayChar {
 				} else {
 					write!(f, "\\U{:08x}", d)
 				}
-			},
-			_ => c.fmt(f)
+			}
+			_ => c.fmt(f),
 		}
 	}
 }
@@ -54,10 +48,11 @@ impl<'a> fmt::Display for DisplayCharRange<'a> {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		if let Some(first) = self.0.first() {
 			let last = self.0.last().unwrap();
-	
+
 			if first == last {
 				fmt::Display::fmt(&DisplayChar(first), f)
-			} else if first as u32 + 1 == last as u32 { // Note: no risk of overflowing here with `char`.
+			} else if first as u32 + 1 == last as u32 {
+				// Note: no risk of overflowing here with `char`.
 				write!(f, "{}{}", DisplayChar(first), DisplayChar(last))
 			} else {
 				write!(f, "{}-{}", DisplayChar(first), DisplayChar(last))
@@ -77,7 +72,7 @@ impl CharSet {
 	}
 
 	/// Creates the charset of whitespaces.
-	/// 
+	///
 	/// TODO: for now, only ASCII whitespaces are included.
 	pub fn whitespace() -> CharSet {
 		let mut set = RangeSet::new();
@@ -92,7 +87,7 @@ impl CharSet {
 
 	pub fn from_char(c: char, case_sensitive: bool) -> CharSet {
 		let mut set = CharSet::new();
-		
+
 		if case_sensitive {
 			set.insert(c)
 		} else {
@@ -107,7 +102,7 @@ impl CharSet {
 		set
 	}
 
-	pub fn ranges(&self) -> impl Iterator<Item=&btree_range_map::AnyRange<char>> {
+	pub fn ranges(&self) -> impl Iterator<Item = &btree_range_map::AnyRange<char>> {
 		self.0.iter()
 	}
 

@@ -1,10 +1,7 @@
+use super::{ty, Ident};
 use source_span::Loc;
-use super::{
-	Ident,
-	ty
-};
 
 pub struct Function {
 	pub id: Option<Loc<Ident>>,
-	pub args: Vec<Loc<ty::Expr>>
+	pub args: Vec<Loc<ty::Expr>>,
 }

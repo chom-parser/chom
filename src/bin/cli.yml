@@ -1,6 +1,6 @@
 name: mkmuncher
-version: "1.0"
-author: Timothée Haudebourg <timothee@haudebourg.net>
+version: "0.0"
+author: Timothée Haudebourg <author@haudebourg.net>
 about: Parser generation tool.
 args:
     - FILE:
@@ -28,6 +28,16 @@ subcommands:
             - PARSER:
                 required: true
                 help: The parser module path.
+            - root:
+                takes_value: true
+                short: r
+                long: root
+                help: Sets the root directory in which the
+                    generated files will be written.
+                    By default this is the current working directory.
+            - create-parents:
+                short: p
+                help: Create parent directories.
             - std-output:
                 takes_value: true
                 short: o

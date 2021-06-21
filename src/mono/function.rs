@@ -1,14 +1,8 @@
-use std::fmt;
-use source_span::Loc;
-use crate::{
-	syntax::Ident,
-	poly
-};
-use super::{
-	Grammar,
-	ty
-};
+use super::{ty, Grammar};
+use crate::{poly, syntax::Ident};
 pub use poly::function::Id;
+use source_span::Loc;
+use std::fmt;
 
 /// Polymorphic function.
 pub struct Function<'a> {
@@ -19,15 +13,19 @@ pub struct Function<'a> {
 	instance: ty::Instance,
 
 	/// Arguments.
-	args: Vec<ty::Expr>
+	args: Vec<ty::Expr>,
 }
 
 impl<'a> Function<'a> {
-	pub(crate) fn new(poly: &'a poly::Function, instance: ty::Instance, args: Vec<ty::Expr>) -> Self {
+	pub(crate) fn new(
+		poly: &'a poly::Function,
+		instance: ty::Instance,
+		args: Vec<ty::Expr>,
+	) -> Self {
 		Self {
 			poly,
 			instance,
-			args
+			args,
 		}
 	}
 
@@ -57,11 +55,11 @@ impl<'a> Function<'a> {
 
 	pub fn instance(&self, grammar: &Grammar) -> String {
 		let mut string = String::new();
-		
+
 		for a in &self.args {
 			string.extend(a.instance(grammar).chars())
 		}
-		
+
 		string
 	}
 }

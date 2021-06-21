@@ -1,12 +1,12 @@
-use std::fmt;
-use source_span::Loc;
 use super::lexer;
+use source_span::Loc;
+use std::fmt;
 
 pub enum Error {
 	Lexer(lexer::Error),
 	UnexpectedEos,
 	UnexpectedToken(lexer::Token),
-	EmptyRegExp
+	EmptyRegExp,
 }
 
 impl fmt::Display for Error {
@@ -16,7 +16,7 @@ impl fmt::Display for Error {
 			Lexer(e) => write!(f, "{}", e),
 			UnexpectedEos => write!(f, "unexpected end of stream"),
 			UnexpectedToken(_) => write!(f, "unexpected token"),
-			EmptyRegExp => write!(f, "empty regexp")
+			EmptyRegExp => write!(f, "empty regexp"),
 		}
 	}
 }

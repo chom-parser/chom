@@ -1,8 +1,5 @@
+use source_span::{Metrics, Span};
 use std::fmt;
-use source_span::{
-	Metrics,
-	Span
-};
 use yansi::Paint;
 
 mod ambiguity;
@@ -13,14 +10,14 @@ pub const WARNING: source_span::fmt::Style = source_span::fmt::Style::Warning;
 
 pub enum Type {
 	Warning,
-	Error
+	Error,
 }
 
 impl fmt::Display for Type {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		match self {
 			Self::Warning => write!(f, "{}", Paint::yellow("warning").bold()),
-			Self::Error => write!(f, "{}", Paint::red("error").bold())
+			Self::Error => write!(f, "{}", Paint::red("error").bold()),
 		}
 	}
 }
@@ -30,7 +27,7 @@ pub struct Block {
 	title: String,
 	source: Option<String>,
 	highlights: source_span::fmt::Formatter,
-	notes: Vec<Note>
+	notes: Vec<Note>,
 }
 
 impl Block {
@@ -40,7 +37,7 @@ impl Block {
 			title: title.to_string(),
 			source: None,
 			highlights: source_span::fmt::Formatter::new(),
-			notes: Vec::new()
+			notes: Vec::new(),
 		}
 	}
 
@@ -59,7 +56,7 @@ impl Block {
 	pub fn add_note<S: ToString>(&mut self, ty: NoteType, content: S) {
 		self.notes.push(Note {
 			ty,
-			content: content.to_string()
+			content: content.to_string(),
 		})
 	}
 
@@ -67,14 +64,18 @@ impl Block {
 		self.highlights.span().unwrap().aligned()
 	}
 
-	pub fn render<E, I: Iterator<Item = Result<char, E>>, M: Metrics>(&self, input: I, metrics: &M) -> Result<Formatted, E> {
+	pub fn render<E, I: Iterator<Item = Result<char, E>>, M: Metrics>(
+		&self,
+		input: I,
+		metrics: &M,
+	) -> Result<Formatted, E> {
 		let span = self.span();
 		let margin_len = self.highlights.margin_len(&span);
-		
+
 		Ok(Formatted {
 			block: self,
 			margin_len: if margin_len >= 2 { margin_len - 2 } else { 0 },
-			highlights: self.highlights.render(input, span, metrics)?
+			highlights: self.highlights.render(input, span, metrics)?,
 		})
 	}
 }
@@ -82,7 +83,7 @@ impl Block {
 pub struct Formatted<'a> {
 	block: &'a Block,
 	margin_len: usize,
-	highlights: source_span::fmt::Formatted
+	highlights: source_span::fmt::Formatted,
 }
 
 impl<'a> fmt::Display for Formatted<'a> {
@@ -92,7 +93,13 @@ impl<'a> fmt::Display for Formatted<'a> {
 			tab.push(' ')
 		}
 
-		write!(f, "{}{} {}\n", self.block.ty, Paint::new(':').bold(), Paint::new(&self.block.title).bold())?;
+		write!(
+			f,
+			"{}{} {}\n",
+			self.block.ty,
+			Paint::new(':').bold(),
+			Paint::new(&self.block.title).bold()
+		)?;
 
 		if let Some(source) = &self.block.source {
 			write!(f, "{}--> {}", tab, source)?
@@ -118,19 +125,19 @@ impl<'a> fmt::Display for Formatted<'a> {
 
 pub enum NoteType {
 	Note,
-	Help
+	Help,
 }
 
 impl fmt::Display for NoteType {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		match self {
 			Self::Note => write!(f, "{}", Paint::new("note").bold()),
-			Self::Help => write!(f, "{}", Paint::green("help").bold())
+			Self::Help => write!(f, "{}", Paint::green("help").bold()),
 		}
 	}
 }
 
 pub struct Note {
 	ty: NoteType,
-	content: String
+	content: String,
 }

@@ -1,23 +1,15 @@
-use std::collections::{
-	BTreeMap
-};
-use source_span::{
-	Span,
-	Loc
-};
-use crate::{
-	syntax::{
-		self,
-		Ident
-	},
-	poly::ExternalType
-};
 use super::Error;
+use crate::{
+	poly::ExternalType,
+	syntax::{self, Ident},
+};
+use source_span::{Loc, Span};
+use std::collections::BTreeMap;
 
 pub struct ExternalTypes {
 	list: Vec<(ExternalType, Option<Span>)>,
 
-	map: BTreeMap<Ident, u32>
+	map: BTreeMap<Ident, u32>,
 }
 
 impl ExternalTypes {
@@ -25,7 +17,10 @@ impl ExternalTypes {
 		let mut list = Vec::new();
 		let mut map = BTreeMap::new();
 
-		map.insert(Ident(ExternalType::Unit.name().to_string()), list.len() as u32);
+		map.insert(
+			Ident(ExternalType::Unit.name().to_string()),
+			list.len() as u32,
+		);
 		list.push((ExternalType::Unit, None));
 
 		for id in ast {
@@ -35,11 +30,14 @@ impl ExternalTypes {
 				Entry::Vacant(entry) => {
 					list.push((ExternalType::from_ident(id.as_ref()), Some(id.span())));
 					entry.insert(index as u32);
-				},
+				}
 				Entry::Occupied(entry) => {
 					let old_index = entry.get();
 					if let Some(old_def_span) = list[*old_index as usize].1 {
-						return Err(Loc::new(Error::AlreadyDefinedExternalType(id.as_ref().clone(), old_def_span), id.span()))
+						return Err(Loc::new(
+							Error::AlreadyDefinedExternalType(id.as_ref().clone(), old_def_span),
+							id.span(),
+						));
 					} else {
 						list[*old_index as usize].1 = Some(id.span());
 					}
@@ -47,16 +45,15 @@ impl ExternalTypes {
 			}
 		}
 
-		Ok(Self {
-			list,
-			map
-		})
+		Ok(Self { list, map })
 	}
 
 	pub fn get(&self, id: Option<&Loc<Ident>>) -> Result<u32, Loc<Error>> {
 		match id {
-			Some(id) => self.map.get(id).cloned().ok_or_else(|| Loc::new(Error::UndefinedExternalType(id.as_ref().clone()), id.span())),
-			None => Ok(0)
+			Some(id) => self.map.get(id).cloned().ok_or_else(|| {
+				Loc::new(Error::UndefinedExternalType(id.as_ref().clone()), id.span())
+			}),
+			None => Ok(0),
 		}
 	}
 

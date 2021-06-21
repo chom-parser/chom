@@ -1,16 +1,19 @@
-use source_span::{
-	Position,
-	Span
-};
+use source_span::{Position, Span};
 use yansi::Paint;
 
 const LINE_CHAR: char = '-';
 const INTER_CHAR: char = '+';
 
-pub fn format_ambiguity_example<A: AsRef<str>, B: AsRef<str>>(content: &str, a_span: Span, a_label: A, b_span: Span, b_label: B) -> String {
+pub fn format_ambiguity_example<A: AsRef<str>, B: AsRef<str>>(
+	content: &str,
+	a_span: Span,
+	a_label: A,
+	b_span: Span,
+	b_label: B,
+) -> String {
 	let a_label = a_label.as_ref();
 	let b_label = b_label.as_ref();
-	
+
 	let mut pos = Position::default();
 
 	let mut down = String::new();
@@ -82,7 +85,7 @@ pub fn format_ambiguity_example<A: AsRef<str>, B: AsRef<str>>(content: &str, a_s
 			if pos == b_span.last() && !b_before {
 				up.push(' ');
 				up.push_str(b_label)
-			}	
+			}
 		}
 
 		pos = pos.next(c, &source_span::DEFAULT_METRICS);
@@ -93,17 +96,17 @@ pub fn format_ambiguity_example<A: AsRef<str>, B: AsRef<str>>(content: &str, a_s
 		margin_str.push(' ');
 	}
 
-	let a_margin = if a_before {
-		""
-	} else {
-		margin_str.as_str()
-	};
+	let a_margin = if a_before { "" } else { margin_str.as_str() };
 
-	let b_margin = if b_before {
-		""
-	} else {
-		margin_str.as_str()
-	};
+	let b_margin = if b_before { "" } else { margin_str.as_str() };
 
-	format!("{}{}\n{}{}\n{}{}", b_margin, Paint::yellow(up).bold(), margin_str, content, a_margin, Paint::yellow(down).bold())
+	format!(
+		"{}{}\n{}{}\n{}{}",
+		b_margin,
+		Paint::yellow(up).bold(),
+		margin_str,
+		content,
+		a_margin,
+		Paint::yellow(down).bold()
+	)
 }

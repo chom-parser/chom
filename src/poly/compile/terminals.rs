@@ -1,33 +1,24 @@
-use std::collections::{
-	HashSet,
-	BTreeMap
+use super::{Error, RegExps};
+use crate::{
+	poly::{terminal, Terminal},
+	syntax,
 };
 use source_span::Loc;
-use crate::{
-	syntax,
-	poly::{
-		terminal,
-		Terminal
-	}
-};
-use super::{
-	Error,
-	RegExps
-};
+use std::collections::{BTreeMap, HashSet};
 
 pub struct Terminals {
 	/// Every terminals.
 	list: Vec<(Terminal, HashSet<Loc<syntax::RegExp>>)>,
 
 	/// Associate each terminal to its identifier.
-	table: BTreeMap<terminal::Desc, u32>
+	table: BTreeMap<terminal::Desc, u32>,
 }
 
 impl Terminals {
 	pub fn new() -> Self {
 		Self {
 			list: Vec::new(),
-			table: BTreeMap::new()
+			table: BTreeMap::new(),
 		}
 	}
 
@@ -36,7 +27,7 @@ impl Terminals {
 			Some(id) => {
 				self.list[id as usize].1.insert(ast);
 				id
-			},
+			}
 			None => {
 				let id = self.list.len() as u32;
 				let mut locs = HashSet::new();
@@ -66,7 +57,11 @@ fn check_terminal(regexps: &RegExps, terminal: &Loc<syntax::RegExp>) -> Result<(
 	check_regexp(regexps, terminal.as_ref(), true)
 }
 
-fn check_regexp(regexps: &RegExps, exp: &syntax::RegExp, mut topmost: bool) -> Result<(), Loc<Error>> {
+fn check_regexp(
+	regexps: &RegExps,
+	exp: &syntax::RegExp,
+	mut topmost: bool,
+) -> Result<(), Loc<Error>> {
 	topmost &= exp.0.len() == 1;
 	for atom in &exp.0 {
 		check_regexp_atom(regexps, atom, topmost)?
@@ -75,7 +70,11 @@ fn check_regexp(regexps: &RegExps, exp: &syntax::RegExp, mut topmost: bool) -> R
 	Ok(())
 }
 
-fn check_regexp_atom(regexps: &RegExps, atom: &Loc<syntax::regexp::Atom>, topmost: bool) -> Result<(), Loc<Error>> {
+fn check_regexp_atom(
+	regexps: &RegExps,
+	atom: &Loc<syntax::regexp::Atom>,
+	topmost: bool,
+) -> Result<(), Loc<Error>> {
 	match atom.as_ref() {
 		syntax::regexp::Atom::Ref(id) => {
 			let target = regexps.get(id, atom.span())?;
@@ -83,12 +82,15 @@ fn check_regexp_atom(regexps: &RegExps, atom: &Loc<syntax::regexp::Atom>, topmos
 
 			if !topmost {
 				if let Some(target_ty) = ast.ty.as_ref() {
-					return Err(Loc::new(Error::RegExpTypeMissmatch(target_ty.clone()), atom.span()))
+					return Err(Loc::new(
+						Error::RegExpTypeMissmatch(target_ty.clone()),
+						atom.span(),
+					));
 				}
 			}
-			
+
 			check_regexp(regexps, ast.exp.as_ref(), false)?;
-		},
+		}
 		syntax::regexp::Atom::CharSet(_) => (),
 		syntax::regexp::Atom::Literal(_, _) => (),
 		syntax::regexp::Atom::Repeat(atom, _, _) => check_regexp_atom(regexps, atom, false)?,
@@ -96,8 +98,8 @@ fn check_regexp_atom(regexps: &RegExps, atom: &Loc<syntax::regexp::Atom>, topmos
 			for exp in list {
 				check_regexp(regexps, exp.as_ref(), false)?
 			}
-		},
-		syntax::regexp::Atom::Group(exp) => check_regexp(regexps, exp.as_ref(), false)?
+		}
+		syntax::regexp::Atom::Group(exp) => check_regexp(regexps, exp.as_ref(), false)?,
 	}
 
 	Ok(())

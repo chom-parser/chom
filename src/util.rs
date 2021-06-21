@@ -6,11 +6,11 @@ pub fn to_caml_case(s: &str) -> String {
 		match c {
 			'_' | ' ' | '-' => {
 				up = true;
-			},
+			}
 			c if up => {
 				up = false;
 				id.push(c.to_uppercase().next().unwrap());
-			},
+			}
 			c => {
 				id.push(c);
 			}
@@ -28,11 +28,11 @@ pub fn upcase_to_caml_case(s: &str) -> String {
 		match c {
 			'_' | ' ' | '-' => {
 				up = true;
-			},
+			}
 			c if up => {
 				up = false;
 				id.push(c.to_uppercase().next().unwrap());
-			},
+			}
 			c => {
 				id.push(c.to_lowercase().next().unwrap());
 			}
@@ -50,17 +50,15 @@ pub fn to_snake_case(s: &str) -> String {
 				if !id.is_empty() {
 					id.push('_');
 				}
-			},
+			}
 			c if c.is_uppercase() => {
 				if !id.is_empty() {
 					id.push('_');
 				}
 
 				id.push(c.to_lowercase().next().unwrap());
-			},
-			c => {
-				id.push(c)
 			}
+			c => id.push(c),
 		}
 	}
 
@@ -75,10 +73,8 @@ pub fn upcase_to_snake_case(s: &str) -> String {
 				if !id.is_empty() {
 					id.push('_');
 				}
-			},
-			c => {
-				id.push(c.to_lowercase().next().unwrap())
 			}
+			c => id.push(c.to_lowercase().next().unwrap()),
 		}
 	}
 

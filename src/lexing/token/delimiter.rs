@@ -25,7 +25,7 @@ macro_rules! delimiter {
 					_ => return None
 				})
 			}
-			
+
 			pub fn name(&self) -> &'static str {
 				match self {
 					$(
@@ -34,7 +34,7 @@ macro_rules! delimiter {
 				}
 			}
 		}
-		
+
 		impl quote::ToTokens for Delimiter {
 			fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
 				match self {

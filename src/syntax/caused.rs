@@ -1,14 +1,11 @@
-use std::ops::{
-	Deref,
-	DerefMut
-};
 use source_span::Span;
+use std::ops::{Deref, DerefMut};
 
 #[derive(Clone, Copy)]
 pub enum Source {
 	None,
 	Explicit(Span),
-	Implicit(Span)
+	Implicit(Span),
 }
 
 impl Source {
@@ -16,7 +13,7 @@ impl Source {
 		match self {
 			Self::Explicit(span) => Some(*span),
 			Self::Implicit(span) => Some(*span),
-			Self::None => None
+			Self::None => None,
 		}
 	}
 }

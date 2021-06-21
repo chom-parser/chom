@@ -1,19 +1,19 @@
-use std::fmt;
-use crate::syntax::Ident;
 use super::Grammar;
+use crate::syntax::Ident;
+use std::fmt;
 
 /// Polymorphic type identifier.
 #[derive(Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum Id {
 	Primitive(Primitive),
-	Defined(Ident)
+	Defined(Ident),
 }
 
 impl Id {
 	pub fn name(&self) -> &str {
 		match self {
 			Self::Primitive(p) => p.name(),
-			Self::Defined(id) => id.as_str()
+			Self::Defined(id) => id.as_str(),
 		}
 	}
 }
@@ -22,14 +22,14 @@ impl Id {
 #[derive(Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum Primitive {
 	Option,
-	List
+	List,
 }
 
 impl Primitive {
 	pub fn name(&self) -> &str {
 		match self {
 			Self::Option => "option",
-			Self::List => "list"
+			Self::List => "list",
 		}
 	}
 }
@@ -38,20 +38,20 @@ impl Primitive {
 pub struct Type {
 	id: Id,
 	parameters: Vec<Parameter>,
-	constructors: Vec<u32>
+	constructors: Vec<u32>,
 }
 
 /// Type parameter.
 pub enum Parameter {
 	NonTerminal(Ident),
-	Terminal(Ident)
+	Terminal(Ident),
 }
 
 impl fmt::Display for Parameter {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		match self {
 			Self::NonTerminal(id) => write!(f, "<{}>", id),
-			Self::Terminal(id) => id.fmt(f)
+			Self::Terminal(id) => id.fmt(f),
 		}
 	}
 }
@@ -61,7 +61,7 @@ impl Type {
 		Self {
 			id,
 			parameters: Vec::new(),
-			constructors: Vec::new()
+			constructors: Vec::new(),
 		}
 	}
 
@@ -80,7 +80,7 @@ impl Type {
 	pub fn defined_id(&self) -> Option<&Ident> {
 		match &self.id {
 			Id::Defined(id) => Some(id),
-			_ => None
+			_ => None,
 		}
 	}
 
@@ -118,10 +118,20 @@ impl fmt::Display for Type {
 pub enum Expr {
 	Var(u32),
 	Terminal(u32),
-	Type(u32, Vec<Expr>)
+	Type(u32, Vec<Expr>),
 }
 
 impl Expr {
+	pub fn depends_on(&self, other: &Self) -> bool {
+		if self == other {
+			true
+		} else if let Self::Type(_, args) = self {
+			args.iter().any(|a| a.depends_on(other))
+		} else {
+			false
+		}
+	}
+
 	pub fn format<'g>(&self, context: &'g Type, grammar: &'g Grammar) -> FormattedExpr<'g, '_> {
 		FormattedExpr(grammar, context, self)
 	}
@@ -132,13 +142,11 @@ pub struct FormattedExpr<'g, 'e>(&'g Grammar, &'g Type, &'e Expr);
 impl<'g, 'e> fmt::Display for FormattedExpr<'g, 'e> {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		match self.2 {
-			Expr::Var(x) => {
-				self.1.parameter(*x).unwrap().fmt(f)
-			}
+			Expr::Var(x) => self.1.parameter(*x).unwrap().fmt(f),
 			Expr::Terminal(t) => {
 				let t = self.0.terminal(*t).unwrap();
 				t.format(self.0).fmt(f)
-			},
+			}
 			Expr::Type(nt, args) => {
 				let ty = self.0.ty(*nt).unwrap();
 				ty.name().fmt(f)

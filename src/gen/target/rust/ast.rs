@@ -1,20 +1,15 @@
-use std::collections::HashMap;
+use super::{ExternModule, StdCrate};
 use crate::{
-	util,
-	poly,
-	mono::{
-		self,
-		Index,
-		Grammar,
-	}
+	mono::{self, Grammar, Index},
+	poly, util,
 };
-use super::ExternModule;
+use std::collections::HashMap;
 
 /// AST Rust module.
 pub struct Module {
 	inner: rust_codegen::module::Ref,
 	types: HashMap<u32, rust_codegen::enm::Ref>,
-	instances: HashMap<Index, rust_codegen::ty::Instance>
+	instances: HashMap<Index, rust_codegen::ty::Instance>,
 }
 
 fn type_name(ty: &poly::Type) -> String {
@@ -26,24 +21,25 @@ pub fn variant_name(f: &poly::Function) -> String {
 }
 
 impl Module {
-	pub fn ty(&self, i: u32) ->  Option<rust_codegen::enm::Ref> {
+	pub fn ty(&self, i: u32) -> Option<rust_codegen::enm::Ref> {
 		self.types.get(&i).cloned()
 	}
 
-	pub fn ty_instance(&self, i: Index) ->  Option<rust_codegen::ty::Instance> {
+	pub fn ty_instance(&self, i: Index) -> Option<rust_codegen::ty::Instance> {
 		self.instances.get(&i).cloned()
 	}
 
 	pub fn write<W: std::io::Write>(&self, out: &mut W) -> std::io::Result<()> {
 		let inner = self.inner();
-		write!(out, "{}", quote::quote!{ #inner })
+		write!(out, "{}", quote::quote! { #inner })
 	}
-	
+
 	pub fn new(
 		context: &rust_codegen::Context,
 		grammar: &Grammar,
+		std_crate: &StdCrate,
 		extern_mod: &ExternModule,
-		path: &[String]
+		path: &[String],
 	) -> Self {
 		let module_ref = super::declare_module(context, path);
 
@@ -55,18 +51,20 @@ impl Module {
 
 			fn rust_ty(
 				grammar: &Grammar,
+				std_crate: &StdCrate,
 				extern_mod: &ExternModule,
 				module: &mut rust_codegen::Module,
 				types: &mut HashMap<u32, rust_codegen::enm::Ref>,
-				i: u32
+				i: u32,
 			) -> rust_codegen::enm::Ref {
 				fn poly_instance(
 					grammar: &Grammar,
+					std_crate: &StdCrate,
 					extern_mod: &ExternModule,
 					module: &mut rust_codegen::Module,
 					types: &mut HashMap<u32, rust_codegen::enm::Ref>,
 					ty_args: &[rust_codegen::ty::param::Definition],
-					e: &poly::ty::Expr
+					e: &poly::ty::Expr,
 				) -> Option<rust_codegen::ty::Instance> {
 					match e {
 						poly::ty::Expr::Terminal(index) => {
@@ -81,28 +79,22 @@ impl Module {
 							} else {
 								None
 							}
-						},
+						}
 						poly::ty::Expr::Type(nt, args) => {
-							let ty = rust_ty(
-								grammar,
-								extern_mod,
-								module,
-								types,
-								*nt
-							);
+							let ty = rust_ty(grammar, std_crate, extern_mod, module, types, *nt);
 
 							let mut rust_args = Vec::new();
 							for a in args {
-								if let Some(rust_a) = poly_instance(grammar, extern_mod, module, types, ty_args, a) {
+								if let Some(rust_a) = poly_instance(
+									grammar, std_crate, extern_mod, module, types, ty_args, a,
+								) {
 									rust_args.push(rust_a)
 								}
 							}
 
 							Some(ty.instanciate_with(rust_args))
-						},
-						poly::ty::Expr::Var(t) => {
-							Some(ty_args[*t as usize].instanciate())
 						}
+						poly::ty::Expr::Var(t) => Some(ty_args[*t as usize].instanciate()),
 					}
 				}
 
@@ -113,19 +105,44 @@ impl Module {
 
 					{
 						let mut enum_ty = enum_ty_ref.borrow_mut();
-					
+						enum_ty.set_public();
+
 						for p in ty.parameters() {
 							if let poly::ty::Parameter::NonTerminal(id) = p {
 								enum_ty.add_param(id.as_str());
 							}
 						}
 
+						let ty_expr = poly::ty::Expr::Type(
+							i,
+							ty.parameters()
+								.iter()
+								.enumerate()
+								.map(|(p, _)| poly::ty::Expr::Var(p as u32))
+								.collect(),
+						);
+
 						for &c in ty.constructors() {
 							let f = grammar.poly().function(c).unwrap();
-							let mut variant = rust_codegen::enm::Variant::new(variant_name(f.as_ref()));
+							let mut variant =
+								rust_codegen::enm::Variant::new(variant_name(f.as_ref()));
 
 							for a in f.arguments() {
-								if let Some(rust_a) = poly_instance(grammar, extern_mod, module, types, enum_ty.parameters(), a) {
+								if let Some(rust_a) = poly_instance(
+									grammar,
+									std_crate,
+									extern_mod,
+									module,
+									types,
+									enum_ty.parameters(),
+									a,
+								) {
+									let rust_a = if a.depends_on(&ty_expr) {
+										std_crate.box_struct.instanciate_with([rust_a])
+									} else {
+										rust_a
+									};
+
 									variant.add_param(rust_a)
 								}
 							}
@@ -140,14 +157,21 @@ impl Module {
 
 			// Declare types.
 			for (i, _) in grammar.poly().types().iter().enumerate() {
-				rust_ty(grammar, extern_mod, &mut module, &mut types, i as u32);
+				rust_ty(
+					grammar,
+					std_crate,
+					extern_mod,
+					&mut module,
+					&mut types,
+					i as u32,
+				);
 			}
 
 			fn instance(
 				grammar: &Grammar,
 				types: &HashMap<u32, rust_codegen::enm::Ref>,
 				instances: &mut HashMap<Index, rust_codegen::ty::Instance>,
-				index: Index
+				index: Index,
 			) -> rust_codegen::ty::Instance {
 				if !instances.contains_key(&index) {
 					let mono_ty = grammar.ty(index).unwrap();
@@ -156,7 +180,8 @@ impl Module {
 
 					let mut params = Vec::new();
 					for i in 0..mono_ty.poly().parameters().len() {
-						if let mono::ty::Expr::Type(p_index) = mono_ty.parameter(i as u32).unwrap() {
+						if let mono::ty::Expr::Type(p_index) = mono_ty.parameter(i as u32).unwrap()
+						{
 							params.push(instance(grammar, types, instances, *p_index))
 						}
 					}
@@ -176,7 +201,7 @@ impl Module {
 		Self {
 			inner: module_ref,
 			types,
-			instances
+			instances,
 		}
 	}
 

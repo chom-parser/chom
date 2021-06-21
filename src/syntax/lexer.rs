@@ -1,13 +1,9 @@
-use std::iter::Peekable;
-use std::convert::TryFrom;
-use std::io;
-use std::fmt;
-use source_span::{
-	Span,
-	Loc,
-	Metrics
-};
 use crate::charset::CharSet;
+use source_span::{Loc, Metrics, Span};
+use std::convert::TryFrom;
+use std::fmt;
+use std::io;
+use std::iter::Peekable;
 
 pub enum Error {
 	IO(std::io::Error),
@@ -16,7 +12,7 @@ pub enum Error {
 	InvalidChar,
 	IncompleteString,
 	IncompleteCharSet,
-	Unexpected(char)
+	Unexpected(char),
 }
 
 impl fmt::Display for Error {
@@ -29,7 +25,7 @@ impl fmt::Display for Error {
 			InvalidChar => write!(f, "incomplete char"),
 			IncompleteString => write!(f, "incomplete string"),
 			IncompleteCharSet => write!(f, "incomplete character set"),
-			Unexpected(c) => write!(f, "unexpected character `{}`", c)
+			Unexpected(c) => write!(f, "unexpected character `{}`", c),
 		}
 	}
 }
@@ -61,7 +57,7 @@ pub enum Token {
 	Ident(String),
 	Group(Delimiter, Vec<Loc<Token>>),
 	String(String, bool),
-	CharSet(CharSet, bool)
+	CharSet(CharSet, bool),
 }
 
 impl fmt::Display for Token {
@@ -77,14 +73,14 @@ impl fmt::Display for Token {
 					write!(f, "{} ", token)?
 				}
 				d.end().fmt(f)
-			},
+			}
 			String(s, case_sensitive) => {
 				if *case_sensitive {
 					write!(f, "'{}'", crate::charset::DisplayString(s))
 				} else {
 					write!(f, "\"{}\"", crate::charset::DisplayString(s))
 				}
-			},
+			}
 			CharSet(set, negate) => {
 				if *negate {
 					write!(f, "[^{}]", set)
@@ -100,7 +96,7 @@ impl fmt::Display for Token {
 pub enum Delimiter {
 	Parenthesis,
 	Brace,
-	Angle
+	Angle,
 }
 
 impl Delimiter {
@@ -109,7 +105,7 @@ impl Delimiter {
 		match self {
 			Parenthesis => '(',
 			Brace => '{',
-			Angle => '<'
+			Angle => '<',
 		}
 	}
 
@@ -118,7 +114,7 @@ impl Delimiter {
 		match self {
 			Parenthesis => ')',
 			Brace => '}',
-			Angle => '>'
+			Angle => '>',
 		}
 	}
 }
@@ -128,17 +124,40 @@ fn is_space(c: char) -> bool {
 }
 
 fn is_punct(c: char) -> bool {
-	c == '/' || c == '\\' || c == ',' || c == ';' || c == ':' || c == '.' || c == '*' || c == '+' || c == '?' || c == '!' || c == '=' || c == '|'
+	c == '/'
+		|| c == '\\'
+		|| c == ','
+		|| c == ';'
+		|| c == ':'
+		|| c == '.'
+		|| c == '*'
+		|| c == '+'
+		|| c == '?'
+		|| c == '!'
+		|| c == '='
+		|| c == '|'
 }
 
 fn is_separator(c: char) -> bool {
-	is_space(c) || is_punct(c) || c == '(' || c == ')' || c == '[' || c == ']' || c == '{' || c == '}' || c == '<' || c == '>' || c == '"' || c == '\'' || c == '#'
+	is_space(c)
+		|| is_punct(c)
+		|| c == '('
+		|| c == ')'
+		|| c == '['
+		|| c == ']'
+		|| c == '{'
+		|| c == '}'
+		|| c == '<'
+		|| c == '>'
+		|| c == '"'
+		|| c == '\''
+		|| c == '#'
 }
 
 pub struct Lexer<I: Iterator<Item = io::Result<char>>, M: Metrics> {
 	input: Peekable<I>,
 	metrics: M,
-	span: Span
+	span: Span,
 }
 
 impl<I: Iterator<Item = io::Result<char>>, M: Metrics> Lexer<I, M> {
@@ -146,7 +165,7 @@ impl<I: Iterator<Item = io::Result<char>>, M: Metrics> Lexer<I, M> {
 		Lexer {
 			input: input.peekable(),
 			metrics,
-			span: Span::default()
+			span: Span::default(),
 		}
 	}
 
@@ -154,7 +173,7 @@ impl<I: Iterator<Item = io::Result<char>>, M: Metrics> Lexer<I, M> {
 		match self.input.peek() {
 			Some(Ok(c)) => Ok(Some(*c)),
 			Some(Err(_)) => self.consume(),
-			None => Ok(None)
+			None => Ok(None),
 		}
 	}
 
@@ -163,9 +182,9 @@ impl<I: Iterator<Item = io::Result<char>>, M: Metrics> Lexer<I, M> {
 			Some(Ok(c)) => {
 				self.span.push(c, &self.metrics);
 				Ok(Some(c))
-			},
+			}
 			Some(Err(e)) => Err(Loc::new(Error::IO(e), self.span.end().into())),
-			None => Ok(None)
+			None => Ok(None),
 		}
 	}
 
@@ -174,7 +193,7 @@ impl<I: Iterator<Item = io::Result<char>>, M: Metrics> Lexer<I, M> {
 			'(' => Delimiter::Parenthesis,
 			'{' => Delimiter::Brace,
 			'<' => Delimiter::Angle,
-			_ => unreachable!()
+			_ => unreachable!(),
 		};
 
 		let mut span = self.span;
@@ -191,17 +210,17 @@ impl<I: Iterator<Item = io::Result<char>>, M: Metrics> Lexer<I, M> {
 					span.append(self.span);
 
 					if c == delimiter.end() {
-						return Ok(Loc::new(Token::Group(delimiter, tokens), span))
+						return Ok(Loc::new(Token::Group(delimiter, tokens), span));
 					} else {
-						return Err(Loc::new(Error::WrongCloser(delimiter, c), span))
+						return Err(Loc::new(Error::WrongCloser(delimiter, c), span));
 					}
-				},
+				}
 				Some(_) => {
 					let token = self.parse_token()?.unwrap();
 					span.append(token.span());
 					tokens.push(token);
-				},
-				None => return Err(Loc::new(Error::MissingCloser(delimiter), span))
+				}
+				None => return Err(Loc::new(Error::MissingCloser(delimiter), span)),
 			}
 		}
 	}
@@ -214,16 +233,22 @@ impl<I: Iterator<Item = io::Result<char>>, M: Metrics> Lexer<I, M> {
 				if let Some(d) = c.to_digit(16) {
 					codepoint = (codepoint << 4) | d
 				} else {
-					return Err(Loc::new(Error::InvalidChar, self.span))
+					return Err(Loc::new(Error::InvalidChar, self.span));
 				}
 			} else {
-				return Err(Loc::new(Error::IO(io::Error::new(io::ErrorKind::UnexpectedEof, "unexpected end of stream")), self.span))
+				return Err(Loc::new(
+					Error::IO(io::Error::new(
+						io::ErrorKind::UnexpectedEof,
+						"unexpected end of stream",
+					)),
+					self.span,
+				));
 			}
 		}
 
 		match char::try_from(codepoint) {
 			Ok(c) => Ok(c),
-			Err(_) => Err(Loc::new(Error::InvalidChar, self.span))
+			Err(_) => Err(Loc::new(Error::InvalidChar, self.span)),
 		}
 	}
 
@@ -242,47 +267,27 @@ impl<I: Iterator<Item = io::Result<char>>, M: Metrics> Lexer<I, M> {
 	fn parse_string_char(&mut self, delimiter: char) -> Result<Option<char>> {
 		if let Some(c) = self.consume()? {
 			match c {
-				_ if c == delimiter => {
-					return Ok(None)
-				},
+				_ if c == delimiter => return Ok(None),
 				'\\' => {
 					if let Some(c) = self.consume()? {
 						match c {
-							'r' => {
-								Ok(Some('\r'))
-							},
-							'n' => {
-								Ok(Some('\n'))
-							},
-							's' => {
-								Ok(Some(' '))
-							},
-							't' => {
-								Ok(Some('\t'))
-							},
-							'x' => {
-								Ok(Some(self.parse_hex_char(2)?))
-							},
-							'u' => {
-								Ok(Some(self.parse_hex_char(4)?))
-							},
-							'U' => {
-								Ok(Some(self.parse_hex_char(8)?))
-							},
-							_ => {
-								Ok(Some(c))
-							}
+							'r' => Ok(Some('\r')),
+							'n' => Ok(Some('\n')),
+							's' => Ok(Some(' ')),
+							't' => Ok(Some('\t')),
+							'x' => Ok(Some(self.parse_hex_char(2)?)),
+							'u' => Ok(Some(self.parse_hex_char(4)?)),
+							'U' => Ok(Some(self.parse_hex_char(8)?)),
+							_ => Ok(Some(c)),
 						}
 					} else {
-						return Err(Loc::new(Error::IncompleteCharSet, self.span))
+						return Err(Loc::new(Error::IncompleteCharSet, self.span));
 					}
-				},
-				_ => {
-					Ok(Some(c))
 				}
+				_ => Ok(Some(c)),
 			}
 		} else {
-			return Err(Loc::new(Error::IncompleteCharSet, self.span))
+			return Err(Loc::new(Error::IncompleteCharSet, self.span));
 		}
 	}
 
@@ -306,7 +311,7 @@ impl<I: Iterator<Item = io::Result<char>>, M: Metrics> Lexer<I, M> {
 					if let Some(last) = self.parse_string_char(']')? {
 						last
 					} else {
-						return Err(Loc::new(Error::IncompleteCharSet, self.span))
+						return Err(Loc::new(Error::IncompleteCharSet, self.span));
 					}
 				} else {
 					first
@@ -314,7 +319,7 @@ impl<I: Iterator<Item = io::Result<char>>, M: Metrics> Lexer<I, M> {
 
 				set.insert(first..=last);
 			} else {
-				break
+				break;
 			}
 		}
 
@@ -327,22 +332,28 @@ impl<I: Iterator<Item = io::Result<char>>, M: Metrics> Lexer<I, M> {
 		loop {
 			if let Some(c) = self.peek()? {
 				if is_separator(c) {
-					break
+					break;
 				} else {
 					self.consume()?;
 					id.push(c);
 				}
 			} else {
-				break
+				break;
 			}
 		}
 
 		match id.as_ref() {
-			"" => Err(Loc::new(Error::IO(io::Error::new(io::ErrorKind::UnexpectedEof, "unexpected end of stream")), self.span)),
+			"" => Err(Loc::new(
+				Error::IO(io::Error::new(
+					io::ErrorKind::UnexpectedEof,
+					"unexpected end of stream",
+				)),
+				self.span,
+			)),
 			"extern" => Ok(Loc::new(Token::Keyword(Keyword::Extern), self.span)),
 			"regexp" => Ok(Loc::new(Token::Keyword(Keyword::RegExp), self.span)),
 			"type" => Ok(Loc::new(Token::Keyword(Keyword::Type), self.span)),
-			_ => Ok(Loc::new(Token::Ident(id), self.span))
+			_ => Ok(Loc::new(Token::Ident(id), self.span)),
 		}
 	}
 
@@ -351,17 +362,15 @@ impl<I: Iterator<Item = io::Result<char>>, M: Metrics> Lexer<I, M> {
 			match self.peek()? {
 				Some(c) if is_space(c) => {
 					self.consume()?;
-				},
-				Some('#') => {
-					loop {
-						match self.consume()? {
-							Some('\n') => break,
-							None => break,
-							_ => ()
-						}
+				}
+				Some('#') => loop {
+					match self.consume()? {
+						Some('\n') => break,
+						None => break,
+						_ => (),
 					}
 				},
-				_ => break
+				_ => break,
 			}
 		}
 
@@ -376,19 +385,17 @@ impl<I: Iterator<Item = io::Result<char>>, M: Metrics> Lexer<I, M> {
 				Some('(') | Some('{') | Some('<') => return Ok(Some(self.parse_group()?)),
 				Some(')') | Some('}') | Some('>') => {
 					let c = self.consume()?.unwrap();
-					return Err(Loc::new(Error::Unexpected(c), self.span))
-				},
+					return Err(Loc::new(Error::Unexpected(c), self.span));
+				}
 				Some('[') => return Ok(Some(self.parse_charset()?)),
 				Some('\'') => return Ok(Some(self.parse_string('\'')?)),
 				Some('"') => return Ok(Some(self.parse_string('"')?)),
 				Some(c) if is_punct(c) => {
 					self.consume()?;
-					return Ok(Some(Loc::new(Token::Punct(c), self.span)))
-				},
-				Some(_) => {
-					return Ok(Some(self.parse_ident()?))
-				},
-				None => break
+					return Ok(Some(Loc::new(Token::Punct(c), self.span)));
+				}
+				Some(_) => return Ok(Some(self.parse_ident()?)),
+				None => break,
 			}
 		}
 

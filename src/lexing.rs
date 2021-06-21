@@ -1,56 +1,45 @@
-use std::{
-	fmt,
-	collections::{
-		HashSet,
-		HashMap
-	}
-};
-use btree_slab::BTreeSet;
-use btree_range_map::{
-	AnyRange,
-};
-use source_span::{
-	Loc
-};
 use crate::{
-	out,
-	CharSet,
-	poly::{
-		Grammar,
-		terminal,
-		Terminal
-	},
 	charset::DisplayCharRange,
+	out,
+	poly::{terminal, Grammar, Terminal},
+	CharSet,
+};
+use btree_range_map::AnyRange;
+use btree_slab::BTreeSet;
+use source_span::Loc;
+use std::{
+	collections::{HashMap, HashSet},
+	fmt,
 };
 
+mod automaton;
 pub mod regexp;
 pub mod token;
-mod automaton;
 
+pub use automaton::*;
 pub use regexp::RegExp;
 pub use token::Token;
-pub use automaton::*;
 
 #[derive(Debug)]
 pub enum Error {
-	AmbiguousTerminals(u32, u32, TerminalAmbiguity)
+	AmbiguousTerminals(u32, u32, TerminalAmbiguity),
 }
 
 #[derive(Debug)]
 pub enum TerminalAmbiguity {
 	ShiftReduce {
 		prefix: String,
-		next: btree_range_map::AnyRange<char>
+		next: btree_range_map::AnyRange<char>,
 	},
 	ReduceReduce {
-		token: String
-	}
+		token: String,
+	},
 }
 
 impl Error {
 	pub fn title(&self) -> String {
 		match self {
-			Error::AmbiguousTerminals(_, _, _) => format!("ambiguous terminals")
+			Error::AmbiguousTerminals(_, _, _) => format!("ambiguous terminals"),
 		}
 	}
 
@@ -61,24 +50,68 @@ impl Error {
 			Error::AmbiguousTerminals(id, other_id, ambiguity) => {
 				let terminal = &grammar.terminals()[*id as usize].0;
 				let other_terminal = &grammar.terminals()[*other_id as usize].0;
-				let other_span = grammar.terminals()[*other_id as usize].1.iter().next().unwrap().span();
+				let other_span = grammar.terminals()[*other_id as usize]
+					.1
+					.iter()
+					.next()
+					.unwrap()
+					.span();
 
-				block.highlights_mut().add(other_span, Some("ambiguous with this terminal".to_string()), out::WARNING);
-			
+				block.highlights_mut().add(
+					other_span,
+					Some("ambiguous with this terminal".to_string()),
+					out::WARNING,
+				);
+
 				match ambiguity {
 					TerminalAmbiguity::ShiftReduce { prefix, next } => {
-						block.add_note(out::NoteType::Note, format!("the following sequence of character is ambiguous:\n\n    {}{}\n\n", Paint::new(prefix).bold(), Paint::new(next.first().unwrap()).bold()));
-						block.add_note(out::NoteType::Note, format!("this could be the {} {}, followed by some {} starting with {}", terminal.format(grammar), Paint::new(prefix).bold(), other_terminal.format(grammar), Paint::new(next.first().unwrap()).bold()));
-						block.add_note(out::NoteType::Note, format!("this could also be some {} starting with {}{}", other_terminal.format(grammar), Paint::new(prefix).bold(), Paint::new(next.first().unwrap()).bold()));
-					},
+						block.add_note(
+							out::NoteType::Note,
+							format!(
+								"the following sequence of character is ambiguous:\n\n    {}{}\n\n",
+								Paint::new(prefix).bold(),
+								Paint::new(next.first().unwrap()).bold()
+							),
+						);
+						block.add_note(
+							out::NoteType::Note,
+							format!(
+								"this could be the {} {}, followed by some {} starting with {}",
+								terminal.format(grammar),
+								Paint::new(prefix).bold(),
+								other_terminal.format(grammar),
+								Paint::new(next.first().unwrap()).bold()
+							),
+						);
+						block.add_note(
+							out::NoteType::Note,
+							format!(
+								"this could also be some {} starting with {}{}",
+								other_terminal.format(grammar),
+								Paint::new(prefix).bold(),
+								Paint::new(next.first().unwrap()).bold()
+							),
+						);
+					}
 					TerminalAmbiguity::ReduceReduce { token } => {
-						block.add_note(out::NoteType::Note, format!("the following sequence of character is ambiguous:\n\n    {}\n\n", Paint::new(token).bold()));
-						block.add_note(out::NoteType::Note, format!("this could also be some {}", terminal.format(grammar)));
-						block.add_note(out::NoteType::Note, format!("this could also be some {}", other_terminal.format(grammar)));
+						block.add_note(
+							out::NoteType::Note,
+							format!(
+								"the following sequence of character is ambiguous:\n\n    {}\n\n",
+								Paint::new(token).bold()
+							),
+						);
+						block.add_note(
+							out::NoteType::Note,
+							format!("this could also be some {}", terminal.format(grammar)),
+						);
+						block.add_note(
+							out::NoteType::Note,
+							format!("this could also be some {}", other_terminal.format(grammar)),
+						);
 					}
 				}
-			},
-			// _ => ()
+			} // _ => ()
 		}
 	}
 }
@@ -144,7 +177,7 @@ impl<'g, 'q> fmt::Display for DisplayDetState<'g, 'q> {
 }
 
 pub struct Table {
-	automaton: DetAutomaton<DetState>
+	automaton: DetAutomaton<DetState>,
 }
 
 impl Table {
@@ -164,9 +197,7 @@ impl Table {
 
 		let automaton = simplify_det_automaton(grammar, &det_automaton)?;
 
-		Ok(Self {
-			automaton
-		})
+		Ok(Self { automaton })
 	}
 
 	pub fn automaton(&self) -> &DetAutomaton<DetState> {
@@ -174,12 +205,15 @@ impl Table {
 	}
 }
 
-pub fn terminals_starting_with<'a, 'b>(aut: &'a DetAutomaton<BTreeSet<State>>, range: &'b AnyRange<char>) -> TerminalsStartingWith<'a, 'b> {
+pub fn terminals_starting_with<'a, 'b>(
+	aut: &'a DetAutomaton<BTreeSet<State>>,
+	range: &'b AnyRange<char>,
+) -> TerminalsStartingWith<'a, 'b> {
 	TerminalsStartingWith {
 		aut,
 		range,
 		initial_transitions: aut.successors(aut.initial_state()),
-		reachable_terminals: None
+		reachable_terminals: None,
 	}
 }
 
@@ -187,7 +221,7 @@ pub struct TerminalsStartingWith<'a, 'b> {
 	aut: &'a DetAutomaton<BTreeSet<State>>,
 	range: &'b AnyRange<char>,
 	initial_transitions: DetSuccessors<'a, BTreeSet<State>>,
-	reachable_terminals: Option<TerminalsReachableFrom<'a>>
+	reachable_terminals: Option<TerminalsReachableFrom<'a>>,
 }
 
 impl<'a, 'b> Iterator for TerminalsStartingWith<'a, 'b> {
@@ -196,22 +230,19 @@ impl<'a, 'b> Iterator for TerminalsStartingWith<'a, 'b> {
 	fn next(&mut self) -> Option<u32> {
 		loop {
 			match &mut self.reachable_terminals {
-				Some(reachable_terminals) => {
-					match reachable_terminals.next() {
-						Some(id) => break Some(id),
-						None => self.reachable_terminals = None
-					}
+				Some(reachable_terminals) => match reachable_terminals.next() {
+					Some(id) => break Some(id),
+					None => self.reachable_terminals = None,
 				},
-				None => {
-					match self.initial_transitions.next() {
-						Some((label, targets)) => {
-							if self.range.intersects(label) {
-								self.reachable_terminals = Some(TerminalsReachableFrom::new(self.aut, targets))
-							}
-						},
-						None => break None
+				None => match self.initial_transitions.next() {
+					Some((label, targets)) => {
+						if self.range.intersects(label) {
+							self.reachable_terminals =
+								Some(TerminalsReachableFrom::new(self.aut, targets))
+						}
 					}
-				}
+					None => break None,
+				},
 			}
 		}
 	}
@@ -220,18 +251,18 @@ impl<'a, 'b> Iterator for TerminalsStartingWith<'a, 'b> {
 pub struct TerminalsReachableFrom<'a> {
 	aut: &'a DetAutomaton<BTreeSet<State>>,
 	visited: HashSet<&'a BTreeSet<State>>,
-	stack: Vec<&'a BTreeSet<State>>
+	stack: Vec<&'a BTreeSet<State>>,
 }
 
 impl<'a> TerminalsReachableFrom<'a> {
 	pub fn new(
 		aut: &'a DetAutomaton<BTreeSet<State>>,
-		state: &'a BTreeSet<State>
+		state: &'a BTreeSet<State>,
 	) -> TerminalsReachableFrom<'a> {
 		TerminalsReachableFrom {
 			aut,
 			visited: HashSet::new(),
-			stack: vec![state]
+			stack: vec![state],
 		}
 	}
 }
@@ -245,10 +276,10 @@ impl<'a> Iterator for TerminalsReachableFrom<'a> {
 				for (_range, target) in self.aut.successors(states) {
 					self.stack.push(target)
 				}
-				
+
 				for q in states {
 					if let State::Final(id) = q {
-						return Some(*id)
+						return Some(*id);
 					}
 				}
 			}
@@ -259,10 +290,23 @@ impl<'a> Iterator for TerminalsReachableFrom<'a> {
 }
 
 fn build_prefix_to(aut: &DetAutomaton<BTreeSet<State>>, state: &BTreeSet<State>) -> String {
-	build_prefix_to_from(aut, state, aut.initial_state(), String::new(), HashSet::new()).expect("no prefix leads to the given state")
+	build_prefix_to_from(
+		aut,
+		state,
+		aut.initial_state(),
+		String::new(),
+		HashSet::new(),
+	)
+	.expect("no prefix leads to the given state")
 }
 
-fn build_prefix_to_from(aut: &DetAutomaton<BTreeSet<State>>, state: &BTreeSet<State>, from: &BTreeSet<State>, current: String, visited: HashSet<BTreeSet<State>>) -> Option<String> {
+fn build_prefix_to_from(
+	aut: &DetAutomaton<BTreeSet<State>>,
+	state: &BTreeSet<State>,
+	from: &BTreeSet<State>,
+	current: String,
+	visited: HashSet<BTreeSet<State>>,
+) -> Option<String> {
 	for (range, target) in aut.successors(from) {
 		if !visited.contains(target) {
 			let mut next = current.clone();
@@ -273,14 +317,14 @@ fn build_prefix_to_from(aut: &DetAutomaton<BTreeSet<State>>, state: &BTreeSet<St
 			next.push(range.pick().unwrap());
 
 			if target == state {
-				return Some(next)
+				return Some(next);
 			}
 
 			let mut visited = visited.clone();
 			visited.insert(target.clone());
 
 			if let Some(string) = build_prefix_to_from(aut, state, target, next, visited) {
-				return Some(string)
+				return Some(string);
 			}
 		}
 	}
@@ -288,32 +332,47 @@ fn build_prefix_to_from(aut: &DetAutomaton<BTreeSet<State>>, state: &BTreeSet<St
 	None
 }
 
-fn simplify_det_automaton(grammar: &Grammar, aut: &DetAutomaton<BTreeSet<State>>) -> Result<DetAutomaton<DetState>, Loc<Error>> {
+fn simplify_det_automaton(
+	grammar: &Grammar,
+	aut: &DetAutomaton<BTreeSet<State>>,
+) -> Result<DetAutomaton<DetState>, Loc<Error>> {
 	let mut terminal_map = HashMap::new();
 	let mut intermediate_count = 0;
 
 	#[derive(Hash, PartialEq, Eq)]
 	pub enum Partition {
 		Intermediate,
-		Final(u32)
+		Final(u32),
 	}
 
 	let partition = aut.try_partition(|states| {
 		let mut terminal = None;
-	
+
 		for q in states {
 			match q {
 				State::Initial => {
 					// Note: we have already checked that there are no empty terminals.
-					return Ok(Partition::Intermediate)
-				},
+					return Ok(Partition::Intermediate);
+				}
 				State::Intermediate(_) => (),
 				State::Final(id) => {
 					if let Some(other_id) = terminal.replace(id) {
-						let span = grammar.terminals()[*id as usize].1.iter().next().unwrap().span();
-						return Err(Loc::new(Error::AmbiguousTerminals(*id, *other_id, TerminalAmbiguity::ReduceReduce {
-							token: build_prefix_to(aut, states)
-						}), span))
+						let span = grammar.terminals()[*id as usize]
+							.1
+							.iter()
+							.next()
+							.unwrap()
+							.span();
+						return Err(Loc::new(
+							Error::AmbiguousTerminals(
+								*id,
+								*other_id,
+								TerminalAmbiguity::ReduceReduce {
+									token: build_prefix_to(aut, states),
+								},
+							),
+							span,
+						));
 					}
 				}
 			}
@@ -321,7 +380,7 @@ fn simplify_det_automaton(grammar: &Grammar, aut: &DetAutomaton<BTreeSet<State>>
 
 		match terminal {
 			Some(id) => Ok(Partition::Final(*id)),
-			None => Ok(Partition::Intermediate)
+			None => Ok(Partition::Intermediate),
 		}
 	})?;
 
@@ -342,23 +401,27 @@ fn simplify_det_automaton(grammar: &Grammar, aut: &DetAutomaton<BTreeSet<State>>
 	Ok(minimal_aut.map(|q| det_states(&mut terminal_map, &mut intermediate_count, q)))
 }
 
-fn det_states(terminal_map: &mut HashMap<u32, u32>, intermediate_count: &mut u32, states: &BTreeSet<State>) -> DetState {
+fn det_states(
+	terminal_map: &mut HashMap<u32, u32>,
+	intermediate_count: &mut u32,
+	states: &BTreeSet<State>,
+) -> DetState {
 	for q in states {
 		match q {
 			State::Initial => {
 				// Note: we have already checked that there are no empty terminals.
-				return DetState::Initial
-			},
+				return DetState::Initial;
+			}
 			State::Intermediate(_) => (),
 			State::Final(id) => {
 				// Note: we have already checked that there are no reduce-reduce conflicts.
 				let i = match terminal_map.get_mut(&id).cloned() {
 					Some(i) => i,
-					None => 0
+					None => 0,
 				};
-	
-				terminal_map.insert(*id, i+1);
-				return DetState::Final(*id, i)
+
+				terminal_map.insert(*id, i + 1);
+				return DetState::Final(*id, i);
 			}
 		}
 	}
@@ -371,7 +434,7 @@ fn det_states(terminal_map: &mut HashMap<u32, u32>, intermediate_count: &mut u32
 /// Non deterministic lexing table.
 struct NDTable {
 	next_state: u32,
-	automaton: Automaton
+	automaton: Automaton,
 }
 
 impl NDTable {
@@ -379,7 +442,7 @@ impl NDTable {
 	pub fn new(grammar: &Grammar) -> Result<Self, Loc<Error>> {
 		let mut table = NDTable {
 			next_state: 0,
-			automaton: Automaton::new()
+			automaton: Automaton::new(),
 		};
 
 		for (id, (terminal, _uses)) in grammar.terminals().iter().enumerate() {
@@ -404,10 +467,14 @@ impl NDTable {
 				let (a, b) = self.build_regexp(grammar, exp);
 				self.automaton.add(State::Initial, None, a);
 				self.automaton.add(b, None, State::Final(id))
-			},
+			}
 			terminal::Desc::Whitespace => {
 				let ws = CharSet::whitespace();
-				let exp = RegExp::new(vec![regexp::Atom::Repeat(Box::new(regexp::Atom::CharSet(ws)), 1, usize::MAX)]);
+				let exp = RegExp::new(vec![regexp::Atom::Repeat(
+					Box::new(regexp::Atom::CharSet(ws)),
+					1,
+					usize::MAX,
+				)]);
 				let (a, b) = self.build_regexp(grammar, &exp);
 				self.automaton.add(State::Initial, None, a);
 				self.automaton.add(b, None, State::Final(id))
@@ -426,7 +493,7 @@ impl NDTable {
 				}
 
 				(i, q)
-			},
+			}
 			None => {
 				let q = self.new_state();
 				(q.clone(), q)
@@ -437,15 +504,13 @@ impl NDTable {
 	fn build_regexp_atom(&mut self, grammar: &Grammar, e: &regexp::Atom) -> (State, State) {
 		use regexp::Atom::*;
 		match e {
-			Ref(i) => {
-				self.build_regexp(grammar, &grammar.regexp(*i).unwrap().exp)
-			},
+			Ref(i) => self.build_regexp(grammar, &grammar.regexp(*i).unwrap().exp),
 			CharSet(set) => {
 				let a = self.new_state();
 				let b = self.new_state();
 				self.automaton.add(a.clone(), Some(set.clone()), b.clone());
 				(a, b)
-			},
+			}
 			Literal(str, case_sensitive) => {
 				let i = self.new_state();
 
@@ -458,7 +523,7 @@ impl NDTable {
 				}
 
 				(i, q)
-			},
+			}
 			Repeat(atom, min, max) => {
 				let i = self.new_state();
 
@@ -477,7 +542,7 @@ impl NDTable {
 					let mut qi = q;
 					q = self.new_state();
 					self.automaton.add(qi.clone(), None, q.clone());
-					for _ in (min+1)..=*max {
+					for _ in (min + 1)..=*max {
 						let (ai, af) = self.build_regexp_atom(grammar, atom);
 						self.automaton.add(qi, None, ai);
 						self.automaton.add(af.clone(), None, q.clone());
@@ -486,7 +551,7 @@ impl NDTable {
 				}
 
 				(i, q)
-			},
+			}
 			Or(regexps) => {
 				let i = self.new_state();
 				let f = self.new_state();
@@ -498,11 +563,9 @@ impl NDTable {
 				}
 
 				(i, f)
-			},
-			Group(regexp) => {
-				self.build_regexp(grammar, regexp)
-			},
- 		}
+			}
+			Group(regexp) => self.build_regexp(grammar, regexp),
+		}
 	}
 
 	pub fn automaton(&self) -> &Automaton {
@@ -513,7 +576,7 @@ impl NDTable {
 impl Automaton {
 	pub fn dot_write<W: std::io::Write>(&self, g: &Grammar, f: &mut W) -> std::io::Result<()> {
 		write!(f, "digraph {{\n")?;
-		
+
 		for (source, transitions) in self.transitions() {
 			for (label, targets) in transitions {
 				for target in targets {
@@ -521,8 +584,10 @@ impl Automaton {
 					let target = target.display(g);
 
 					match label {
-						Some(label) => write!(f, "\t{} -> {} [ label=\"{}\" ]\n", source, target, label)?,
-						None => write!(f, "\t{} -> {}\n", source, target)?
+						Some(label) => {
+							write!(f, "\t{} -> {} [ label=\"{}\" ]\n", source, target, label)?
+						}
+						None => write!(f, "\t{} -> {}\n", source, target)?,
 					}
 				}
 			}
@@ -535,12 +600,18 @@ impl Automaton {
 impl DetAutomaton<BTreeSet<State>> {
 	pub fn dot_write<W: std::io::Write>(&self, g: &Grammar, f: &mut W) -> std::io::Result<()> {
 		write!(f, "digraph {{\n")?;
-		
+
 		for (source, transitions) in self.transitions() {
 			for (label, target) in transitions {
 				let source = DisplayStateSet(g, source);
 				let target = DisplayStateSet(g, target);
-				write!(f, "\t{} -> {} [ label=\"{}\" ]\n", source, target, DisplayCharRange(label))?
+				write!(
+					f,
+					"\t{} -> {} [ label=\"{}\" ]\n",
+					source,
+					target,
+					DisplayCharRange(label)
+				)?
 			}
 		}
 
@@ -551,12 +622,18 @@ impl DetAutomaton<BTreeSet<State>> {
 impl DetAutomaton<DetState> {
 	pub fn dot_write<W: std::io::Write>(&self, g: &Grammar, f: &mut W) -> std::io::Result<()> {
 		write!(f, "digraph {{\n")?;
-		
+
 		for (source, transitions) in self.transitions() {
 			for (label, target) in transitions {
 				let source = DisplayDetState(g, source);
 				let target = DisplayDetState(g, target);
-				write!(f, "\t{} -> {} [ label=\"{}\" ]\n", source, target, DisplayCharRange(label))?
+				write!(
+					f,
+					"\t{} -> {} [ label=\"{}\" ]\n",
+					source,
+					target,
+					DisplayCharRange(label)
+				)?
 			}
 		}
 
