@@ -78,19 +78,20 @@ fn check_regexp_atom(
 	match atom.as_ref() {
 		syntax::regexp::Atom::Ref(id) => {
 			let target = regexps.get(id, atom.span())?;
-			let ast = regexps.ast(target);
-
-			if !topmost {
-				if let Some(target_ty) = ast.ty.as_ref() {
-					return Err(Loc::new(
-						Error::RegExpTypeMissmatch(target_ty.clone()),
-						atom.span(),
-					));
+			if let Some(ast) = regexps.ast(target) {
+				if !topmost {
+					if let Some(target_ty) = ast.ty.as_ref() {
+						return Err(Loc::new(
+							Error::RegExpTypeMissmatch(target_ty.clone()),
+							atom.span(),
+						));
+					}
 				}
+	
+				check_regexp(regexps, ast.exp.as_ref(), false)?;
 			}
-
-			check_regexp(regexps, ast.exp.as_ref(), false)?;
 		}
+		syntax::regexp::Atom::Any => (),
 		syntax::regexp::Atom::CharSet(_) => (),
 		syntax::regexp::Atom::Literal(_, _) => (),
 		syntax::regexp::Atom::Repeat(atom, _, _) => check_regexp_atom(regexps, atom, false)?,

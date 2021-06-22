@@ -58,6 +58,7 @@ pub enum Token {
 	Group(Delimiter, Vec<Loc<Token>>),
 	String(String, bool),
 	CharSet(CharSet, bool),
+	Comment(String)
 }
 
 impl fmt::Display for Token {
@@ -87,6 +88,13 @@ impl fmt::Display for Token {
 				} else {
 					write!(f, "[{}]", set)
 				}
+			},
+			Comment(content) => {
+				for line in content.lines() {
+					write!(f, "# {}", line)?
+				}
+
+				Ok(())
 			}
 		}
 	}
@@ -136,6 +144,7 @@ fn is_punct(c: char) -> bool {
 		|| c == '!'
 		|| c == '='
 		|| c == '|'
+		|| c == '@'
 }
 
 fn is_separator(c: char) -> bool {
@@ -357,19 +366,52 @@ impl<I: Iterator<Item = io::Result<char>>, M: Metrics> Lexer<I, M> {
 		}
 	}
 
+	fn parse_comment(&mut self) -> Result<Loc<Token>> {
+		let mut content = String::new();
+
+		loop {
+			self.skip_whitespaces()?;
+			if let Some('#') = self.peek()? {
+				self.consume()?;
+
+				if !content.is_empty() {
+					content.push('\n')
+				}
+
+				let mut first = true;
+				loop {
+					match self.consume()? {
+						Some('\n') | None => break,
+						Some(c) => {
+							if !first || !c.is_whitespace() {
+								content.push(c)
+							}
+
+							first = false
+						}
+					}
+				}
+			} else {
+				break
+			}
+		}
+
+		Ok(Loc::new(Token::Comment(content), self.span))
+	}
+
 	fn skip_whitespaces(&mut self) -> Result<()> {
 		loop {
 			match self.peek()? {
 				Some(c) if is_space(c) => {
 					self.consume()?;
 				}
-				Some('#') => loop {
-					match self.consume()? {
-						Some('\n') => break,
-						None => break,
-						_ => (),
-					}
-				},
+				// Some('#') => loop {
+				// 	match self.consume()? {
+				// 		Some('\n') => break,
+				// 		None => break,
+				// 		_ => (),
+				// 	}
+				// },
 				_ => break,
 			}
 		}
@@ -390,6 +432,10 @@ impl<I: Iterator<Item = io::Result<char>>, M: Metrics> Lexer<I, M> {
 				Some('[') => return Ok(Some(self.parse_charset()?)),
 				Some('\'') => return Ok(Some(self.parse_string('\'')?)),
 				Some('"') => return Ok(Some(self.parse_string('"')?)),
+				Some('#') => { // ignore comments.
+					self.parse_comment()?;
+					// return Ok(Some(self.parse_comment()?))
+				},
 				Some(c) if is_punct(c) => {
 					self.consume()?;
 					return Ok(Some(Loc::new(Token::Punct(c), self.span)));

@@ -1,16 +1,16 @@
-use super::{Error, Functions};
+use super::Error;
 use crate::{
-	poly::{function, ty, Function, Type},
+	poly::Type,
 	syntax::{self, Caused, Ident},
 };
-use source_span::{Loc, Span};
+use source_span::{Loc};
 use std::collections::BTreeMap;
 
 pub struct Types {
 	list: Vec<Caused<Type>>,
 
 	id_map: BTreeMap<Ident, u32>,
-	desc_map: BTreeMap<ty::Id, u32>,
+	// desc_map: BTreeMap<ty::Id, u32>,
 }
 
 impl Types {
@@ -43,7 +43,7 @@ impl Types {
 		Ok(Self {
 			list,
 			id_map: map,
-			desc_map: BTreeMap::new(),
+			// desc_map: BTreeMap::new(),
 		})
 	}
 
@@ -51,48 +51,61 @@ impl Types {
 		self.list
 	}
 
+	fn add_type(&mut self, id: &Loc<Ident>, ty: Type) -> u32 {
+		let i = self.list.len() as u32;
+		let ty = Caused::explicit(ty, id.span());
+		self.list.push(ty);
+		self.id_map.insert(id.as_ref().clone(), i);
+		i
+	}
+
 	pub fn get_by_id(&mut self, id: &Loc<Ident>) -> Result<u32, Loc<Error>> {
-		self.id_map
-			.get(id.as_ref())
-			.cloned()
-			.ok_or_else(|| Loc::new(Error::UndefinedType(id.as_ref().clone()), id.span()))
-	}
-
-	pub fn get_by_desc(&mut self, id: ty::Id, span: Span) -> u32 {
-		match id {
-			ty::Id::Defined(id) => self.id_map.get(&id).cloned().unwrap(),
-			_ => {
-				use std::collections::btree_map::Entry;
-				match self.desc_map.entry(id.clone()) {
-					Entry::Vacant(entry) => {
-						let i = self.list.len() as u32;
-						self.list.push(Caused::explicit(Type::new(id), span));
-						entry.insert(i);
-						i
-					}
-					Entry::Occupied(entry) => *entry.get(),
-				}
+		if self.id_map.contains_key(id.as_ref()) {
+			Ok(self.id_map.get(id.as_ref()).unwrap().clone())
+		} else {
+			match id.as_str() {
+				"option" => Ok(self.add_type(id, Type::primitive_option())),
+				"list" => Ok(self.add_type(id, Type::primitive_list())),
+				_ => Err(Loc::new(Error::UndefinedType(id.as_ref().clone()), id.span()))
 			}
 		}
 	}
 
-	pub fn insert_by_desc(&mut self, id: ty::Id, span: Span) -> (u32, bool) {
-		match id {
-			ty::Id::Defined(id) => (self.id_map.get(&id).cloned().unwrap(), false),
-			_ => {
-				use std::collections::btree_map::Entry;
-				match self.desc_map.entry(id.clone()) {
-					Entry::Vacant(entry) => {
-						let i = self.list.len() as u32;
-						self.list.push(Caused::explicit(Type::new(id), span));
-						entry.insert(i);
-						(i, true)
-					}
-					Entry::Occupied(entry) => (*entry.get(), false),
-				}
-			}
-		}
-	}
+	// pub fn get_by_desc(&mut self, id: ty::Id, span: Span) -> u32 {
+	// 	match id {
+	// 		ty::Id::Defined(id) => self.id_map.get(&id).cloned().unwrap(),
+	// 		_ => {
+	// 			use std::collections::btree_map::Entry;
+	// 			match self.desc_map.entry(id.clone()) {
+	// 				Entry::Vacant(entry) => {
+	// 					let i = self.list.len() as u32;
+	// 					self.list.push(Caused::explicit(Type::new(id), span));
+	// 					entry.insert(i);
+	// 					i
+	// 				}
+	// 				Entry::Occupied(entry) => *entry.get(),
+	// 			}
+	// 		}
+	// 	}
+	// }
+
+	// pub fn insert_by_desc(&mut self, id: ty::Id, span: Span) -> (u32, bool) {
+	// 	match id {
+	// 		ty::Id::Defined(id) => (self.id_map.get(&id).cloned().unwrap(), false),
+	// 		_ => {
+	// 			use std::collections::btree_map::Entry;
+	// 			match self.desc_map.entry(id.clone()) {
+	// 				Entry::Vacant(entry) => {
+	// 					let i = self.list.len() as u32;
+	// 					self.list.push(Caused::explicit(Type::new(id), span));
+	// 					entry.insert(i);
+	// 					(i, true)
+	// 				}
+	// 				Entry::Occupied(entry) => (*entry.get(), false),
+	// 			}
+	// 		}
+	// 	}
+	// }
 
 	pub fn add_constructor(&mut self, index: u32, function: u32) {
 		self.list[index as usize].add_constructor(function)

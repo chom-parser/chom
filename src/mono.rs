@@ -77,7 +77,7 @@ impl<'a> Grammar<'a> {
 						for f_index in poly_ty.constructors() {
 							let f = poly.function(*f_index).unwrap();
 							for arg in f.arguments() {
-								monomorphize_ty_expr(poly, mono, Some((*ty, i)), arg);
+								monomorphize_ty_expr(poly, mono, Some((*ty, i)), arg.expr());
 							}
 						}
 					}
@@ -131,7 +131,7 @@ impl<'a> Grammar<'a> {
 						let mono_args = f
 							.arguments()
 							.iter()
-							.map(|a| monomorphized_ty_expr(mono_ty, &mono, a))
+							.map(|a| monomorphized_ty_expr(mono_ty, &mono, a.expr()))
 							.collect();
 						Function::new(f, i as ty::Instance, mono_args)
 					})
@@ -160,7 +160,7 @@ impl<'a> Grammar<'a> {
 		self.poly().extern_type(index)
 	}
 
-	pub fn regexps(&self) -> &[(regexp::Definition, Loc<syntax::regexp::Definition>)] {
+	pub fn regexps(&self) -> &[(regexp::Definition, Option<Loc<syntax::regexp::Definition>>)] {
 		self.poly().regexps()
 	}
 

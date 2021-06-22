@@ -1,8 +1,6 @@
 use super::{ty, Grammar};
-use crate::{poly, syntax::Ident};
+use crate::poly;
 pub use poly::function::Id;
-use source_span::Loc;
-use std::fmt;
 
 /// Polymorphic function.
 pub struct Function<'a> {

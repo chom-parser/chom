@@ -1,5 +1,8 @@
-use super::{function, regexp, terminal, ty, ExternalType, Function, Grammar, RegExp, Terminal};
-use crate::syntax::{self, Caused, Ident};
+use super::{function, regexp, terminal, ty, Function, Grammar, RegExp, Terminal};
+use crate::{
+	CharSet,
+	syntax::{self, Caused, Ident}
+};
 use source_span::Loc;
 use std::collections::HashSet;
 
@@ -43,6 +46,7 @@ fn compile_regexp_atom(
 			let index = regexps.get(&id, span)?;
 			regexp::Atom::Ref(index)
 		}
+		syntax::regexp::Atom::Any => regexp::Atom::CharSet(CharSet::any()),
 		syntax::regexp::Atom::CharSet(set) => regexp::Atom::CharSet(set),
 		syntax::regexp::Atom::Literal(str, case_sensitive) => {
 			regexp::Atom::Literal(str, case_sensitive)
@@ -99,6 +103,16 @@ fn compile_ty_expr(
 	}
 }
 
+fn compile_labeled_ty_expr(
+	regexps: &RegExps,
+	types: &mut Types,
+	terminals: &mut Terminals,
+	ast: Loc<syntax::ty::LabeledExpr>,
+) -> Result<ty::LabeledExpr, Loc<Error>> {
+	let (ast, _) = ast.into_raw_parts();
+	Ok(ty::LabeledExpr::new(ast.label.map(|label| label.into_inner()), compile_ty_expr(regexps, types, terminals, ast.expr)?))
+}
+
 fn compile_function_id(id: Option<Loc<Ident>>) -> Result<function::Id, Loc<Error>> {
 	match id {
 		Some(id) => Ok(function::Id::Defined(id.into_inner())),
@@ -118,7 +132,7 @@ fn compile_rule(
 	let ast = ast.into_inner();
 	let mut args = Vec::new();
 	for a in ast.args.into_iter() {
-		args.push(compile_ty_expr(regexps, types, terminals, a)?);
+		args.push(compile_labeled_ty_expr(regexps, types, terminals, a)?);
 	}
 
 	let fun = Function::new(compile_function_id(ast.id)?, ty, args);
@@ -173,7 +187,7 @@ impl syntax::Grammar {
 
 		// Add special terminals.
 		let mut terminals = terminals.into_vec();
-		terminals.push((Terminal::whitespace(), HashSet::new()));
+		terminals.push((Terminal::whitespace(regexps.ws_index()), HashSet::new()));
 
 		let g = Grammar::from_raw_parts(
 			external_types.into_vec(),

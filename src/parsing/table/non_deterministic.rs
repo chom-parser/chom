@@ -1,12 +1,10 @@
 use super::{Item, ItemSet, Symbol};
 use crate::{
-	mono::{ty, Grammar, Index},
-	parsing::Error,
+	mono::{Grammar, Index}
 };
-use source_span::Loc;
 use std::{
-	collections::{BTreeMap, BTreeSet, HashMap, HashSet},
-	fmt, io,
+	collections::{BTreeMap, HashMap, HashSet},
+	io,
 };
 
 pub struct State {
@@ -89,12 +87,8 @@ impl NonDeterministic {
 		}
 
 		let mut stack = Vec::new();
-		for (ty_index, ty) in grammar.enumerate_types() {
+		for (ty_index, _ty) in grammar.enumerate_types() {
 			let mut item_set = ItemSet::new();
-
-			// for f in ty.constructors() {
-			// 	item_set.insert(Item::from_rule(f))
-			// }
 			item_set.insert(Item::initial(ty_index));
 
 			item_set.close(grammar);

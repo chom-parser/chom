@@ -135,9 +135,9 @@ impl Module {
 									module,
 									types,
 									enum_ty.parameters(),
-									a,
+									a.expr(),
 								) {
-									let rust_a = if a.depends_on(&ty_expr) {
+									let rust_a = if a.expr().depends_on(&ty_expr) {
 										std_crate.box_struct.instanciate_with([rust_a])
 									} else {
 										rust_a

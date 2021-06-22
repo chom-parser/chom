@@ -1,8 +1,7 @@
 use super::{Item, NonDeterministic, Rule, Symbol};
 use crate::{
-	mono::{ty, Function, Grammar, Index},
-	out,
-	parsing::Error,
+	mono::{ty, Grammar, Index},
+	out
 };
 use source_span::{Loc, Position, Span};
 use std::{

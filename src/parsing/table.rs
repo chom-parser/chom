@@ -1,5 +1,4 @@
 use crate::mono::{function, ty, Function, Grammar, Index};
-use source_span::Loc;
 use std::{
 	collections::{BTreeMap, BTreeSet},
 	fmt,

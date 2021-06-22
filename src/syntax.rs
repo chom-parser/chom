@@ -194,7 +194,8 @@ impl Parsable for Grammar {
 									}
 								}
 								_ => {
-									let items = Vec::<Loc<ty::Expr>>::parse(lexer)?;
+									// Alias.
+									let items = Vec::<Loc<ty::LabeledExpr>>::parse(lexer)?;
 									let tokens_span = items.span();
 									span.append(tokens_span);
 									rules.push(Loc::new(
@@ -272,7 +273,7 @@ impl Parsable for Function {
 				))
 			}
 		}
-		let items = Vec::<Loc<ast::ty::Expr>>::parse(lexer)?;
+		let items = Vec::<Loc<ast::ty::LabeledExpr>>::parse(lexer)?;
 		span.append(items.span());
 		Ok(Loc::new(
 			Function {
@@ -288,6 +289,40 @@ fn is_repeater(c: char) -> bool {
 	match c {
 		'+' | '*' | '?' => true,
 		_ => false,
+	}
+}
+
+impl Parsable for ast::ty::LabeledExpr {
+	fn parse<L: Iterator<Item = lexer::Result<Loc<lexer::Token>>>>(
+		lexer: &mut Peekable<L>,
+	) -> Result<Loc<Self>> {
+		let mut span = Span::default();
+		let label = match peek_token(lexer, &span)?.as_ref() {
+			lexer::Token::Punct('@') => {
+				consume(lexer, &mut span)?;
+				let (token, token_span) = expect(lexer, &mut span)?.into_raw_parts();
+				match token {
+					lexer::Token::Ident(id) => {
+						Some(Loc::new(Ident(id), token_span))
+					},
+					token => {
+						return Err(Loc::new(
+							Error::UnexpectedToken(token),
+							token_span,
+						))
+					}
+				}
+			},
+			_ => None
+		};
+
+		let expr = ast::ty::Expr::parse(lexer)?;
+		let span = span.union(expr.span());
+
+		Ok(Loc::new(ast::ty::LabeledExpr {
+			label,
+			expr
+		}, span))
 	}
 }
 
@@ -391,7 +426,7 @@ impl Parsable for ast::ty::Expr {
 	}
 }
 
-impl Parsable for Vec<Loc<ast::ty::Expr>> {
+impl Parsable for Vec<Loc<ast::ty::LabeledExpr>> {
 	fn parse<L: Iterator<Item = lexer::Result<Loc<lexer::Token>>>>(
 		lexer: &mut Peekable<L>,
 	) -> Result<Loc<Self>> {
@@ -402,7 +437,7 @@ impl Parsable for Vec<Loc<ast::ty::Expr>> {
 				match token.as_ref() {
 					lexer::Token::Punct('|') | lexer::Token::Keyword(_) => break,
 					_ => {
-						let token = ast::ty::Expr::parse(lexer)?;
+						let token = ast::ty::LabeledExpr::parse(lexer)?;
 						span.append(token.span());
 						items.push(token);
 					}
@@ -434,6 +469,9 @@ impl Parsable for RegExp {
 			if let Some(token) = peek(lexer)? {
 				let token_span = token.span().clone();
 				match token.into_inner() {
+					lexer::Token::Punct('.') => {
+						atoms.push(Loc::new(regexp::Atom::Any, token_span))
+					},
 					lexer::Token::Ident(id) => {
 						consume(lexer, &mut span)?;
 						atoms.push(Loc::new(regexp::Atom::Ref(Ident(id.clone())), token_span));

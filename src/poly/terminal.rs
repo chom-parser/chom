@@ -1,5 +1,5 @@
 use super::Grammar;
-use crate::lexing::{regexp, RegExp, Token};
+use crate::{lexing::{regexp, RegExp, Token}};
 use once_cell::unsync::OnceCell;
 use std::{cmp::Ordering, fmt};
 
@@ -28,8 +28,13 @@ impl Terminal {
 		None
 	}
 
-	pub fn whitespace() -> Self {
-		Self::new(Desc::Whitespace)
+	pub fn whitespace(ws_index: u32) -> Self {
+		Self::new(Desc::Whitespace(ws_index))
+		// Self::new(Desc::RegExp(RegExp::new(vec![regexp::Atom::Repeat(
+		// 	Box::new(regexp::Atom::Ref(ws_index)),
+		// 	1,
+		// 	usize::MAX
+		// )])))
 	}
 
 	pub fn regexp(exp: RegExp) -> Self {
@@ -47,7 +52,7 @@ impl Terminal {
 	pub fn init_token(&self, grammar: &Grammar) {
 		match &self.desc {
 			Desc::RegExp(exp) => self.token.set(exp.token(grammar)).ok().unwrap(),
-			Desc::Whitespace => (),
+			Desc::Whitespace(_) => (),
 		}
 	}
 
@@ -66,7 +71,7 @@ impl Terminal {
 	pub fn instance(&self, grammar: &Grammar) -> String {
 		match self.desc() {
 			Desc::RegExp(exp) => exp.instance(grammar),
-			Desc::Whitespace => " ".to_string(),
+			Desc::Whitespace(_) => " ".to_string(), // TODO actually instanciate the `WS` regexp.
 		}
 	}
 }
@@ -101,14 +106,14 @@ impl Ord for Terminal {
 /// Terminal description.
 pub enum Desc {
 	RegExp(RegExp),
-	Whitespace,
+	Whitespace(u32),
 }
 
 impl fmt::Display for Desc {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		match self {
 			Self::RegExp(exp) => exp.fmt(f),
-			Self::Whitespace => write!(f, "WS*"),
+			Self::Whitespace(_) => write!(f, "WS*"),
 		}
 	}
 }
@@ -125,7 +130,7 @@ impl<'g, 'd> fmt::Display for Formatted<'g, 'd> {
 		match self.2 {
 			FormatStyle::Canonical => match self.1 {
 				Desc::RegExp(exp) => exp.format(self.0).fmt(f),
-				Desc::Whitespace => write!(f, "WS*"),
+				Desc::Whitespace(_) => write!(f, "WS*"),
 			},
 			FormatStyle::Human => match self.1 {
 				Desc::RegExp(exp) => {
@@ -142,7 +147,7 @@ impl<'g, 'd> fmt::Display for Formatted<'g, 'd> {
 
 					write!(f, "terminal {}", exp)
 				}
-				Desc::Whitespace => write!(f, "whitespace"),
+				Desc::Whitespace(_) => write!(f, "whitespace"),
 			},
 		}
 	}

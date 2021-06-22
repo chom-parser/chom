@@ -24,6 +24,7 @@ impl fmt::Display for RegExp {
 #[derive(Clone, Hash, PartialEq, Eq)]
 pub enum Atom {
 	Ref(Ident),
+	Any,
 	CharSet(CharSet),
 	Literal(String, bool),
 	Repeat(Box<Loc<Atom>>, usize, usize),
@@ -35,6 +36,7 @@ impl fmt::Display for Atom {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		match self {
 			Self::Ref(id) => id.fmt(f),
+			Self::Any => write!(f, "."),
 			Self::CharSet(set) => set.fmt(f),
 			Self::Literal(string, case_sensitive) => {
 				if *case_sensitive {

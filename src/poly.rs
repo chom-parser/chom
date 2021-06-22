@@ -22,7 +22,7 @@ pub struct Grammar {
 	externs: Vec<(ExternalType, Option<Span>)>,
 
 	/// Regular expressions.
-	regexps: Vec<(regexp::Definition, Loc<syntax::regexp::Definition>)>,
+	regexps: Vec<(regexp::Definition, Option<Loc<syntax::regexp::Definition>>)>,
 
 	/// Terminals.
 	terminals: Vec<(Terminal, HashSet<Loc<syntax::RegExp>>)>,
@@ -37,7 +37,7 @@ pub struct Grammar {
 impl Grammar {
 	pub(crate) fn from_raw_parts(
 		externs: Vec<(ExternalType, Option<Span>)>,
-		regexps: Vec<(regexp::Definition, Loc<syntax::regexp::Definition>)>,
+		regexps: Vec<(regexp::Definition, Option<Loc<syntax::regexp::Definition>>)>,
 		terminals: Vec<(Terminal, HashSet<Loc<syntax::RegExp>>)>,
 		types: Vec<Caused<Type>>,
 		functions: Vec<Caused<Function>>,
@@ -65,7 +65,7 @@ impl Grammar {
 		self.externs.get(index as usize).map(|p| &p.0)
 	}
 
-	pub fn regexps(&self) -> &[(regexp::Definition, Loc<syntax::regexp::Definition>)] {
+	pub fn regexps(&self) -> &[(regexp::Definition, Option<Loc<syntax::regexp::Definition>>)] {
 		&self.regexps
 	}
 

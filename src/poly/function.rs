@@ -1,7 +1,5 @@
-use super::{ty, Grammar};
+use super::ty;
 use crate::syntax::Ident;
-use source_span::Loc;
-use std::fmt;
 
 /// Primitive type constructor.
 pub enum Primitive {
@@ -48,11 +46,11 @@ pub struct Function {
 	return_ty: u32,
 
 	/// Arguments.
-	args: Vec<ty::Expr>,
+	args: Vec<ty::LabeledExpr>,
 }
 
 impl Function {
-	pub fn new(id: Id, return_ty: u32, args: Vec<ty::Expr>) -> Self {
+	pub fn new(id: Id, return_ty: u32, args: Vec<ty::LabeledExpr>) -> Self {
 		Function {
 			id,
 			return_ty,
@@ -68,11 +66,11 @@ impl Function {
 		self.return_ty
 	}
 
-	pub fn arguments(&self) -> &[ty::Expr] {
+	pub fn arguments(&self) -> &[ty::LabeledExpr] {
 		&self.args
 	}
 
-	pub fn argument(&self, offset: usize) -> Option<&ty::Expr> {
+	pub fn argument(&self, offset: usize) -> Option<&ty::LabeledExpr> {
 		self.args.get(offset)
 	}
 }

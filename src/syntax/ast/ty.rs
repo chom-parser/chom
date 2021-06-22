@@ -14,6 +14,12 @@ pub enum Parameter {
 	NonTerminal(Loc<Ident>),
 }
 
+/// Labeled type expr.
+pub struct LabeledExpr {
+	pub label: Option<Loc<Ident>>,
+	pub expr: Loc<Expr>
+}
+
 /// Type expression.
 pub enum Expr {
 	Terminal(RegExp),

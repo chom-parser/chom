@@ -1,0 +1,105 @@
+extern ident
+extern charset
+extern char
+extern comment
+
+# Identifier.
+regexp IDENT: ident = [%a-zA-Z][a-zA-Z0-9]*
+
+# Regexp character.
+regexp CHAR = [^\]] | '\\]'
+
+# Regexp charset.
+regexp CHARSET: charset = '[' CHAR* ']'
+
+# Comment.
+regexp COMMENT: comment = ( WS* '#' [^\n]* '\n' )+
+
+# Grammar.
+type grammar =
+  # Extern type definition.
+  | %extern: <extern_type_definition>
+  # Regular expression.
+  | %regexp: <regexp_definition>
+  # Type definition.
+  | %type: <type_definition>
+
+# Extern type definition.
+type extern_type_definition =
+  # Type description.
+  @comment <option COMMENT> 'extern'
+  # Identifier.
+  @id IDENT
+
+# Regular expression definition.
+type regexp_definition = 
+  # Regexp description.
+  @comment <option COMMENT> 'regexp'
+  # Identifier.
+  @id IDENT
+  # Type annotation.
+  @ty <option <extern_type>>
+  # Regexp.
+  <%regexp>
+
+# Type definition.
+type type_definition =
+  # Description.
+  @comment <option COMMENT> 'type'
+  # Identifier.
+  @id IDENT
+  # Parameters.
+  @params <list IDENT>
+  # Constructors.
+  @constructors <type_constructors>
+
+type type_constructors =
+  | alias: <signature>
+  | rules: <list <function>>
+
+# Function definition.
+type function = <option COMMENT> '|' IDENT ':' <signature>
+
+# Function signature.
+type signature = <list <labeled_symbol>>
+
+# Labeled symbol.
+type labeled_symbol =
+  # Description.
+  @comment <option COMMENT>
+  # Label.
+  @label <option <label>>
+  # Symbol.
+  @symbol <symbol>
+
+type label = '@' IDENT
+
+# Symbol.
+type symbol =
+  # Terminal symbol.
+  | terminal: <terminal>
+  # Non terminal symbol.
+  | non_terminal: <non_terminal>
+
+# Terminal.
+type terminal = <regexp_atom>
+
+# Non terminal.
+type non_terminal = '<' IDENT <list <symbol>> '>'
+
+# Extern type annotation.
+type extern_type = ':' IDENT
+
+# Regular expression.
+type %regexp = <list <regexp_atom>>
+
+# Regular expression atom.
+type regexp_atom =
+  # Reference.
+  | ref: IDENT
+  # Any char.
+  | any: '.'
+  # Character set.
+  | charset: CHARSET
+  # Group.
+  | group: '(' <%regexp> ')'

@@ -254,7 +254,7 @@ impl FirstAndFollowGraph {
 	}
 
 	fn empty(deps: &DependencyGraph) -> Self {
-		let mut map = deps.firsts.map(|_| (0, 0));
+		let map = deps.firsts.map(|_| (0, 0));
 
 		Self {
 			map,

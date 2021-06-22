@@ -33,6 +33,10 @@ impl<T> Caused<T> {
 		Self(t, Source::Implicit(span))
 	}
 
+	pub fn nowhere(t: T) -> Self {
+		Self(t, Source::None)
+	}
+
 	pub fn source(&self) -> &Source {
 		&self.1
 	}

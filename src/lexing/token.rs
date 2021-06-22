@@ -84,6 +84,10 @@ impl Token {
 		}
 	}
 
+	pub fn parameter_type(&self) -> Option<u32> {
+		self.conversion().map(|c| c.target)
+	}
+
 	pub fn has_parameter(&self) -> bool {
 		match self {
 			Self::Anonymous(_, c) | Self::Named(_, c) | Self::Composed(_, c) => c.is_some(),

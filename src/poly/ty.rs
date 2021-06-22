@@ -69,6 +69,22 @@ impl Type {
 		Self::new(Id::Defined(id))
 	}
 
+	pub fn primitive_option() -> Self {
+		Self {
+			id: Id::Primitive(Primitive::Option),
+			parameters: vec![Parameter::NonTerminal(Ident("t".to_string()))],
+			constructors: Vec::new()
+		}
+	}
+
+	pub fn primitive_list() -> Self {
+		Self {
+			id: Id::Primitive(Primitive::List),
+			parameters: vec![Parameter::NonTerminal(Ident("t".to_string()))],
+			constructors: Vec::new()
+		}
+	}
+
 	pub fn id(&self) -> &Id {
 		&self.id
 	}
@@ -113,6 +129,29 @@ impl fmt::Display for Type {
 	}
 }
 
+/// Labeled type expression.
+pub struct LabeledExpr {
+	label: Option<Ident>,
+	expr: Expr
+}
+
+impl LabeledExpr {
+	pub fn new(label: Option<Ident>, expr: Expr) -> Self {
+		Self {
+			label,
+			expr
+		}
+	}
+
+	pub fn label(&self) -> Option<&Ident> {
+		self.label.as_ref()
+	}
+
+	pub fn expr(&self) -> &Expr {
+		&self.expr
+	}
+}
+
 /// Expression.
 #[derive(Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum Expr {
@@ -147,7 +186,7 @@ impl<'g, 'e> fmt::Display for FormattedExpr<'g, 'e> {
 				let t = self.0.terminal(*t).unwrap();
 				t.format(self.0).fmt(f)
 			}
-			Expr::Type(nt, args) => {
+			Expr::Type(nt, _args) => {
 				let ty = self.0.ty(*nt).unwrap();
 				ty.name().fmt(f)
 			}

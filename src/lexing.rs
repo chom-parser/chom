@@ -1,8 +1,7 @@
 use crate::{
 	charset::DisplayCharRange,
 	out,
-	poly::{terminal, Grammar, Terminal},
-	CharSet,
+	poly::{terminal, Grammar, Terminal}
 };
 use btree_range_map::AnyRange;
 use btree_slab::BTreeSet;
@@ -468,10 +467,9 @@ impl NDTable {
 				self.automaton.add(State::Initial, None, a);
 				self.automaton.add(b, None, State::Final(id))
 			}
-			terminal::Desc::Whitespace => {
-				let ws = CharSet::whitespace();
+			terminal::Desc::Whitespace(ws_index) => {
 				let exp = RegExp::new(vec![regexp::Atom::Repeat(
-					Box::new(regexp::Atom::CharSet(ws)),
+					Box::new(regexp::Atom::Ref(*ws_index)),
 					1,
 					usize::MAX,
 				)]);

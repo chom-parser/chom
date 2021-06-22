@@ -71,6 +71,13 @@ impl CharSet {
 		CharSet(RangeSet::new())
 	}
 
+	pub fn any() -> CharSet {
+		let mut set = RangeSet::new();
+		set.insert('\u{0000}'..='\u{d7ff}');
+		set.insert('\u{e000}'..=char::MAX);
+		CharSet(set)
+	}
+
 	/// Creates the charset of whitespaces.
 	///
 	/// TODO: for now, only ASCII whitespaces are included.

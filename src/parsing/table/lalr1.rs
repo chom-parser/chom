@@ -1,6 +1,6 @@
 use super::{lr0, Item, NonDeterministic, Rule, Symbol};
 use crate::{
-	mono::{ty, Function, Grammar, Index},
+	mono::{ty, Grammar, Index},
 	out,
 	parsing::FirstAndFollowGraph,
 };
@@ -271,6 +271,10 @@ pub struct LALR1 {
 }
 
 impl LALR1 {
+	pub fn states(&self) -> &[State] {
+		&self.states
+	}
+
 	pub fn from_non_deterministic(
 		grammar: &Grammar,
 		nd_table: &NonDeterministic,

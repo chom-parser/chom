@@ -261,7 +261,7 @@ fn generate_next_token_function(
 				let terminal = &grammar.terminals()[*token_id as usize].0;
 
 				match terminal.desc() {
-					terminal::Desc::Whitespace => {
+					terminal::Desc::Whitespace(_) => {
 						quote! {
 							state = #init_id;
 							self.buffer.clear();
