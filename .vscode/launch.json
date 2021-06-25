@@ -38,7 +38,14 @@
 					"kind": "bin"
 				}
 			},
-			"args": ["examples/grammar.grammar"],
+			"args": [
+				"examples/grammar.grammar",
+				"parser",
+				"-p",
+				"-r", "src",
+				"test::glue", "test::ast", "test::lexer", "test::parser",
+				"-o", "parser"
+			],
 			"cwd": "${workspaceFolder}"
 		},
 		{

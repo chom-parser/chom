@@ -87,7 +87,7 @@ fn check_regexp_atom(
 						));
 					}
 				}
-	
+
 				check_regexp(regexps, ast.exp.as_ref(), false)?;
 			}
 		}

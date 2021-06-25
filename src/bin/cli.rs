@@ -1,6 +1,5 @@
 #[macro_use]
 extern crate clap;
-extern crate grammar;
 
 use source_span::{
 	fmt::{Formatter, Style},
@@ -13,7 +12,7 @@ use std::{
 };
 use utf8_decode::UnsafeDecoder;
 
-use grammar::{
+use chom::{
 	mono, out, poly,
 	syntax::{self, Parsable},
 };
@@ -48,23 +47,27 @@ fn main() -> io::Result<()> {
 	let buffer = source_span::SourceBuffer::new(utf8_input, Position::default(), metrics);
 	let mut lexer = syntax::Lexer::new(buffer.iter(), metrics).peekable();
 
+	log::info!("parsing grammar...");
 	match syntax::Grammar::parse(&mut lexer) {
-		Ok(ast) => match ast.compile() {
-			Ok(grammar) => {
-				if let Err(e) = run_subcommand(&matches, &grammar) {
-					e.format(&buffer, &metrics)?;
+		Ok(ast) => {
+			log::info!("compiling grammar...");
+			match ast.compile() {
+				Ok(grammar) => {
+					if let Err(e) = run_subcommand(&matches, &grammar) {
+						e.format(&buffer, &metrics)?;
+						std::process::exit(1)
+					}
+				}
+				Err(e) => {
+					let mut fmt = Formatter::new();
+					fmt.add(e.span(), Some(format!("{}", e)), Style::Error);
+					e.format_notes(&mut fmt, Style::Note);
+					let formatted = fmt.render(buffer.iter(), buffer.span(), &metrics)?;
+					eprintln!("{}", formatted);
 					std::process::exit(1)
 				}
 			}
-			Err(e) => {
-				let mut fmt = Formatter::new();
-				fmt.add(e.span(), Some(format!("{}", e)), Style::Error);
-				e.format_notes(&mut fmt, Style::Note);
-				let formatted = fmt.render(buffer.iter(), buffer.span(), &metrics)?;
-				eprintln!("{}", formatted);
-				std::process::exit(1)
-			}
-		},
+		}
 		Err(e) => {
 			let mut fmt = Formatter::new();
 			fmt.add(e.span(), Some(format!("{}", e)), Style::Error);
@@ -145,11 +148,8 @@ fn run_subcommand<'a>(
 enum Error<'a> {
 	UnknownCommand(String),
 	IO(io::Error),
-	Lexing(&'a poly::Grammar, Loc<grammar::lexing::Error>),
-	LR0Ambiguity(
-		mono::Grammar<'a>,
-		Loc<grammar::parsing::table::lr0::Ambiguity>,
-	),
+	Lexing(&'a poly::Grammar, Loc<chom::lexing::Error>),
+	LR0Ambiguity(mono::Grammar<'a>, Loc<chom::parsing::table::lr0::Ambiguity>),
 }
 
 impl<'a> Error<'a> {
@@ -198,11 +198,11 @@ fn generate_parse_table<'a>(
 	output: &mut Output,
 ) -> Result<(), Error<'a>> {
 	let mono_grammar = mono::Grammar::new(&grammar);
-	let parsing_table = grammar::parsing::table::NonDeterministic::new(&mono_grammar);
+	let parsing_table = chom::parsing::table::NonDeterministic::new(&mono_grammar);
 	parsing_table.dot_write(&mono_grammar, &mut output.lock())?;
 	Ok(())
 
-	// match grammar::parsing::table::LR0::from_non_deterministic(&mono_grammar, &parsing_table) {
+	// match chom::parsing::table::LR0::from_non_deterministic(&mono_grammar, &parsing_table) {
 	// 	Ok(lr0_table) => {
 	// 		// ...
 
@@ -233,7 +233,7 @@ fn generate_parser<'a>(
 		ast_module.write(&mut ast_output.lock())?
 	}
 
-	match grammar::lexing::Table::new(&grammar) {
+	match chom::lexing::Table::new(&grammar) {
 		Ok(lexing_table) => {
 			let lexer_module = env.generate_lexer(&mono_grammar, &lexing_table, lexer_mod_path);
 
@@ -243,12 +243,9 @@ fn generate_parser<'a>(
 				lexer_module.write(&mut lexer_output.lock())?
 			}
 
-			let parsing_table = grammar::parsing::table::NonDeterministic::new(&mono_grammar);
+			let parsing_table = chom::parsing::table::NonDeterministic::new(&mono_grammar);
 
-			match grammar::parsing::table::LR0::from_non_deterministic(
-				&mono_grammar,
-				&parsing_table,
-			) {
+			match chom::parsing::table::LR0::from_non_deterministic(&mono_grammar, &parsing_table) {
 				Ok(lr0_table) => {
 					let parser_module = env.generate_lr0_parser(
 						&mono_grammar,
@@ -287,7 +284,7 @@ impl Target {
 		match self {
 			Self::Rust => {
 				for segment in path {
-					filename.push(grammar::util::to_snake_case(segment.as_str()))
+					filename.push(chom::util::to_snake_case(segment.as_str()))
 				}
 
 				filename.set_extension("rs");
@@ -306,12 +303,12 @@ impl Target {
 }
 
 pub enum TargetEnv {
-	Rust(grammar::gen::target::rust::Target),
+	Rust(chom::gen::target::rust::Target),
 }
 
 impl TargetEnv {
 	fn rust(grammar: &mono::Grammar, extern_module_path: &[String]) -> Self {
-		Self::Rust(grammar::gen::target::rust::Target::new(
+		Self::Rust(chom::gen::target::rust::Target::new(
 			grammar,
 			extern_module_path,
 		))
@@ -326,7 +323,7 @@ impl TargetEnv {
 	fn generate_lexer(
 		&self,
 		grammar: &mono::Grammar,
-		table: &grammar::lexing::Table,
+		table: &chom::lexing::Table,
 		path: &[String],
 	) -> LexerModule {
 		match self {
@@ -339,7 +336,7 @@ impl TargetEnv {
 		grammar: &mono::Grammar,
 		ast_mod: &AstModule,
 		lexer_mod: &LexerModule,
-		table: &grammar::parsing::table::LR0,
+		table: &chom::parsing::table::LR0,
 		path: &[String],
 	) -> LR0Module {
 		match self {
@@ -355,7 +352,7 @@ impl TargetEnv {
 }
 
 pub enum AstModule {
-	Rust(grammar::gen::target::rust::ast::Module),
+	Rust(chom::gen::target::rust::ast::Module),
 }
 
 impl AstModule {
@@ -365,7 +362,7 @@ impl AstModule {
 		}
 	}
 
-	fn as_rust(&self) -> &grammar::gen::target::rust::ast::Module {
+	fn as_rust(&self) -> &chom::gen::target::rust::ast::Module {
 		match self {
 			Self::Rust(m) => m,
 		}
@@ -373,7 +370,7 @@ impl AstModule {
 }
 
 pub enum LexerModule {
-	Rust(grammar::gen::target::rust::lexer::Module),
+	Rust(chom::gen::target::rust::lexer::Module),
 }
 
 impl LexerModule {
@@ -383,7 +380,7 @@ impl LexerModule {
 		}
 	}
 
-	fn as_rust(&self) -> &grammar::gen::target::rust::lexer::Module {
+	fn as_rust(&self) -> &chom::gen::target::rust::lexer::Module {
 		match self {
 			Self::Rust(m) => m,
 		}
@@ -391,7 +388,7 @@ impl LexerModule {
 }
 
 pub enum LR0Module {
-	Rust(grammar::gen::target::rust::lr0::Module),
+	Rust(chom::gen::target::rust::lr0::Module),
 }
 
 impl LR0Module {

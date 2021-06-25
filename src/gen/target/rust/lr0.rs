@@ -392,7 +392,7 @@ pub fn generate_state(
 
 				let mut body = quote! {
 					{
-						#(#args_pop);*
+						#(#args_pop;)*
 						node = Some(Node::#id (#return_ty :: #variant #args ));
 						next_state
 					}

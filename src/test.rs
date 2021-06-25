@@ -4,8 +4,13 @@ pub mod glue {
 	}
 
 	pub type Int = i32;
+	pub type String = std::string::String;
 
 	pub fn integer(s: &str) -> Result<Int, Error> {
+		unimplemented!()
+	}
+
+	pub fn ident(s: &str) -> Result<String, Error> {
 		unimplemented!()
 	}
 

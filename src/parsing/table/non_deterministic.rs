@@ -1,7 +1,5 @@
 use super::{Item, ItemSet, Symbol};
-use crate::{
-	mono::{Grammar, Index}
-};
+use crate::mono::{Grammar, Index};
 use std::{
 	collections::{BTreeMap, HashMap, HashSet},
 	io,

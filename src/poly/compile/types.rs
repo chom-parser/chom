@@ -3,7 +3,7 @@ use crate::{
 	poly::Type,
 	syntax::{self, Caused, Ident},
 };
-use source_span::{Loc};
+use source_span::Loc;
 use std::collections::BTreeMap;
 
 pub struct Types {
@@ -66,7 +66,10 @@ impl Types {
 			match id.as_str() {
 				"option" => Ok(self.add_type(id, Type::primitive_option())),
 				"list" => Ok(self.add_type(id, Type::primitive_list())),
-				_ => Err(Loc::new(Error::UndefinedType(id.as_ref().clone()), id.span()))
+				_ => Err(Loc::new(
+					Error::UndefinedType(id.as_ref().clone()),
+					id.span(),
+				)),
 			}
 		}
 	}

@@ -113,10 +113,8 @@ impl CharSet {
 		self.0.iter()
 	}
 
-	pub fn negated(&self) -> CharSet {
-		let mut set = CharSet::new();
-		set.insert('\u{0}'..='\u{d7ff}');
-		set.insert('\u{e000}'..='\u{10ffff}');
+	pub fn negated(&self) -> Self {
+		let mut set = CharSet::any();
 
 		for range in self.iter() {
 			set.remove(range.clone())

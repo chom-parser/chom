@@ -1,7 +1,7 @@
 use super::{function, regexp, terminal, ty, Function, Grammar, RegExp, Terminal};
 use crate::{
+	syntax::{self, Caused, Ident},
 	CharSet,
-	syntax::{self, Caused, Ident}
 };
 use source_span::Loc;
 use std::collections::HashSet;
@@ -110,7 +110,10 @@ fn compile_labeled_ty_expr(
 	ast: Loc<syntax::ty::LabeledExpr>,
 ) -> Result<ty::LabeledExpr, Loc<Error>> {
 	let (ast, _) = ast.into_raw_parts();
-	Ok(ty::LabeledExpr::new(ast.label.map(|label| label.into_inner()), compile_ty_expr(regexps, types, terminals, ast.expr)?))
+	Ok(ty::LabeledExpr::new(
+		ast.label.map(|label| label.into_inner()),
+		compile_ty_expr(regexps, types, terminals, ast.expr)?,
+	))
 }
 
 fn compile_function_id(id: Option<Loc<Ident>>) -> Result<function::Id, Loc<Error>> {

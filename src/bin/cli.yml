@@ -1,4 +1,4 @@
-name: mkmuncher
+name: chom
 version: "0.0"
 author: Timothée Haudebourg <author@haudebourg.net>
 about: Parser generation tool.

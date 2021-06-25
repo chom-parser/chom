@@ -1,19 +1,19 @@
 [package]
-name = "grammar"
-version = "0.1.0"
+name = "chom"
+version = "0.1.0-alpha"
 authors = ["Timothée Haudebourg <timothee.haudebourg@ens-rennes.fr>"]
 edition = "2018"
 
 [dependencies]
 source-span = "^2.6"
 once_cell = "*"
-btree-slab = { path = "../../data-structures/btree-slab" }
-btree-range-map = { path = "../../data-structures/btree-range-map" }
+btree-slab = { path = "../../../data-structures/btree-slab" }
+btree-range-map = { path = "../../../data-structures/btree-range-map" }
 itertools = "*"
 
 proc-macro2 = "*"
 quote = "*"
-rust-codegen = { path = "../../rust/rust-codegen" }
+rust-codegen = { path = "../../../rust/rust-codegen" }
 
 utf8-decode = "*"
 stderrlog = "*"

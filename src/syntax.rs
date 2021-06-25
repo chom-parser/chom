@@ -302,27 +302,17 @@ impl Parsable for ast::ty::LabeledExpr {
 				consume(lexer, &mut span)?;
 				let (token, token_span) = expect(lexer, &mut span)?.into_raw_parts();
 				match token {
-					lexer::Token::Ident(id) => {
-						Some(Loc::new(Ident(id), token_span))
-					},
-					token => {
-						return Err(Loc::new(
-							Error::UnexpectedToken(token),
-							token_span,
-						))
-					}
+					lexer::Token::Ident(id) => Some(Loc::new(Ident(id), token_span)),
+					token => return Err(Loc::new(Error::UnexpectedToken(token), token_span)),
 				}
-			},
-			_ => None
+			}
+			_ => None,
 		};
 
 		let expr = ast::ty::Expr::parse(lexer)?;
 		let span = span.union(expr.span());
 
-		Ok(Loc::new(ast::ty::LabeledExpr {
-			label,
-			expr
-		}, span))
+		Ok(Loc::new(ast::ty::LabeledExpr { label, expr }, span))
 	}
 }
 
@@ -470,8 +460,9 @@ impl Parsable for RegExp {
 				let token_span = token.span().clone();
 				match token.into_inner() {
 					lexer::Token::Punct('.') => {
-						atoms.push(Loc::new(regexp::Atom::Any, token_span))
-					},
+						consume(lexer, &mut span)?;
+						atoms.push(Loc::new(regexp::Atom::Any, token_span));
+					}
 					lexer::Token::Ident(id) => {
 						consume(lexer, &mut span)?;
 						atoms.push(Loc::new(regexp::Atom::Ref(Ident(id.clone())), token_span));

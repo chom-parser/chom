@@ -1,0 +1,8 @@
+extern int
+extern string
+
+regexp IDENT: string = [a-zA-Z][a-zA-Z0-9]*
+
+# Expression.
+type foo =
+  | keyword: 'keyword' IDENT

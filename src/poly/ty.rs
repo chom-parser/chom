@@ -73,7 +73,7 @@ impl Type {
 		Self {
 			id: Id::Primitive(Primitive::Option),
 			parameters: vec![Parameter::NonTerminal(Ident("t".to_string()))],
-			constructors: Vec::new()
+			constructors: Vec::new(),
 		}
 	}
 
@@ -81,7 +81,7 @@ impl Type {
 		Self {
 			id: Id::Primitive(Primitive::List),
 			parameters: vec![Parameter::NonTerminal(Ident("t".to_string()))],
-			constructors: Vec::new()
+			constructors: Vec::new(),
 		}
 	}
 
@@ -132,15 +132,12 @@ impl fmt::Display for Type {
 /// Labeled type expression.
 pub struct LabeledExpr {
 	label: Option<Ident>,
-	expr: Expr
+	expr: Expr,
 }
 
 impl LabeledExpr {
 	pub fn new(label: Option<Ident>, expr: Expr) -> Self {
-		Self {
-			label,
-			expr
-		}
+		Self { label, expr }
 	}
 
 	pub fn label(&self) -> Option<&Ident> {

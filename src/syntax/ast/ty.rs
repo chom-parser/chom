@@ -17,7 +17,7 @@ pub enum Parameter {
 /// Labeled type expr.
 pub struct LabeledExpr {
 	pub label: Option<Loc<Ident>>,
-	pub expr: Loc<Expr>
+	pub expr: Loc<Expr>,
 }
 
 /// Type expression.

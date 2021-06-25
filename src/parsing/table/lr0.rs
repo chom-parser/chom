@@ -1,7 +1,7 @@
 use super::{Item, NonDeterministic, Rule, Symbol};
 use crate::{
 	mono::{ty, Grammar, Index},
-	out
+	out,
 };
 use source_span::{Loc, Position, Span};
 use std::{

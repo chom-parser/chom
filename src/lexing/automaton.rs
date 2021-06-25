@@ -259,6 +259,13 @@ impl<Q: Ord> DetAutomaton<Q> {
 		set
 	}
 
+	pub fn states(&self) -> BTreeSet<&Q>
+	where
+		Q: Hash + Eq,
+	{
+		self.select_states(|_| true)
+	}
+
 	fn select_states_from<'a, F>(
 		&'a self,
 		q: &'a Q,
@@ -278,6 +285,20 @@ impl<Q: Ord> DetAutomaton<Q> {
 				self.select_states_from(r, f, visited, set)
 			}
 		}
+	}
+
+	pub fn partition<'a, P, F>(&'a self, f: F) -> HashMap<P, BTreeSet<&'a Q>>
+	where
+		Q: Ord + Hash + Eq,
+		P: Hash + Eq,
+		F: Fn(&Q) -> P,
+	{
+		// unsafe {
+		// 	self.try_partition::<P, F, std::convert::Infallible>(|q| Ok(q)).unwrap_unchecked() // safe because infallible.
+		// }
+		// TODO use `unwrap_unchecked` when stabilized.
+		self.try_partition::<P, _, std::convert::Infallible>(|q| Ok(f(q)))
+			.unwrap()
 	}
 
 	pub fn try_partition<'a, P, F, E>(&'a self, f: F) -> Result<HashMap<P, BTreeSet<&'a Q>>, E>

@@ -20,7 +20,7 @@ pub struct RegExps {
 	map: BTreeMap<Ident, u32>,
 
 	/// Index of the `WS` regexp.
-	ws_index: u32
+	ws_index: u32,
 }
 
 impl RegExps {
@@ -59,21 +59,20 @@ impl RegExps {
 			Entry::Vacant(entry) => {
 				let i = list.len() as u32;
 				let ty = external_types.get(None)?;
-				let exp = regexp::RegExp::new(vec![regexp::Atom::CharSet(crate::CharSet::whitespace())]);
-				list.push((Some(regexp::Definition {
-					id: ws_id,
-					ty,
-					exp
-				}), ty, None));
+				let exp =
+					regexp::RegExp::new(vec![regexp::Atom::CharSet(crate::CharSet::whitespace())]);
+				list.push((Some(regexp::Definition { id: ws_id, ty, exp }), ty, None));
 				entry.insert(i);
 				i
-			},
-			Entry::Occupied(entry) => {
-				*entry.get()
 			}
+			Entry::Occupied(entry) => *entry.get(),
 		};
 
-		Ok(Self { list, map, ws_index })
+		Ok(Self {
+			list,
+			map,
+			ws_index,
+		})
 	}
 
 	/// Returns the index of the `WS` regexp.

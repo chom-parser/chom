@@ -1,6 +1,6 @@
 use super::{ExternModule, SourceSpanCrate, StdCrate};
 use crate::{
-	lexing::{token, DetState, Table, Token},
+	lexing::{token, DetAutomaton, DetState, Table, Token},
 	mono::{terminal, Grammar},
 	util,
 };
@@ -107,7 +107,15 @@ impl Module {
 			let scope = rust_codegen::Scope::new(module_ref.clone());
 			use rust_codegen::Instance;
 			loc_path = source_span_crate.loc_struct.path(&scope);
-			generate_next_token_function(source_span_crate, extern_mod, &scope, grammar, table)
+			generate_next_token_function(
+				source_span_crate,
+				extern_mod,
+				&scope,
+				grammar,
+				table,
+				table.root(),
+				false,
+			)
 		};
 
 		{
@@ -118,7 +126,7 @@ impl Module {
 			implem.add_type_param(metrics_param.clone());
 
 			let sig = rust_codegen::func::Signature::method_mut(
-				"next_char",
+				"peek_char",
 				std_crate.result_enum.instanciate_with([
 					std_crate.option_enum.instanciate_with([char_primitive]),
 					loc_error_type.clone(),
@@ -127,14 +135,32 @@ impl Module {
 			implem.add_function(
 				sig,
 				quote! {
+					match self.chars.peek() {
+						Some(Ok(c)) => {
+							Ok(Some(*c))
+						},
+						Some(Err(_)) => Err(self.consume_char().unwrap_err()),
+						None => Ok(None)
+					}
+				},
+			);
+			let sig = rust_codegen::func::Signature::method_mut(
+				"consume_char",
+				std_crate
+					.result_enum
+					.instanciate_with([rust_codegen::ty::Instance::unit(), loc_error_type.clone()]),
+			);
+			implem.add_function(
+				sig,
+				quote! {
 					match self.chars.next() {
 						Some(Ok(c)) => {
 							self.buffer.push(c);
 							self.span.push(c, &self.metrics);
-							Ok(Some(c))
+							Ok(())
 						},
 						Some(Err(e)) => Err(#loc_path::new(e.into(), self.span.end().into())),
-						None => Ok(None)
+						None => Ok(())
 					}
 				},
 			);
@@ -217,14 +243,22 @@ fn generate_next_token_function(
 	scope: &rust_codegen::Scope,
 	grammar: &Grammar,
 	table: &Table,
+	automaton: &DetAutomaton<DetState>,
+	default_token: bool,
 ) -> TokenStream {
 	use rust_codegen::Instance;
 	let loc_path = source_span_crate.loc_struct.path(scope);
 
-	let automaton = table.automaton();
+	// let automaton = table.root();
 	let mut id_table = HashMap::new();
 
 	let init_id = state_id(&mut id_table, automaton.initial_state());
+
+	let consume_char = if default_token {
+		None
+	} else {
+		Some(quote! { self.consume_char()?; })
+	};
 
 	let states = automaton.transitions().iter().map(|(q, transitions)| {
 		let mut inverse: BTreeMap<
@@ -251,21 +285,21 @@ fn generate_next_token_function(
 
 			quote! {
 				#rust_ranges => {
-					state = #target_id
+					#consume_char
+					state = #target_id;
+					continue
 				}
 			}
 		});
 
 		let default_case = match q {
 			DetState::Final(token_id, _) => {
-				let terminal = &grammar.terminals()[*token_id as usize].0;
-
-				match terminal.desc() {
+				let loc_path = source_span_crate.loc_struct.path(scope);
+				let terminal = grammar.terminal(*token_id).unwrap();
+				let output_token = match terminal.desc() {
 					terminal::Desc::Whitespace(_) => {
 						quote! {
-							state = #init_id;
-							self.buffer.clear();
-							self.span.clear();
+							continue 'next_token
 						}
 					}
 					terminal::Desc::RegExp(_) => {
@@ -279,53 +313,90 @@ fn generate_next_token_function(
 						);
 
 						quote! {
-							break Ok(Some(#loc_path::new(#path, self.span)))
+							return Ok(Some(#loc_path::new(#path, self.span)))
 						}
 					}
+				};
+
+				match table.sub_automaton(*token_id) {
+					Some(sub_automaton) => {
+						let body = generate_next_token_function(
+							source_span_crate,
+							extern_mod,
+							scope,
+							grammar,
+							table,
+							sub_automaton,
+							true,
+						);
+						quote! {
+							#body
+							#output_token
+						}
+					}
+					None => output_token,
 				}
 			}
 			_ => {
-				let extern_mod_path = extern_mod.path(scope);
-				quote! {
-					break Err(#loc_path::new(#extern_mod_path::unexpected(next_c), self.span.last().into()))
+				if default_token {
+					quote! { break }
+				} else {
+					let extern_mod_path = extern_mod.path(scope);
+					quote! {
+						return Err(#loc_path::new(#extern_mod_path::unexpected(next_c), self.span.last().into()))
+					}
 				}
 			}
 		};
 
 		let eos_case = match q {
-			DetState::Initial => {
-				quote! { break Ok(None) }
-			}
-			_ => default_case.clone(),
+			DetState::Initial => quote! { { return Ok(None) } },
+			_ => quote! { () },
+		};
+
+		let next_char = if default_token {
+			quote! { chars.next() }
+		} else {
+			quote! { self.peek_char()? }
 		};
 
 		quote! {
 			#id => {
-				let next_c = self.next_char()?;
+				let next_c = #next_char;
 				match next_c {
 					Some(c) => match c {
 						#(#cases)*
-						_ => {
-							#default_case
-						}
-					},
-					None => {
-						#eos_case
+						_ => ()
 					}
+					None => #eos_case
 				}
+				#default_case
 			}
 		}
 	});
 
-	quote! {
+	let automaton_loop = quote! {
 		let mut state = #init_id;
-		self.buffer.clear();
-		self.span.clear();
 
 		loop {
 			match state {
 				#(#states)*,
 				_ => unreachable!()
+			}
+		}
+	};
+
+	if default_token {
+		quote! {
+			let mut chars = self.buffer.chars();
+			#automaton_loop
+		}
+	} else {
+		quote! {
+			'next_token: loop {
+				self.buffer.clear();
+				self.span.clear();
+				#automaton_loop
 			}
 		}
 	}

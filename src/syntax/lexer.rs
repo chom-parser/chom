@@ -58,7 +58,7 @@ pub enum Token {
 	Group(Delimiter, Vec<Loc<Token>>),
 	String(String, bool),
 	CharSet(CharSet, bool),
-	Comment(String)
+	Comment(String),
 }
 
 impl fmt::Display for Token {
@@ -88,7 +88,7 @@ impl fmt::Display for Token {
 				} else {
 					write!(f, "[{}]", set)
 				}
-			},
+			}
 			Comment(content) => {
 				for line in content.lines() {
 					write!(f, "# {}", line)?
@@ -392,7 +392,7 @@ impl<I: Iterator<Item = io::Result<char>>, M: Metrics> Lexer<I, M> {
 					}
 				}
 			} else {
-				break
+				break;
 			}
 		}
 
@@ -432,10 +432,11 @@ impl<I: Iterator<Item = io::Result<char>>, M: Metrics> Lexer<I, M> {
 				Some('[') => return Ok(Some(self.parse_charset()?)),
 				Some('\'') => return Ok(Some(self.parse_string('\'')?)),
 				Some('"') => return Ok(Some(self.parse_string('"')?)),
-				Some('#') => { // ignore comments.
+				Some('#') => {
+					// ignore comments.
 					self.parse_comment()?;
 					// return Ok(Some(self.parse_comment()?))
-				},
+				}
 				Some(c) if is_punct(c) => {
 					self.consume()?;
 					return Ok(Some(Loc::new(Token::Punct(c), self.span)));

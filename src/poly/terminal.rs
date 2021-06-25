@@ -1,8 +1,9 @@
 use super::Grammar;
-use crate::{lexing::{regexp, RegExp, Token}};
+use crate::lexing::{regexp, RegExp, Token};
 use once_cell::unsync::OnceCell;
 use std::{cmp::Ordering, fmt};
 
+/// Grammar terminal.
 pub struct Terminal {
 	desc: Desc,
 	token: OnceCell<Token>,
@@ -30,11 +31,6 @@ impl Terminal {
 
 	pub fn whitespace(ws_index: u32) -> Self {
 		Self::new(Desc::Whitespace(ws_index))
-		// Self::new(Desc::RegExp(RegExp::new(vec![regexp::Atom::Repeat(
-		// 	Box::new(regexp::Atom::Ref(ws_index)),
-		// 	1,
-		// 	usize::MAX
-		// )])))
 	}
 
 	pub fn regexp(exp: RegExp) -> Self {
@@ -105,7 +101,10 @@ impl Ord for Terminal {
 #[derive(Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
 /// Terminal description.
 pub enum Desc {
+	/// Regular expression.
 	RegExp(RegExp),
+
+	/// Special whitespaces terminal.
 	Whitespace(u32),
 }
 
