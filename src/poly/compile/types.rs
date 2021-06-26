@@ -1,7 +1,8 @@
 use super::Error;
 use crate::{
+	Ident,
 	poly::Type,
-	syntax::{self, Caused, Ident},
+	syntax::{self, Caused},
 };
 use source_span::Loc;
 use std::collections::BTreeMap;

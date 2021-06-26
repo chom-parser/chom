@@ -1,5 +1,5 @@
 use super::Grammar;
-use crate::syntax::Ident;
+use crate::Ident;
 use std::fmt;
 
 /// Polymorphic type identifier.
@@ -36,21 +36,29 @@ impl Primitive {
 
 /// Polymorphic type.
 pub struct Type {
+	/// Identifier.
 	id: Id,
+
+	/// Parameters.
 	parameters: Vec<Parameter>,
+
+	/// Constructors.
 	constructors: Vec<u32>,
 }
 
 /// Type parameter.
 pub enum Parameter {
-	NonTerminal(Ident),
+	/// Type.
+	Type(Ident),
+
+	/// Terminal.
 	Terminal(Ident),
 }
 
 impl fmt::Display for Parameter {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		match self {
-			Self::NonTerminal(id) => write!(f, "<{}>", id),
+			Self::Type(id) => write!(f, "<{}>", id),
 			Self::Terminal(id) => id.fmt(f),
 		}
 	}
@@ -72,7 +80,7 @@ impl Type {
 	pub fn primitive_option() -> Self {
 		Self {
 			id: Id::Primitive(Primitive::Option),
-			parameters: vec![Parameter::NonTerminal(Ident("t".to_string()))],
+			parameters: vec![Parameter::Type(Ident::new("t".to_string()).unwrap())],
 			constructors: Vec::new(),
 		}
 	}
@@ -80,7 +88,7 @@ impl Type {
 	pub fn primitive_list() -> Self {
 		Self {
 			id: Id::Primitive(Primitive::List),
-			parameters: vec![Parameter::NonTerminal(Ident("t".to_string()))],
+			parameters: vec![Parameter::Type(Ident::new("t".to_string()).unwrap())],
 			constructors: Vec::new(),
 		}
 	}
@@ -108,6 +116,10 @@ impl Type {
 		self.parameters.get(index as usize)
 	}
 
+	pub fn constructor_count(&self) -> u32 {
+		self.constructors.len() as u32
+	}
+
 	pub fn constructors(&self) -> &[u32] {
 		&self.constructors
 	}
@@ -129,6 +141,12 @@ impl fmt::Display for Type {
 	}
 }
 
+// pub enum GrammarType {
+// 	Extern(u32),
+// 	Intern(u32, Vec<GrammarType>),
+// 	Var(u32)
+// }
+
 /// Labeled type expression.
 pub struct LabeledExpr {
 	label: Option<Ident>,
@@ -146,6 +164,14 @@ impl LabeledExpr {
 
 	pub fn expr(&self) -> &Expr {
 		&self.expr
+	}
+
+	pub fn is_labeled(&self) -> bool {
+		self.label.is_some()
+	}
+
+	pub fn is_typed(&self, grammar: &Grammar) -> bool {
+		self.expr.is_typed(grammar)
 	}
 }
 
@@ -167,6 +193,36 @@ impl Expr {
 			false
 		}
 	}
+
+	/// Checks if this expression is typed (with an intern or extern type).
+	pub fn is_typed(&self, grammar: &Grammar, context: &Type) -> bool {
+		match self {
+			Self::Var(x) => match context.parameter(*x).unwrap() {
+				Parameter::Terminal(_) => false,
+				Parameter::Type(_) => true
+			},
+			Self::Terminal(t) => {
+				grammar.terminal(*t).unwrap().extern_type(grammar).is_some()
+			},
+			Self::Type(_, _) => true
+		}
+	}
+
+	// pub fn ty(&self, grammar: &Grammar, context: &Type) -> Option<GrammarType> {
+	// 	match self {
+	// 		Self::Var(x) => match context.parameter(*x).unwrap() {
+	// 			Parameter::Terminal(t) => None,
+	// 			Parameter::Type(_, i) => Some(GrammarType::Var(*i))
+	// 		},
+	// 		Self::Terminal(t) => {
+	// 			grammar.terminal(t).unwrap().ty().map(GrammarType::Extern)
+	// 			// context.parameter(index: u32)
+	// 		},
+	// 		Self::Type(t, _) => {
+	// 			// ...
+	// 		}
+	// 	}
+	// }
 
 	pub fn format<'g>(&self, context: &'g Type, grammar: &'g Grammar) -> FormattedExpr<'g, '_> {
 		FormattedExpr(grammar, context, self)

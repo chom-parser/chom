@@ -1,5 +1,9 @@
 pub use source_span::{Loc, Position, Span};
-use std::iter::Peekable;
+use std::{
+	iter::Peekable,
+	convert::TryInto
+};
+use crate::Ident;
 
 mod ast;
 mod caused;
@@ -239,6 +243,26 @@ impl Parsable for Grammar {
 	}
 }
 
+fn string_to_ident(name: String, span: Span) -> Result<Ident> {
+	match name.clone().try_into() {
+		Ok(id) => Ok(id),
+		Err(_) => Err(Loc::new(
+			Error::InvalidIdent(name),
+			span
+		))
+	}
+}
+
+fn string_to_loc_ident(name: String, span: Span) -> Result<Loc<Ident>> {
+	match name.clone().try_into() {
+		Ok(id) => Ok(Loc::new(id, span)),
+		Err(_) => Err(Loc::new(
+			Error::InvalidIdent(name),
+			span
+		))
+	}
+}
+
 impl Parsable for Ident {
 	fn parse<L: Iterator<Item = lexer::Result<Loc<lexer::Token>>>>(
 		lexer: &mut Peekable<L>,
@@ -246,7 +270,7 @@ impl Parsable for Ident {
 		let mut span = Span::default();
 		let token = expect(lexer, &mut span)?;
 		match token.as_ref() {
-			lexer::Token::Ident(name) => Ok(Loc::new(Ident(name.clone()), token.span())),
+			lexer::Token::Ident(name) => string_to_loc_ident(name.clone(), token.span()),
 			_ => {
 				return Err(Loc::new(
 					Error::UnexpectedToken(token.as_ref().clone()),
@@ -302,7 +326,7 @@ impl Parsable for ast::ty::LabeledExpr {
 				consume(lexer, &mut span)?;
 				let (token, token_span) = expect(lexer, &mut span)?.into_raw_parts();
 				match token {
-					lexer::Token::Ident(id) => Some(Loc::new(Ident(id), token_span)),
+					lexer::Token::Ident(id) => Some(string_to_loc_ident(id, token_span)?),
 					token => return Err(Loc::new(Error::UnexpectedToken(token), token_span)),
 				}
 			}
@@ -325,7 +349,7 @@ impl Parsable for ast::ty::Expr {
 		let token_span = token.span().clone();
 		let ast = match token.into_inner() {
 			lexer::Token::Ident(id) => {
-				let exp = RegExp(vec![Loc::new(regexp::Atom::Ref(Ident(id)), token_span)]);
+				let exp = RegExp(vec![Loc::new(regexp::Atom::Ref(string_to_ident(id, token_span)?), token_span)]);
 				ast::ty::Expr::Terminal(exp)
 			}
 			lexer::Token::String(s, case_sensitive) => {
@@ -345,7 +369,7 @@ impl Parsable for ast::ty::Expr {
 				let token = expect(&mut lexer, &mut span)?;
 				let token_span = token.span().clone();
 				let id = match token.into_inner() {
-					lexer::Token::Ident(id) => Loc::new(Ident(id), token_span),
+					lexer::Token::Ident(id) => string_to_loc_ident(id, token_span)?,
 					unexpected => {
 						return Err(Loc::new(Error::UnexpectedToken(unexpected), token_span))
 					}
@@ -465,7 +489,7 @@ impl Parsable for RegExp {
 					}
 					lexer::Token::Ident(id) => {
 						consume(lexer, &mut span)?;
-						atoms.push(Loc::new(regexp::Atom::Ref(Ident(id.clone())), token_span));
+						atoms.push(Loc::new(regexp::Atom::Ref(string_to_ident(id.clone(), token_span)?), token_span));
 					}
 					lexer::Token::CharSet(set, false) => {
 						consume(lexer, &mut span)?;

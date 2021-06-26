@@ -1,4 +1,5 @@
-use super::{ty, Ident};
+use crate::Ident;
+use super::ty;
 use source_span::Loc;
 
 pub struct Function {

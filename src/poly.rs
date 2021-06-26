@@ -1,4 +1,5 @@
 use crate::{
+	Ident,
 	lexing::{regexp, RegExp},
 	syntax::{self, Caused},
 };
@@ -12,14 +13,14 @@ pub mod terminal;
 pub mod ty;
 
 pub use compile::Error;
-pub use external::ExternalType;
+// pub use external::ExternalType;
 pub use function::Function;
 pub use terminal::Terminal;
 pub use ty::Type;
 
 pub struct Grammar {
 	/// Extern types.
-	externs: Vec<(ExternalType, Option<Span>)>,
+	externs: Vec<(Ident, Option<Span>)>,
 
 	/// Regular expressions.
 	regexps: Vec<(regexp::Definition, Option<Loc<syntax::regexp::Definition>>)>,
@@ -36,7 +37,7 @@ pub struct Grammar {
 
 impl Grammar {
 	pub(crate) fn from_raw_parts(
-		externs: Vec<(ExternalType, Option<Span>)>,
+		externs: Vec<(Ident, Option<Span>)>,
 		regexps: Vec<(regexp::Definition, Option<Loc<syntax::regexp::Definition>>)>,
 		terminals: Vec<(Terminal, HashSet<Loc<syntax::RegExp>>)>,
 		types: Vec<Caused<Type>>,
@@ -50,18 +51,14 @@ impl Grammar {
 			functions,
 		};
 
-		for (terminal, _) in &g.terminals {
-			terminal.init_token(&g)
-		}
-
 		g
 	}
 
-	pub fn extern_types(&self) -> &[(ExternalType, Option<Span>)] {
+	pub fn extern_types(&self) -> &[(Ident, Option<Span>)] {
 		&self.externs
 	}
 
-	pub fn extern_type(&self, index: u32) -> Option<&ExternalType> {
+	pub fn extern_type(&self, index: u32) -> Option<&Ident> {
 		self.externs.get(index as usize).map(|p| &p.0)
 	}
 

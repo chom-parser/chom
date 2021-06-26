@@ -1,6 +1,6 @@
 use source_span::Loc;
-
-use super::{regexp, ty, Ident};
+use crate::Ident;
+use super::{regexp, ty};
 
 pub struct Grammar {
 	pub externs: Vec<Loc<Ident>>,

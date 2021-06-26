@@ -1,6 +1,7 @@
 #![feature(arbitrary_self_types)]
 extern crate source_span;
 
+mod ident;
 pub mod charset;
 pub mod gen;
 pub mod lexing;
@@ -14,4 +15,4 @@ pub mod util;
 pub mod test;
 
 pub use charset::CharSet;
-pub use syntax::Ident;
+pub use ident::Ident;

@@ -1,19 +1,16 @@
 use super::Grammar;
 use crate::lexing::{regexp, RegExp, Token};
-use once_cell::unsync::OnceCell;
 use std::{cmp::Ordering, fmt};
 
 /// Grammar terminal.
 pub struct Terminal {
-	desc: Desc,
-	token: OnceCell<Token>,
+	desc: Desc
 }
 
 impl Terminal {
 	pub fn new(desc: Desc) -> Self {
 		Self {
-			desc,
-			token: OnceCell::new(),
+			desc
 		}
 	}
 
@@ -41,14 +38,17 @@ impl Terminal {
 		&self.desc
 	}
 
-	pub fn token(&self) -> Option<&Token> {
-		self.token.get()
+	pub fn token(&self, grammar: &Grammar) -> Option<Token> {
+		match &self.desc {
+			Desc::RegExp(exp) => Some(exp.token(grammar)),
+			Desc::Whitespace(_) => None
+		}
 	}
 
-	pub fn init_token(&self, grammar: &Grammar) {
+	pub fn extern_type(&self, grammar: &Grammar) -> Option<u32> {
 		match &self.desc {
-			Desc::RegExp(exp) => self.token.set(exp.token(grammar)).ok().unwrap(),
-			Desc::Whitespace(_) => (),
+			Desc::RegExp(exp) => exp.extern_type(grammar),
+			Desc::Whitespace(_) => None
 		}
 	}
 

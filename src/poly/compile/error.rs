@@ -1,4 +1,4 @@
-use crate::syntax::Ident;
+use crate::Ident;
 use source_span::{Loc, Span};
 use std::fmt;
 

@@ -1,5 +1,8 @@
-use super::ty;
-use crate::syntax::Ident;
+use super::{
+	ty,
+	Grammar
+};
+use crate::Ident;
 
 /// Primitive type constructor.
 pub enum Primitive {
@@ -72,6 +75,13 @@ impl Function {
 
 	pub fn argument(&self, offset: usize) -> Option<&ty::LabeledExpr> {
 		self.args.get(offset)
+	}
+
+	/// Checks if the function is "fully labeled".
+	/// 
+	/// That is when every typed (non unit) argument is labeled.
+	pub fn is_fully_labeled(&self, grammar: &Grammar) -> bool {
+		self.args.iter().all(|a| a.is_labeled() || !a.is_typed(grammar))
 	}
 }
 

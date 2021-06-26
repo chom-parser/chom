@@ -1,7 +1,8 @@
 use super::{Error, ExternalTypes};
 use crate::{
+	Ident,
 	lexing::regexp,
-	syntax::{self, Ident},
+	syntax,
 };
 use source_span::{Loc, Span};
 use std::collections::BTreeMap;
@@ -10,7 +11,7 @@ pub struct RegExps {
 	/// List of regular expressions.
 	list: Vec<(
 		Option<regexp::Definition>,
-		u32,
+		Option<u32>,
 		Option<Loc<syntax::regexp::Definition>>,
 	)>,
 
@@ -34,7 +35,7 @@ impl RegExps {
 		let mut map = BTreeMap::new();
 
 		for def in ast {
-			let ty = external_types.get(def.ty.as_ref())?;
+			let ty = def.ty.as_ref().map(|ty| external_types.get(ty)).transpose()?;
 
 			match map.entry(def.id.as_ref().clone()) {
 				Entry::Vacant(entry) => {
@@ -54,14 +55,13 @@ impl RegExps {
 		}
 
 		// Whitespace regexp.
-		let ws_id = Ident("WS".to_string());
+		let ws_id = Ident::new("WS".to_string()).unwrap();
 		let ws_index = match map.entry(ws_id.clone()) {
 			Entry::Vacant(entry) => {
 				let i = list.len() as u32;
-				let ty = external_types.get(None)?;
 				let exp =
 					regexp::RegExp::new(vec![regexp::Atom::CharSet(crate::CharSet::whitespace())]);
-				list.push((Some(regexp::Definition { id: ws_id, ty, exp }), ty, None));
+				list.push((Some(regexp::Definition { id: ws_id, ty: None, exp }), None, None));
 				entry.insert(i);
 				i
 			}

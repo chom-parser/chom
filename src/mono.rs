@@ -1,4 +1,5 @@
 use crate::{
+	Ident,
 	lexing::regexp,
 	poly,
 	syntax::{self, Caused},
@@ -14,7 +15,7 @@ pub use ty::Type;
 
 pub type Index = (u32, ty::Instance);
 
-pub use poly::{terminal, ExternalType, Terminal};
+pub use poly::{terminal, Terminal};
 
 pub struct Grammar<'a> {
 	poly: &'a poly::Grammar,
@@ -152,11 +153,11 @@ impl<'a> Grammar<'a> {
 		self.poly
 	}
 
-	pub fn extern_types(&self) -> &[(ExternalType, Option<Span>)] {
+	pub fn extern_types(&self) -> &[(Ident, Option<Span>)] {
 		self.poly().extern_types()
 	}
 
-	pub fn extern_type(&self, index: u32) -> Option<&ExternalType> {
+	pub fn extern_type(&self, index: u32) -> Option<&Ident> {
 		self.poly().extern_type(index)
 	}
 

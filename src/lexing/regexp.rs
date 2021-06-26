@@ -1,9 +1,8 @@
 use super::{token, Token};
 use crate::{
-	poly::{ExternalType, Grammar},
+	poly::Grammar,
 	CharSet, Ident,
 };
-use once_cell::unsync::OnceCell;
 use std::{
 	cmp::{Ord, Ordering, PartialOrd},
 	fmt,
@@ -12,7 +11,7 @@ use std::{
 
 pub struct Definition {
 	pub id: Ident,
-	pub ty: u32,
+	pub ty: Option<u32>,
 	pub exp: RegExp,
 }
 
@@ -26,17 +25,18 @@ pub struct FormattedDefinition<'g, 'd>(&'g Grammar, &'d Definition);
 
 impl<'g, 'd> fmt::Display for FormattedDefinition<'g, 'd> {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		let ty = self.0.extern_type(self.1.ty).unwrap();
-		if *ty != ExternalType::Unit {
-			write!(f, "regexp {}: {} = {}", self.1.id, ty, self.1.exp)
-		} else {
-			write!(f, "regexp {} = {}", self.1.id, self.1.exp)
+		match self.1.ty {
+			Some(ty) => {
+				let ty = self.0.extern_type(ty).unwrap();
+				write!(f, "regexp {}: {} = {}", self.1.id, ty, self.1.exp)
+			},
+			None => write!(f, "regexp {} = {}", self.1.id, self.1.exp)
 		}
 	}
 }
 
 #[derive(Clone)]
-pub struct RegExp(pub Vec<Atom>, OnceCell<Token>);
+pub struct RegExp(pub Vec<Atom>);
 
 impl PartialEq for RegExp {
 	fn eq(&self, other: &Self) -> bool {
@@ -66,7 +66,7 @@ impl Hash for RegExp {
 
 impl RegExp {
 	pub fn new(atoms: Vec<Atom>) -> Self {
-		Self(atoms, OnceCell::new())
+		Self(atoms)
 	}
 
 	pub fn len(&self) -> usize {
@@ -85,33 +85,41 @@ impl RegExp {
 		}
 	}
 
-	pub fn token(&self, grammar: &Grammar) -> Token {
+	pub fn extern_type(&self, grammar: &Grammar) -> Option<u32> {
 		if self.len() == 1 {
-			if let Some(token) = self.0.first().unwrap().token(grammar) {
-				return token;
-			}
+			self.0.first().unwrap().extern_type(grammar)
+		} else {
+			None
 		}
-
-		if let Some(name) = self.composite_name(grammar) {
-			return Token::Composed(name, token::Convertion::from_regexp(grammar, self));
-		}
-
-		Token::Anonymous(0, token::Convertion::from_regexp(grammar, self))
 	}
 
-	fn composite_name(&self, grammar: &Grammar) -> Option<Vec<String>> {
-		let mut name = Vec::new();
+	pub fn token(&self, grammar: &Grammar) -> Token {
+		if self.len() == 1 {
+			match self.0.first().unwrap().token(grammar) {
+				Some(token) => token,
+				None => Token::Anonymous(0, None)
+			}
+		} else {
+			let mut id: Option<Ident> = None;
+			for atom in &self.0 {
+				let atom_id = match atom.token(grammar) {
+					Some(Token::Named(n, _)) => n,
+					Some(Token::Keyword(k)) => Ident::new(k.clone()).unwrap(),
+					_ => return Token::Anonymous(0, None),
+				};
+				
+				if let Some(id) = &mut id {
+					id.push_ident(&atom_id)
+				} else {
+					id = Some(atom_id)
+				}
+			}
 
-		for atom in &self.0 {
-			match atom.token(grammar) {
-				Some(Token::Named(n, _)) => name.push(n.as_str().to_string()),
-				Some(Token::Keyword(k)) => name.push(k.clone()),
-				Some(Token::Composed(n, _)) => name.extend(n.iter().cloned()),
-				_ => return None,
+			match id {
+				Some(id) => Token::Named(id, None),
+				None => Token::Anonymous(0, None)
 			}
 		}
-
-		Some(name)
 	}
 
 	pub fn format<'g>(&self, grammar: &'g Grammar) -> Formatted<'g, '_> {
@@ -158,13 +166,24 @@ impl Atom {
 		}
 	}
 
+	pub fn extern_type(&self, grammar: &Grammar) -> Option<u32> {
+		match self {
+			Self::Ref(i) => {
+				let exp = grammar.regexp(*i).unwrap();
+				exp.ty
+			},
+			Self::Group(g) => g.extern_type(grammar),
+			_ => None
+		}
+	}
+
 	pub fn token(&self, grammar: &Grammar) -> Option<Token> {
 		match self {
 			Self::Ref(i) => {
 				let exp = grammar.regexp(*i).unwrap();
 				Some(Token::Named(
 					exp.id.clone(),
-					token::Convertion::new_opt(grammar, &exp.id, exp.ty),
+					exp.ty
 				))
 			}
 			Self::CharSet(set) => {

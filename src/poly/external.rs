@@ -1,4 +1,4 @@
-use crate::syntax::Ident;
+use crate::Ident;
 use std::fmt;
 
 #[derive(Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -20,6 +20,13 @@ impl ExternalType {
 
 	pub fn from_opt_ident(ident: Option<&Ident>) -> Self {
 		ident.map(Self::from_ident).unwrap_or_default()
+	}
+
+	pub fn is_unit(&self) -> bool {
+		match self {
+			Self::Unit => true,
+			_ => false
+		}
 	}
 
 	pub fn name(&self) -> &str {

@@ -1,8 +1,6 @@
-use crate::CharSet;
+use crate::{Ident,CharSet};
 use source_span::Loc;
 use std::fmt;
-
-use super::Ident;
 
 #[derive(Clone)]
 pub struct Definition {
