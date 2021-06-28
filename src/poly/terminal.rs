@@ -1,5 +1,5 @@
 use super::Grammar;
-use crate::lexing::{regexp, RegExp, Token};
+use crate::{Ident,lexing::{regexp, RegExp, Token}};
 use std::{cmp::Ordering, fmt};
 
 /// Grammar terminal.
@@ -36,6 +36,17 @@ impl Terminal {
 
 	pub fn desc(&self) -> &Desc {
 		&self.desc
+	}
+
+	/// Returns the identifier associated to the terminal.
+	/// 
+	/// It corresponds to the identifier of the referenced regexp,
+	/// if the terminal is a direct regexp reference.
+	pub fn id<'g>(&self, grammar: &'g Grammar) -> Option<&'g Ident> {
+		match &self.desc {
+			Desc::RegExp(exp) => exp.id(grammar),
+			Desc::Whitespace(_) => None
+		}
 	}
 
 	pub fn token(&self, grammar: &Grammar) -> Option<Token> {

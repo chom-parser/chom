@@ -1,6 +1,7 @@
 use super::{
 	ty,
-	Grammar
+	Grammar,
+	Type
 };
 use crate::Ident;
 
@@ -36,6 +37,13 @@ impl Id {
 			Self::Defined(id) => id.as_str(),
 			Self::Primitive(p) => p.as_str(),
 			Self::Cast => "cast",
+		}
+	}
+
+	pub fn as_defined(&self) -> &Ident {
+		match self {
+			Self::Defined(id) => id,
+			_ => panic!("invalid function id")
 		}
 	}
 }
@@ -79,9 +87,10 @@ impl Function {
 
 	/// Checks if the function is "fully labeled".
 	/// 
-	/// That is when every typed (non unit) argument is labeled.
-	pub fn is_fully_labeled(&self, grammar: &Grammar) -> bool {
-		self.args.iter().all(|a| a.is_labeled() || !a.is_typed(grammar))
+	/// That is when it is not a constant (it has some arguments)
+	/// and every typed (non unit) argument is labeled.
+	pub fn is_fully_labeled(&self, grammar: &Grammar, context: &Type) -> bool {
+		!self.args.is_empty() && self.args.iter().all(|a| a.is_labeled() || !a.is_typed(grammar, context))
 	}
 }
 

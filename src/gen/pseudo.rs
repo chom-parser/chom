@@ -12,12 +12,24 @@ pub use crate::lexing::token::{
 pub mod built_in;
 pub mod ty;
 pub mod module;
+pub mod constant;
+pub mod id;
+pub mod expr;
+pub mod pattern;
+pub mod routine;
 
 pub use ty::Type;
 pub use module::Module;
+pub use constant::Constant;
+pub use id::Id;
+pub use expr::Expr;
+pub use pattern::Pattern;
+pub use routine::Routine;
 
 /// Pseudo-code context.
-pub struct Context {
+pub struct Context<'a, 'p> {
+	grammar: &'a mono::Grammar<'p>,
+
 	/// List of modules.
 	modules: Vec<Module>,
 
@@ -25,7 +37,7 @@ pub struct Context {
 	types: Vec<Type>,
 
 	/// Built-in types.
-	build_in: built_in::Types,
+	built_in: built_in::Types,
 
 	/// Index of the extern module.
 	extern_module: u32,
@@ -47,13 +59,62 @@ pub struct Context {
 	/// Maps each grammar polymorphic type to a pseudo-code type (in the `types` field).
 	grammar_type: HashMap<u32, u32>,
 
-	/// Maps each terminal to a token pattern.
-	grammar_terminal: HashMap<u32, Pattern>,
+	/// Function variants.
+	/// 
+	/// Maps each function to its associated variant (if any) in its return type.
+	function_variants: HashMap<u32, u32>
 }
 
-impl Context {
+impl<'a, 'p> Context<'a, 'p> {
+	pub fn module(&self, index: u32) -> Option<&Module> {
+		self.modules.get(index as usize)
+	}
+
+	/// Creates a expression that calls the given constructor function.
+	pub fn constructor_expr<F>(&self, index: mono::Index, build_arg: F) -> Expr where F: Fn(u32) -> Expr {
+		let f = self.grammar.function(index).unwrap();
+		let ty_index = f.return_ty();
+		let grammar_ty = self.grammar.poly().ty(ty_index.0).unwrap();
+		let ty = *self.grammar_type.get(&ty_index.0).unwrap();
+
+		let args = if f.poly().is_fully_labeled(self.grammar.poly(), grammar_ty) {
+			let bindings = f.poly().arguments().iter().enumerate().filter_map(|(i, labeled_a)| {
+				let i = i as u32;
+				if labeled_a.is_typed(self.grammar.poly(), grammar_ty) {
+					let label = labeled_a.label().unwrap().clone();
+					Some(expr::Binding {
+						name: label,
+						expr: build_arg(i)
+					})
+				} else {
+					None
+				}
+			});
+			expr::BuildArgs::Struct(bindings.collect())
+		} else {
+			let args = f.poly().arguments().iter().enumerate().filter_map(|(i, labeled_a)| {
+				let i = i as u32;
+				if labeled_a.is_typed(self.grammar.poly(), grammar_ty) {
+					Some(build_arg(i))
+				} else {
+					None
+				}
+			});
+			expr::BuildArgs::Tuple(args.collect())
+		};
+
+		match self.function_variants.get(&index.0) {
+			Some(&v) => {
+				Expr::Cons(ty::Ref::Defined(ty), v, args)
+			},
+			None => {
+				Expr::New(ty::Ref::Defined(ty), args)
+			}
+		}
+	}
+
 	pub fn new(
-		grammar: &mono::Grammar,
+		grammar: &'a mono::Grammar<'p>,
 		extern_module_path: &[String],
 		ast_module_path: &[String],
 		lexer_module_path: &[String],
@@ -105,77 +166,156 @@ impl Context {
 			grammar_extern_type.insert(index, i);
 		}
 
-		let (build_in, grammar_terminal) = built_in::Types::new(grammar, parser_module, &grammar_extern_type);
+		struct DefinitionEnv<'a> {
+			ast_module: u32,
+			modules: &'a mut [Module],
+			types: &'a mut Vec<Type>,
+			grammar: &'a poly::Grammar,
+			grammar_extern_type: &'a HashMap<u32, u32>,
+			grammar_type: &'a mut HashMap<u32, u32>,
+			function_variants: &'a mut HashMap<u32, u32>,
+		}
 
-		let mut grammar_type = HashMap::new();
-		let poly_grammar = grammar.poly();
-		for (index, ty) in poly_grammar.types().iter().enumerate() {
-			let index = index as u32;
-			if let poly::ty::Id::Defined(id) = ty.id() {
-				let type_parameters: Vec<_> = ty.parameters().iter().filter_map(|p| match p {
-					poly::ty::Parameter::Type(id) => Some(id.clone()),
-					poly::ty::Parameter::Terminal(_) => None
-				}).collect();
-
-				if ty.constructor_count() == 1 {
-					// Single constructor type.
-					let f_index = ty.constructors()[0];
-					let f = poly_grammar.function(f_index).unwrap();
-					if f.is_fully_labeled(poly_grammar) {
-						// ...
-					} else {
-						// ...
-					}
-				} else {
-					for &f_index in ty.constructors() {
-						let f = poly_grammar.function(f_index).unwrap();
-						if f.is_fully_labeled(poly_grammar) {
-							// ...
-						} else {
-							// ...
-						}
+		fn type_expr(
+			env: &mut DefinitionEnv,
+			context: &poly::Type,
+			expr: &poly::ty::Expr
+		) -> Option<ty::Expr> {
+			match expr {
+				poly::ty::Expr::Type(index, params) => {
+					let ty = define_type(env, *index);
+					let params = params.iter().filter_map(|e| type_expr(env, context, e)).collect();
+					Some(ty::Expr::Defined(ty, params))
+				},
+				poly::ty::Expr::Terminal(index) => {
+					let t = env.grammar.terminal(*index).unwrap();
+					t.extern_type(env.grammar).map(|i| {
+						let ty = *env.grammar_extern_type.get(&i).unwrap();
+						ty::Expr::Defined(ty, Vec::new())
+					})
+				},
+				poly::ty::Expr::Var(x) => {
+					match context.parameter(*x).unwrap() {
+						poly::ty::Parameter::Terminal(_) => None,
+						poly::ty::Parameter::Type(i) => Some(ty::Expr::Var(i))
 					}
 				}
 			}
 		}
 
+		fn define_type(
+			env: &mut DefinitionEnv,
+			index: u32
+		) -> u32 {
+			match env.grammar_type.get(&index).cloned() {
+				Some(i) => i,
+				None => {
+					let ty = env.grammar.ty(index).unwrap();
+					let id = ty.id().as_defined();
+					
+					let desc = if ty.constructor_count() == 1 {
+						// Single constructor type.
+						let f_index = ty.constructors()[0];
+						let f = env.grammar.function(f_index).unwrap();
+
+						if f.is_fully_labeled(env.grammar, ty) {
+							// Structure type.
+							let mut strct = ty::Struct::new();
+							for p in f.arguments() {
+								if let Some(p_ty) = type_expr(env, ty, p.expr()) {
+									strct.add_field(p.label().unwrap().clone(), p_ty);
+								}
+							}
+							ty::Desc::Struct(strct)
+						} else {
+							// Tuple struct type.
+							let args = f.arguments().iter().filter_map(|p| type_expr(env, ty, p.expr()));
+							ty::Desc::TupleStruct(args.collect())
+						}
+					} else {
+						let mut enm = ty::Enum::new();
+						for &f_index in ty.constructors() {
+							let f = env.grammar.function(f_index).unwrap();
+
+							let desc = if f.is_fully_labeled(env.grammar, ty) {
+								// Struct variant.
+								let mut strct = ty::Struct::new();
+								for p in f.arguments() {
+									if let Some(p_ty) = type_expr(env, ty, p.expr()) {
+										strct.add_field(p.label().unwrap().clone(), p_ty);
+									}
+								}
+								ty::VariantDesc::Struct(strct)
+							} else {
+								// Regular vartiant.
+								let args = f.arguments().iter().filter_map(|p| type_expr(env, ty, p.expr()));
+								ty::VariantDesc::Tuple(args.collect())
+							};
+
+							let variant = ty::Variant::Defined(f.id().as_defined().clone(), desc);
+							env.function_variants.insert(f_index, enm.add_variant(variant));
+						}
+
+						ty::Desc::Enum(enm)
+					};
+
+					let i = declare_type(env.modules, env.types, Type::new(env.ast_module, id.clone(), Some(index), desc));
+					env.grammar_type.insert(index, i);
+					i
+				}
+			}
+		}
+
+		let mut grammar_type = HashMap::new();
+		let mut function_variants = HashMap::new();
+		let poly_grammar = grammar.poly();
+		let mut env = DefinitionEnv {
+			ast_module,
+			modules: &mut modules,
+			types: &mut types,
+			grammar: poly_grammar,
+			grammar_extern_type: &grammar_extern_type,
+			grammar_type: &mut grammar_type,
+			function_variants: &mut function_variants,
+		};
+		for (index, _) in poly_grammar.types().iter().enumerate() {
+			define_type(&mut env, index as u32);
+		}
+
+		let built_in = built_in::Types::new(
+			grammar,
+			lexer_module,
+			parser_module,
+			&grammar_extern_type
+		);
+
 		Self {
+			grammar,
 			modules,
 			types,
-			build_in,
+			built_in,
 			extern_module,
 			ast_module,
 			lexer_module,
 			parser_module,
 			grammar_extern_type,
 			grammar_type,
-			grammar_terminal
+			function_variants
 		}
 	}
 
 	pub fn ty(&self, r: ty::Ref) -> Option<&Type> {
 		match r {
 			ty::Ref::BuiltIn(b) => match b {
-				built_in::Type::Token => Some(&self.build_in.tokens),
-				built_in::Type::Keyword => self.build_in.keywords.as_ref(),
-				built_in::Type::Operator => self.build_in.operators.as_ref(),
-				built_in::Type::Delimiter => self.build_in.delimiters.as_ref(),
-				built_in::Type::Punct => self.build_in.puncts.as_ref()
+				built_in::Type::Token => Some(&self.built_in.tokens),
+				built_in::Type::Keyword => self.built_in.keywords.as_ref(),
+				built_in::Type::Operator => self.built_in.operators.as_ref(),
+				built_in::Type::Delimiter => self.built_in.delimiters.as_ref(),
+				built_in::Type::Punct => self.built_in.puncts.as_ref(),
+				built_in::Type::Node => Some(&self.built_in.nodes),
+				built_in::Type::Item => Some(&self.built_in.items)
 			},
 			ty::Ref::Defined(index) => self.types.get(index as usize)
 		}
 	}
-}
-
-/// Pattern.
-pub enum Pattern {
-	/// Pattern payload.
-	Payload,
-
-	/// Enum variant.
-	/// 
-	/// The first parameter is the type id.
-	/// The second is the variant index.
-	/// The third is the inner pattern if any.
-	Variant(ty::Ref, u32, Option<Box<Pattern>>)
 }

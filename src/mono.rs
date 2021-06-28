@@ -177,6 +177,10 @@ impl<'a> Grammar<'a> {
 		self.poly.terminal(index)
 	}
 
+	pub fn type_count(&self) -> u32 {
+		self.types.len() as u32
+	}
+
 	pub fn ty(&self, (index, instance): (u32, ty::Instance)) -> Option<Caused<&Type<'a>>> {
 		self.poly
 			.ty(index)

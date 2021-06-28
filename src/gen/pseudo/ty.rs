@@ -57,16 +57,19 @@ impl Type {
 	}
 }
 
+#[derive(Clone, Copy)]
 pub enum GrammarType {
 	Extern(u32),
 	Intern(u32)
 }
 
+#[derive(Clone)]
 pub enum Id {
 	BuiltIn(built_in::Type),
 	Defined(Ident)
 }
 
+#[derive(Clone, Copy)]
 pub enum Ref {
 	BuiltIn(built_in::Type),
 	Defined(u32)
@@ -76,7 +79,7 @@ pub enum Desc {
 	Opaque,
 	Enum(Enum),
 	Struct(Struct),
-	TupleStruct(TupleStruct)
+	TupleStruct(Vec<Expr>)
 }
 
 /// Enumerator type.
@@ -124,6 +127,13 @@ pub enum Variant {
 }
 
 impl Variant {
+	pub fn is_empty(&self) -> bool {
+		match self {
+			Self::BuiltIn(t) => t.parameter().is_none(),
+			Self::Defined(_, desc) => desc.is_empty()
+		}
+	}
+
 	pub fn tuple_parameters(&self) -> Option<&[Expr]> {
 		match self {
 			Self::BuiltIn(t) => t.parameter().map(|p| std::slice::from_ref(p)),
@@ -141,9 +151,6 @@ impl Variant {
 }
 
 pub enum VariantDesc {
-	/// The variant does not take any parameters.
-	Empty,
-
 	/// The variant contains untagged parameters.
 	/// 
 	/// The given list is not empty.
@@ -154,9 +161,45 @@ pub enum VariantDesc {
 	Struct(Struct)
 }
 
+impl VariantDesc {
+	pub fn len(&self) -> u32 {
+		match self {
+			Self::Tuple(args) => args.len() as u32,
+			Self::Struct(s) => s.len()
+		}
+	}
+	
+	pub fn is_empty(&self) -> bool {
+		self.len() == 0
+	}
+}
+
 /// Structure type.
 pub struct Struct {
 	fields: Vec<Field>
+}
+
+impl Struct {
+	pub fn new() -> Self {
+		Self {
+			fields: Vec::new()
+		}
+	}
+
+	pub fn len(&self) -> u32 {
+		self.fields.len() as u32
+	}
+
+	pub fn is_empty(&self) -> bool {
+		self.fields.is_empty()
+	}
+
+	pub fn add_field(&mut self, id: Ident, ty: Expr) -> u32 {
+		let field = Field { id, ty };
+		let i = self.fields.len() as u32;
+		self.fields.push(field);
+		i
+	}
 }
 
 pub struct Field {
@@ -164,14 +207,11 @@ pub struct Field {
 	ty: Expr
 }
 
-/// Tuple structure type.
-pub struct TupleStruct {
-	/// The single parameter in the tuple.
-	ty: Expr
-}
-
 /// Type expression.
 pub enum Expr {
+	/// Type variable.
+	Var(u32),
+
 	/// Unit type.
 	Unit,
 
@@ -180,8 +220,9 @@ pub enum Expr {
 
 	/// Defined type.
 	/// 
-	/// The parameter is the index of the type definition in `Context`.
-	Defined(u32),
+	/// The first parameter is the index of the type definition in `Context`.
+	/// The second parameter is the list of type parameters.
+	Defined(u32, Vec<Expr>),
 
 	/// Located type.
 	/// 

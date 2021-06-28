@@ -10,7 +10,7 @@ pub struct Table {
 	automata: Vec<DetAutomaton<DetState>>,
 
 	/// Maps terminals to automata.
-	sub_automata: HashMap<u32, usize>,
+	sub_automata: HashMap<u32, u32>,
 }
 
 impl Table {
@@ -18,10 +18,21 @@ impl Table {
 		&self.automata[0]
 	}
 
+	pub fn root_index(&self) -> u32 {
+		0
+	}
+
+	pub fn automaton(&self, i: u32) -> Option<&DetAutomaton<DetState>> {
+		self.automata.get(i as usize)
+	}
+
+	pub fn sub_automaton_index(&self, terminal: u32) -> Option<u32> {
+		self.sub_automata.get(&terminal).cloned()
+	}
+
 	pub fn sub_automaton(&self, terminal: u32) -> Option<&DetAutomaton<DetState>> {
-		self.sub_automata.get(&terminal).map(|i| {
-			log::debug!("accessing automaton {}", i);
-			&self.automata[*i]
+		self.sub_automaton_index(terminal).map(|i| {
+			&self.automata[i as usize]
 		})
 	}
 
@@ -248,7 +259,7 @@ impl Table {
 				.filter(|u| *depth.get(&u).unwrap() == d + 1)
 				.collect();
 			debug_assert!(!direct_t_children.is_empty());
-			let index = automata.len();
+			let index = automata.len() as u32;
 			log::debug!("terminal {} leads to the automaton {}", t, index);
 			for u in &direct_t_children {
 				log::debug!("this automaton recognizes terminal {}", u)

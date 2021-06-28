@@ -85,6 +85,10 @@ impl RegExp {
 		}
 	}
 
+	pub fn id<'g>(&self, grammar: &'g Grammar) -> Option<&'g Ident> {
+		self.as_reference().map(|index| &grammar.regexp(index).unwrap().id)
+	}
+
 	pub fn extern_type(&self, grammar: &Grammar) -> Option<u32> {
 		if self.len() == 1 {
 			self.0.first().unwrap().extern_type(grammar)

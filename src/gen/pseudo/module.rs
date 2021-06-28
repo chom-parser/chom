@@ -1,5 +1,8 @@
 use std::collections::HashSet;
-use super::ty;
+use super::{
+	ty,
+	Routine
+};
 
 /// Module.
 pub struct Module {
@@ -16,7 +19,10 @@ pub struct Module {
 	types: Vec<ty::Ref>,
 
 	/// Sub-modules.
-	modules: Vec<u32>
+	modules: Vec<u32>,
+
+	/// Defined routines.
+	routines: Vec<Routine>
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
@@ -35,7 +41,8 @@ impl Module {
 			id: Id::Root,
 			roles: HashSet::new(),
 			types: Vec::new(),
-			modules: Vec::new()
+			modules: Vec::new(),
+			routines: Vec::new()
 		}
 	}
 
@@ -45,8 +52,30 @@ impl Module {
 			id: Id::Named(name),
 			roles: HashSet::new(),
 			types: Vec::new(),
-			modules: Vec::new()
+			modules: Vec::new(),
+			routines: Vec::new()
 		}
+	}
+
+	/// Module id.
+	pub fn id(&self) -> &Id {
+		&self.id
+	}
+
+	pub fn roles(&self) -> impl '_ + Iterator<Item=Role> {
+		self.roles.iter().cloned()
+	}
+
+	pub fn types(&self) -> impl '_ + Iterator<Item=ty::Ref> {
+		self.types.iter().cloned()
+	}
+
+	pub fn modules(&self) -> impl '_ + Iterator<Item=u32> {
+		self.modules.iter().cloned()
+	}
+
+	pub fn routines(&self) -> impl '_ + Iterator<Item=Routine> {
+		self.routines.iter().cloned()
 	}
 
 	pub fn add_type(&mut self, ty: ty::Ref) {
@@ -55,6 +84,10 @@ impl Module {
 
 	pub fn add_module(&mut self, m: u32) {
 		self.modules.push(m)
+	}
+
+	pub fn add_routine(&mut self, routine: Routine) {
+		self.routines.push(routine)
 	}
 }
 
