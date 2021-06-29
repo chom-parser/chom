@@ -13,7 +13,6 @@ itertools = "*"
 
 proc-macro2 = "*"
 quote = "*"
-rust-codegen = { path = "../../../rust/rust-codegen" }
 
 utf8-decode = "*"
 stderrlog = "*"

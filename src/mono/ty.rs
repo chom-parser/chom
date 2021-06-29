@@ -1,5 +1,5 @@
 use super::{Grammar, Index};
-use crate::poly;
+use crate::{Ident, poly};
 use std::fmt;
 
 /// Type instance identifier.
@@ -29,6 +29,28 @@ impl<'a> Type<'a> {
 
 	pub fn id(&self) -> &Id {
 		self.poly.id()
+	}
+
+	pub fn composed_id(&self, grammar: &Grammar) -> Ident {
+		let mut id = match self.id() {
+			Id::Primitive(p) => {
+				use poly::ty::Primitive;
+				match p {
+					Primitive::List => Ident::new("list").unwrap(),
+					Primitive::Option => Ident::new("option").unwrap()
+				}
+			},
+			Id::Defined(id) => id.clone()
+		};
+
+		for p in self.parameters() {
+			if let Expr::Type(index) = p {
+				let ty = grammar.ty(*index).unwrap();
+				id.push_ident(&ty.composed_id(grammar))
+			}
+		}
+
+		id
 	}
 
 	pub fn parameter(&self, i: u32) -> Option<&Expr> {

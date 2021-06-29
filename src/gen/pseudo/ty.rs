@@ -55,6 +55,13 @@ impl Type {
 	pub fn desc(&self) -> &Desc {
 		&self.desc
 	}
+
+	pub fn as_enum(&self) -> &Enum {
+		match &self.desc {
+			Desc::Enum(enm) => enm,
+			_ => panic!("type is not an enum")
+		}
+	}
 }
 
 #[derive(Clone, Copy)]
@@ -94,18 +101,22 @@ impl Enum {
 		}
 	}
 
-	pub fn add_variant(&mut self, v: Variant) -> u32 {
-		let i = self.variants.len() as u32;
-		self.variants.push(v);
-		i
-	}
-
 	pub fn len(&self) -> u32 {
 		self.variants.len() as u32
 	}
 
 	pub fn is_empty(&self) -> bool {
 		self.variants.is_empty()
+	}
+
+	pub fn variant(&self, index: u32) -> Option<&Variant> {
+		self.variants.get(index as usize)
+	}
+
+	pub fn add_variant(&mut self, v: Variant) -> u32 {
+		let i = self.variants.len() as u32;
+		self.variants.push(v);
+		i
 	}
 
 	pub fn not_empty(self) -> Option<Self> {
@@ -242,4 +253,13 @@ pub enum Expr {
 	/// 
 	/// In Rust, this will generally be translated into `Vec`.
 	List(Box<Expr>)
+}
+
+impl Expr {
+	pub fn as_defined(&self) -> Option<(u32, &[Expr])> {
+		match self {
+			Self::Defined(i, args) => Some((*i, args.as_ref())),
+			_ => None
+		}
+	}
 }

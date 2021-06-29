@@ -244,7 +244,7 @@ impl Types {
 		let mut nodes_variants = HashMap::new();
 		for (index, ty) in grammar.enumerate_types() {
 			let expr = type_expr(grammar, grammar_extern_type, grammar_type, index);
-			let v = nodes.add_variant(ty::Variant::BuiltIn(Variant::Node(expr)));
+			let v = nodes.add_variant(ty::Variant::BuiltIn(Variant::Node(index, expr)));
 			nodes_variants.insert(index, v);
 		}
 
@@ -309,7 +309,7 @@ pub enum Variant {
 	Punct(Punct),
 
 	/// Node.
-	Node(ty::Expr),
+	Node(mono::Index, ty::Expr),
 
 	/// Item variant.
 	Item(ItemVariant)
@@ -323,7 +323,7 @@ impl Variant {
 			Self::Delimiter(_) => None,
 			Self::Operator(_) => None,
 			Self::Punct(_) => None,
-			Self::Node(ty) => Some(&ty),
+			Self::Node(_, ty) => Some(&ty),
 			Self::Item(v) => Some(v.parameter())
 		}
 	}
