@@ -3,10 +3,16 @@ use crate::{
 	poly,
 	mono
 };
-pub use crate::lexing::token::{
-	Delimiter,
-	Operator,
-	Punct
+pub use crate::{
+	parsing,
+	lexing::{
+		self,
+		token::{
+			Delimiter,
+			Operator,
+			Punct
+		}
+	}
 };
 
 pub mod built_in;
@@ -66,8 +72,55 @@ pub struct Context<'a, 'p> {
 }
 
 impl<'a, 'p> Context<'a, 'p> {
+	pub fn grammar(&self) -> &'a mono::Grammar<'p> {
+		self.grammar
+	}
+
 	pub fn module(&self, index: u32) -> Option<&Module> {
 		self.modules.get(index as usize)
+	}
+
+	pub fn module_mut(&mut self, index: u32) -> Option<&mut Module> {
+		self.modules.get_mut(index as usize)
+	}
+
+	pub fn extern_module(&self) -> &Module {
+		self.module(self.extern_module).unwrap()
+	}
+
+	pub fn ast_module(&self) -> &Module {
+		self.module(self.ast_module).unwrap()
+	}
+
+	pub fn lexer_module(&self) -> &Module {
+		self.module(self.lexer_module).unwrap()
+	}
+
+	pub fn parser_module(&self) -> &Module {
+		self.module(self.parser_module).unwrap()
+	}
+
+	pub fn module_path(&self, index: u32) -> Option<module::Path> {
+		self.module(index).map(|m| module::Path::new(
+			m.parent().map(|p| self.module_path(p).unwrap()),
+			m.id()
+		))
+	}
+
+	pub fn extern_module_path(&self) -> module::Path {
+		self.module_path(self.extern_module).unwrap()
+	}
+
+	pub fn ast_module_path(&self) -> module::Path {
+		self.module_path(self.ast_module).unwrap()
+	}
+
+	pub fn lexer_module_path(&self) -> module::Path {
+		self.module_path(self.lexer_module).unwrap()
+	}
+
+	pub fn parser_module_path(&self) -> module::Path {
+		self.module_path(self.parser_module).unwrap()
 	}
 
 	/// Creates a expression that calls the given constructor function.
@@ -118,7 +171,9 @@ impl<'a, 'p> Context<'a, 'p> {
 		extern_module_path: &[String],
 		ast_module_path: &[String],
 		lexer_module_path: &[String],
-		parser_module_path: &[String]
+		lexing_table: &lexing::Table,
+		parser_module_path: &[String],
+		parsing_table: &parsing::Table
 	) -> Self {
 		let mut modules = vec![Module::root()];
 		let mut submodules = vec![HashMap::new()];
@@ -286,10 +341,11 @@ impl<'a, 'p> Context<'a, 'p> {
 			grammar,
 			lexer_module,
 			parser_module,
-			&grammar_extern_type
+			&grammar_extern_type,
+			&grammar_type
 		);
 
-		Self {
+		let mut context = Self {
 			grammar,
 			modules,
 			types,
@@ -301,7 +357,26 @@ impl<'a, 'p> Context<'a, 'p> {
 			grammar_extern_type,
 			grammar_type,
 			function_variants
+		};
+
+		let lexer = Routine::Lexer(routine::lexer::generate(&context, lexing_table));
+		context.module_mut(context.lexer_module).unwrap().add_routine(lexer);
+
+		match parsing_table {
+			parsing::Table::LR0(table) => {
+				for (q, ty_index) in table.initial_states() {
+					let parser = Routine::Parser(ty_index, super::Parser::LR0(
+						routine::lr0::generate(&context, table, q)
+					));
+					context.module_mut(context.parser_module).unwrap().add_routine(parser);
+				}
+			},
+			parsing::Table::LALR1(table) => {
+				unimplemented!()
+			}
 		}
+
+		context
 	}
 
 	pub fn ty(&self, r: ty::Ref) -> Option<&Type> {

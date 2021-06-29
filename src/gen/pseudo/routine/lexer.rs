@@ -132,13 +132,13 @@ fn generate_automaton(
 		for (range, target) in automaton.transitions_from(q) {
 			use std::collections::btree_map::Entry;
 			match inverse.entry(*target) {
-				Entry::Occupied(entry) => {
-					entry.get_mut()
+				Entry::Occupied(mut entry) => {
+					entry.get_mut().insert(range.clone());
 				},
 				Entry::Vacant(entry) => {
-					entry.insert(BTreeSet::new())
+					entry.insert(BTreeSet::new()).insert(range.clone());
 				}
-			}.insert(range.clone());
+			}
 		}
 
 		let id = state_id(&mut id_table, *q);
@@ -181,8 +181,7 @@ fn generate_automaton(
 					},
 					terminal::Desc::RegExp(_) => {
 						let expr = context.built_in.token_expr(*terminal_index, || {
-							let id = terminal.id(context.grammar.poly()).unwrap().clone();
-							Expr::Lexer(LexerOperation::BufferParse(id))
+							Expr::Lexer(LexerOperation::BufferParse(*terminal_index))
 						});
 						let result = if default_token {
 							Expr::Some(Box::new(expr))

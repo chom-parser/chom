@@ -12,7 +12,8 @@ use super::{
 	},
 	Pattern,
 	Id,
-	Expr
+	Expr,
+	expr::BuildArgs
 };
 
 pub use crate::lexing::token::{
@@ -62,12 +63,12 @@ impl Types {
 		self.tokens_patterns.len()
 	}
 
-	pub fn token_pattern<F>(&self, index: u32, f: F) -> Pattern where F: FnMut() -> Id {
+	pub fn token_pattern<F>(&self, index: u32, f: F) -> Pattern where F: Copy + Fn() -> Id {
 		let pattern = self.tokens_patterns.get(&index).unwrap();
 		pattern.bind_any(f)
 	}
 
-	pub fn token_expr<F>(&self, index: u32, f: F) -> Expr where F: FnMut() -> Expr {
+	pub fn token_expr<F>(&self, index: u32, f: F) -> Expr where F: Copy + Fn() -> Expr {
 		let pattern = self.tokens_patterns.get(&index).unwrap();
 		pattern.as_expr(|_| f())
 	}
@@ -84,11 +85,11 @@ impl Types {
 		Expr::Cons(
 			ty::Ref::BuiltIn(Type::Node),
 			*self.nodes_variants.get(&index).unwrap(),
-			vec![e]
+			BuildArgs::Tuple(vec![e])
 		)
 	}
 
-	pub fn item_token_pattern<F>(&self, index: u32, f: F) -> Pattern where F: FnMut() -> Id {
+	pub fn item_token_pattern<F>(&self, index: u32, f: F) -> Pattern where F: Copy + Fn() -> Id {
 		Pattern::Cons(
 			ty::Ref::BuiltIn(Type::Item),
 			0,
@@ -96,11 +97,11 @@ impl Types {
 		)
 	}
 
-	pub fn item_token_expr<F>(&self, index: u32, f: F) -> Expr where F: FnMut() -> Expr {
+	pub fn item_token_expr<F>(&self, index: u32, f: F) -> Expr where F: Copy + Fn() -> Expr {
 		Expr::Cons(
 			ty::Ref::BuiltIn(Type::Item),
 			0,
-			vec![self.token_expr(index, f)]
+			BuildArgs::Tuple(vec![self.token_expr(index, f)])
 		)
 	}
 
@@ -116,7 +117,7 @@ impl Types {
 		Expr::Cons(
 			ty::Ref::BuiltIn(Type::Item),
 			1,
-			vec![self.node_expr(index, e)]
+			BuildArgs::Tuple(vec![self.node_expr(index, e)])
 		)
 	}
 
@@ -124,7 +125,8 @@ impl Types {
 		grammar: &mono::Grammar,
 		lexer_module: u32,
 		parser_module: u32,
-		grammar_extern_type: &HashMap<u32, u32>
+		grammar_extern_type: &HashMap<u32, u32>,
+		grammar_type: &HashMap<u32, u32>
 	) -> Self {
 		let mut tokens = Enum::new();
 		let mut token_keyword_variant = None;
@@ -210,10 +212,40 @@ impl Types {
 			}
 		}
 
+		fn type_expr(
+			grammar: &mono::Grammar,
+			grammar_extern_type: &HashMap<u32, u32>,
+			grammar_type: &HashMap<u32, u32>,
+			index: mono::Index
+		) -> ty::Expr {
+			let ty = grammar.ty(index).unwrap();
+			let params = ty.parameters().iter().filter_map(|p| match p {
+				mono::ty::Expr::Terminal(index) => {
+					let t = grammar.terminal(*index).unwrap();
+					t.extern_type(grammar.poly()).map(|i| {
+						let ty = *grammar_extern_type.get(&i).unwrap();
+						ty::Expr::Defined(ty, Vec::new())
+					})
+				},
+				mono::ty::Expr::Type(index) => {
+					Some(type_expr(
+						grammar,
+						grammar_extern_type,
+						grammar_type,
+						*index
+					))
+				}
+			}).collect();
+			let generated_index = *grammar_type.get(&index.0).unwrap();
+			ty::Expr::Defined(generated_index, params)
+		}
+
 		let mut nodes = Enum::new();
 		let mut nodes_variants = HashMap::new();
 		for (index, ty) in grammar.enumerate_types() {
-			panic!("TODO")
+			let expr = type_expr(grammar, grammar_extern_type, grammar_type, index);
+			let v = nodes.add_variant(ty::Variant::BuiltIn(Variant::Node(expr)));
+			nodes_variants.insert(index, v);
 		}
 
 		let mut items = Enum::new();
@@ -277,7 +309,7 @@ pub enum Variant {
 	Punct(Punct),
 
 	/// Node.
-	Node,
+	Node(ty::Expr),
 
 	/// Item variant.
 	Item(ItemVariant)
@@ -290,7 +322,9 @@ impl Variant {
 			Self::Keyword(_) => None,
 			Self::Delimiter(_) => None,
 			Self::Operator(_) => None,
-			Self::Punct(_) => None
+			Self::Punct(_) => None,
+			Self::Node(ty) => Some(&ty),
+			Self::Item(v) => Some(v.parameter())
 		}
 	}
 }

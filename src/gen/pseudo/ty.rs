@@ -208,6 +208,7 @@ pub struct Field {
 }
 
 /// Type expression.
+#[derive(Clone)]
 pub enum Expr {
 	/// Type variable.
 	Var(u32),

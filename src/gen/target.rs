@@ -1,9 +1,14 @@
+use std::path::{Path, PathBuf};
 use super::pseudo;
 
-pub mod rust;
+mod rust;
+
+pub use rust::Rust;
 
 pub trait Target {
 	type Output;
+
+	fn module_filename<P: AsRef<Path>>(&self, root: P, path: pseudo::module::Path) -> PathBuf;
 }
 
 pub trait Generate<T>: Target {

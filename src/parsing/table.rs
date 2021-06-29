@@ -12,6 +12,11 @@ pub use lalr1::LALR1;
 pub use lr0::LR0;
 pub use non_deterministic::NonDeterministic;
 
+pub enum Table {
+	LR0(LR0),
+	LALR1(LALR1)
+}
+
 /// Item rule.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum Rule {

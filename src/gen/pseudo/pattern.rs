@@ -35,7 +35,7 @@ pub enum Pattern {
 }
 
 impl Pattern {
-	pub fn bind_any<F>(&self, f: F) -> Self where F: FnMut() -> Id {
+	pub fn bind_any<F>(&self, f: F) -> Self where F: Copy + Fn() -> Id {
 		match self {
 			Self::Any => Self::Bind(f()),
 			Self::Bind(id) => Self::Bind(*id),
@@ -50,7 +50,7 @@ impl Pattern {
 		}
 	}
 
-	pub fn as_expr<F>(&self, f: F) -> Expr where F: FnMut(Option<Id>) -> Expr {
+	pub fn as_expr<F>(&self, f: F) -> Expr where F: Copy + Fn(Option<Id>) -> Expr {
 		match self {
 			Self::Any => f(None),
 			Self::Bind(id) => f(Some(*id)),

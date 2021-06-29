@@ -82,7 +82,7 @@ pub fn generate(
 	table: &table::LR0,
 	initial_state: u32
 ) -> Expr {
-	let cases = Vec::new();
+	let mut cases = Vec::new();
 	let mut stack = vec![initial_state];
 	let mut visited = HashSet::new();
 	while let Some(q) = stack.pop() {

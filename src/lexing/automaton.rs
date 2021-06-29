@@ -40,7 +40,7 @@ impl fmt::Display for State {
 }
 
 /// State of deterministic automaton.
-#[derive(Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum DetState {
 	/// The (unique) initial state of the automaton.
 	Initial,

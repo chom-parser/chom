@@ -32,8 +32,8 @@ pub enum LexerOperation {
 	/// Clear the buffer and evaluate the given expression.
 	BufferClear(Box<Expr>),
 
-	/// Parse the buffer content using the given regexp parser (given by identifier).
-	BufferParse(Ident),
+	/// Parse the buffer content using the given token parser (given the index of the grammar terminal).
+	BufferParse(u32),
 
 	/// Creates an iterator from the characters of the buffer.
 	BufferIter,
@@ -47,8 +47,6 @@ pub enum LexerOperation {
 /// Parser operation.
 pub enum ParserOperation {
 	/// Push a value on the stack and evaluate the given expression.
-	/// 
-	/// 
 	StackPush(Box<Expr>, Box<Expr>),
 
 	/// Pop some values from the stack and evaluate the given expression.
@@ -155,8 +153,8 @@ pub enum Expr {
 }
 
 pub struct MatchCase {
-	pattern: Pattern,
-	expr: Expr
+	pub pattern: Pattern,
+	pub expr: Expr
 }
 
 pub enum BuildArgs {
@@ -165,6 +163,6 @@ pub enum BuildArgs {
 }
 
 pub struct Binding {
-	name: Ident,
-	expr: Expr
+	pub name: Ident,
+	pub expr: Expr
 }

@@ -118,10 +118,10 @@ impl Ident {
 		self.normalized.split('_').map(|segment| {
 			let c = segment.chars().next().unwrap(); // segment is never empty.
 			let (_, rest) = segment.split_at(c.len_utf8());
-			[
+			IntoIterator::into_iter([
 				c.to_uppercase().next().unwrap().to_string(),
 				rest.to_string()
-			].into_iter()
+			])
 		}).flatten().join("")
 	}
 
@@ -142,7 +142,7 @@ impl Ident {
 
 impl fmt::Display for Ident {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		match self.prefered {
+		match &self.prefered {
 			Some(id) => id.fmt(f),
 			None => self.normalized.fmt(f)
 		}

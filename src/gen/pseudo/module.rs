@@ -57,6 +57,10 @@ impl Module {
 		}
 	}
 
+	pub fn parent(&self) -> Option<u32> {
+		self.parent
+	}
+
 	/// Module id.
 	pub fn id(&self) -> &Id {
 		&self.id
@@ -74,8 +78,8 @@ impl Module {
 		self.modules.iter().cloned()
 	}
 
-	pub fn routines(&self) -> impl '_ + Iterator<Item=Routine> {
-		self.routines.iter().cloned()
+	pub fn routines(&self) -> impl '_ + Iterator<Item=&'_ Routine> {
+		self.routines.iter()
 	}
 
 	pub fn add_type(&mut self, ty: ty::Ref) {
@@ -99,4 +103,29 @@ pub enum Id {
 
 	/// Named module.
 	Named(String)
+}
+
+pub struct Path<'a> {
+	parent: Option<Box<Path<'a>>>,
+	id: Option<&'a Id>
+}
+
+impl<'a> Path<'a> {
+	pub(crate) fn new(parent: Option<Path<'a>>, id: &'a Id) -> Self {
+		Self {
+			parent: parent.map(Box::new),
+			id: Some(id)
+		}
+	}
+}
+
+impl<'a> Iterator for Path<'a> {
+	type Item = &'a Id;
+
+	fn next(&mut self) -> Option<Self::Item> {
+		match self.parent.as_mut().map(|p| p.next()).flatten() {
+			Some(id) => Some(id),
+			None => self.id.take()
+		}
+	}
 }
