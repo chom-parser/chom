@@ -1,8 +1,7 @@
 use super::{function, regexp, terminal, ty, Function, Grammar, RegExp, Terminal};
 use crate::{
-	Ident,
 	syntax::{self, Caused},
-	CharSet,
+	CharSet, Ident,
 };
 use source_span::Loc;
 use std::collections::HashSet;
@@ -166,7 +165,11 @@ impl syntax::Grammar {
 
 			let def = regexp::Definition {
 				id: def_ast.id.into_inner(),
-				ty: def_ast.ty.as_ref().map(|ty| external_types.get(ty)).transpose()?,
+				ty: def_ast
+					.ty
+					.as_ref()
+					.map(|ty| external_types.get(ty))
+					.transpose()?,
 				exp: compile_loc_regexp(&regexps, def_ast.exp)?,
 			};
 

@@ -1,7 +1,7 @@
 use crate::{
-	Ident,
 	lexing::{regexp, RegExp},
 	syntax::{self, Caused},
+	Ident,
 };
 use source_span::{Loc, Span};
 use std::collections::HashSet;
@@ -84,6 +84,11 @@ impl Grammar {
 
 	pub fn ty(&self, index: u32) -> Option<&Caused<Type>> {
 		self.types.get(index as usize)
+	}
+
+	pub fn ty_expr(&self, index: u32) -> Option<ty::Expr> {
+		self.ty(index)
+			.map(|ty| ty::Expr::Type(index, (0..ty.arity()).map(|i| ty::Expr::Var(i)).collect()))
 	}
 
 	pub fn functions(&self) -> &[Caused<Function>] {

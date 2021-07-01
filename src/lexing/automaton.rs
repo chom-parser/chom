@@ -229,7 +229,10 @@ impl<Q: Ord> DetAutomaton<Q> {
 		&self.transitions
 	}
 
-	pub fn transitions_from(&self, q: &Q) -> impl '_ + Iterator<Item=(&'_ AnyRange<char>, &'_ Q)> {
+	pub fn transitions_from(
+		&self,
+		q: &Q,
+	) -> impl '_ + Iterator<Item = (&'_ AnyRange<char>, &'_ Q)> {
 		self.transitions.get(q).into_iter().flatten()
 	}
 

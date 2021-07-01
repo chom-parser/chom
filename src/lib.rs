@@ -1,9 +1,9 @@
 #![feature(arbitrary_self_types)]
 extern crate source_span;
 
-mod ident;
 pub mod charset;
 pub mod gen;
+mod ident;
 pub mod lexing;
 pub mod mono;
 pub mod out;

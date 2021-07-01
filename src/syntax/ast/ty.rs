@@ -1,5 +1,5 @@
-use crate::Ident;
 use super::{Function, RegExp};
+use crate::Ident;
 use source_span::Loc;
 
 /// Type definition.

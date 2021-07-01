@@ -1,8 +1,8 @@
 use crate::{
-	Ident,
 	lexing::regexp,
 	poly,
 	syntax::{self, Caused},
+	Ident,
 };
 use source_span::{Loc, Span};
 use std::collections::{HashMap, HashSet};

@@ -20,7 +20,7 @@ impl Id {
 	pub fn as_defined(&self) -> &Ident {
 		match self {
 			Self::Defined(id) => id,
-			_ => panic!("invalid type id")
+			_ => panic!("invalid type id"),
 		}
 	}
 }
@@ -49,7 +49,7 @@ pub struct Parameters {
 	terminal_parameters: Vec<Ident>,
 
 	/// List.
-	list: Vec<Parameter>
+	list: Vec<Parameter>,
 }
 
 impl Parameters {
@@ -57,7 +57,7 @@ impl Parameters {
 		Self {
 			type_parameters: Vec::new(),
 			terminal_parameters: Vec::new(),
-			list: Vec::new()
+			list: Vec::new(),
 		}
 	}
 
@@ -65,7 +65,7 @@ impl Parameters {
 		Self {
 			type_parameters: vec![Ident::new("t").unwrap()],
 			terminal_parameters: Vec::new(),
-			list: vec![Parameter::Type(0)]
+			list: vec![Parameter::Type(0)],
 		}
 	}
 
@@ -76,8 +76,8 @@ impl Parameters {
 	pub fn is_empty(&self) -> bool {
 		self.list.is_empty()
 	}
-	
-	pub fn iter(&self) -> impl '_ + Iterator<Item=Parameter> {
+
+	pub fn iter(&self) -> impl '_ + Iterator<Item = Parameter> {
 		self.list.iter().cloned()
 	}
 
@@ -89,7 +89,7 @@ impl Parameters {
 		self.type_parameters.get(i as usize)
 	}
 
-	pub fn type_parameters(&self) -> impl '_ + Iterator<Item=&Ident> {
+	pub fn type_parameters(&self) -> impl '_ + Iterator<Item = &Ident> {
 		self.type_parameters.iter()
 	}
 
@@ -97,7 +97,7 @@ impl Parameters {
 		self.terminal_parameters.get(i as usize)
 	}
 
-	pub fn terminal_parameters(&self) -> impl '_ + Iterator<Item=&Ident> {
+	pub fn terminal_parameters(&self) -> impl '_ + Iterator<Item = &Ident> {
 		self.terminal_parameters.iter()
 	}
 
@@ -118,14 +118,14 @@ impl Parameters {
 #[derive(Clone)]
 pub enum Parameter {
 	/// Type.
-	/// 
+	///
 	/// Provides its index in `Parameters::type_parameters`.
 	Type(u32),
 
 	/// Terminal.
-	/// 
+	///
 	/// Provides its index in `Parameters::terminal_parameters`.
-	Terminal(u32)
+	Terminal(u32),
 }
 
 impl Parameter {
@@ -142,7 +142,7 @@ impl<'s, 'p> fmt::Display for DisplayParameter<'s, 'p> {
 			Parameter::Type(i) => {
 				let id = self.1.type_parameter(*i).unwrap();
 				write!(f, "<{}>", id)
-			},
+			}
 			Parameter::Terminal(i) => {
 				let id = self.1.terminal_parameter(*i).unwrap();
 				id.fmt(f)
@@ -205,6 +205,10 @@ impl Type {
 			Id::Defined(id) => Some(id),
 			_ => None,
 		}
+	}
+
+	pub fn arity(&self) -> u32 {
+		self.parameters.len()
 	}
 
 	pub fn parameters(&self) -> &Parameters {
@@ -283,11 +287,26 @@ pub enum Expr {
 }
 
 impl Expr {
-	pub fn depends_on(&self, other: &Self) -> bool {
-		if self == other {
-			true
-		} else if let Self::Type(_, args) = self {
-			args.iter().any(|a| a.depends_on(other))
+	/// Checks if this type expression directly depends on the given type.
+	///
+	/// This means that the size of this type includes the size of the given type.
+	/// This is used to decide when to put a parameter on the heap to avoid
+	/// infinitely sized types.
+	pub fn depends_on(&self, grammar: &Grammar, ty_index: u32) -> bool {
+		if let Self::Type(other_ty_index, args) = self {
+			if *other_ty_index == ty_index {
+				true
+			} else if *other_ty_index > ty_index {
+				let other_ty = grammar.ty(*other_ty_index).unwrap();
+				other_ty.constructors().iter().any(|&c_index| {
+					let c = grammar.function(c_index).unwrap();
+					c.arguments()
+						.iter()
+						.any(|a| a.expr().depends_on(grammar, ty_index))
+				}) || args.iter().any(|a| a.depends_on(grammar, ty_index))
+			} else {
+				false
+			}
 		} else {
 			false
 		}
@@ -298,12 +317,10 @@ impl Expr {
 		match self {
 			Self::Var(x) => match context.parameter(*x).unwrap() {
 				Parameter::Terminal(_) => false,
-				Parameter::Type(_) => true
+				Parameter::Type(_) => true,
 			},
-			Self::Terminal(t) => {
-				grammar.terminal(*t).unwrap().extern_type(grammar).is_some()
-			},
-			Self::Type(_, _) => true
+			Self::Terminal(t) => grammar.terminal(*t).unwrap().extern_type(grammar).is_some(),
+			Self::Type(_, _) => true,
 		}
 	}
 
@@ -333,7 +350,12 @@ pub struct FormattedExpr<'g, 'e>(&'g Grammar, &'g Type, &'e Expr);
 impl<'g, 'e> fmt::Display for FormattedExpr<'g, 'e> {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		match self.2 {
-			Expr::Var(x) => self.1.parameter(*x).unwrap().display(self.1.parameters()).fmt(f),
+			Expr::Var(x) => self
+				.1
+				.parameter(*x)
+				.unwrap()
+				.display(self.1.parameters())
+				.fmt(f),
 			Expr::Terminal(t) => {
 				let t = self.0.terminal(*t).unwrap();
 				t.format(self.0).fmt(f)

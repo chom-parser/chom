@@ -13,12 +13,9 @@ use std::{
 use utf8_decode::UnsafeDecoder;
 
 use chom::{
+	gen::{Generate, Target as GenTarget},
 	mono, out, poly,
 	syntax::{self, Parsable},
-	gen::{
-		Target as GenTarget,
-		Generate
-	}
 };
 
 fn is_path_separator(c: char) -> bool {
@@ -92,17 +89,20 @@ fn run_subcommand<'a, 'p>(
 	match matches.subcommand() {
 		("table", Some(_m)) => generate_parse_table(grammar.poly(), &mut Output::std()?),
 		("parser", Some(m)) => {
+			let config = chom::gen::Config { locate: true };
+
 			let extern_mod_path = parse_path(m.value_of("EXTERN").unwrap());
 			let ast_mod_path = parse_path(m.value_of("AST").unwrap());
 			let lexer_mod_path = parse_path(m.value_of("LEXER").unwrap());
 			let parser_mod_path = parse_path(m.value_of("PARSER").unwrap());
 
 			let context = generate_pseudo_context(
+				config,
 				grammar,
 				&extern_mod_path,
 				&ast_mod_path,
 				&lexer_mod_path,
-				&parser_mod_path
+				&parser_mod_path,
 			)?;
 
 			let mut lexer_output = None;
@@ -158,7 +158,10 @@ enum Error<'a, 'p> {
 	UnknownCommand(String),
 	IO(io::Error),
 	Lexing(&'p poly::Grammar, Loc<chom::lexing::Error>),
-	LR0Ambiguity(&'a mono::Grammar<'p>, Loc<chom::parsing::table::lr0::Ambiguity>),
+	LR0Ambiguity(
+		&'a mono::Grammar<'p>,
+		Loc<chom::parsing::table::lr0::Ambiguity>,
+	),
 }
 
 impl<'a, 'p> Error<'a, 'p> {
@@ -222,28 +225,28 @@ fn generate_parse_table<'a, 'p>(
 }
 
 fn generate_pseudo_context<'a, 'g>(
+	config: chom::gen::Config,
 	grammar: &'a mono::Grammar<'g>,
 	extern_module_path: &[String],
 	ast_module_path: &[String],
 	lexer_module_path: &[String],
-	parser_module_path: &[String]
+	parser_module_path: &[String],
 ) -> Result<chom::gen::pseudo::Context<'a, 'g>, Error<'a, 'g>> {
 	match chom::lexing::Table::new(grammar.poly()) {
 		Ok(lexing_table) => {
 			let parsing_table = chom::parsing::table::NonDeterministic::new(grammar);
 
 			match chom::parsing::table::LR0::from_non_deterministic(grammar, &parsing_table) {
-				Ok(lr0_table) => {
-					Ok(chom::gen::pseudo::Context::new(
-						grammar,
-						extern_module_path,
-						ast_module_path,
-						lexer_module_path,
-						&lexing_table,
-						parser_module_path,
-						&chom::parsing::Table::LR0(lr0_table)
-					))
-				}
+				Ok(lr0_table) => Ok(chom::gen::pseudo::Context::new(
+					config,
+					grammar,
+					extern_module_path,
+					ast_module_path,
+					lexer_module_path,
+					&lexing_table,
+					parser_module_path,
+					&chom::parsing::Table::LR0(lr0_table),
+				)),
 				Err(e) => Err(Error::LR0Ambiguity(grammar, e)),
 			}
 		}
@@ -288,18 +291,27 @@ impl Target {
 		Self::Rust(chom::gen::target::Rust)
 	}
 
-	fn module_filename<P: AsRef<Path>>(&self, root: P, path: chom::gen::pseudo::module::Path) -> PathBuf {
+	fn module_filename<P: AsRef<Path>>(
+		&self,
+		root: P,
+		path: chom::gen::pseudo::module::Path,
+	) -> PathBuf {
 		let filename = match self {
-			Self::Rust(target) => target.module_filename(root, path)
+			Self::Rust(target) => target.module_filename(root, path),
 		};
 
 		log::info!("will write to `{}`", filename.to_string_lossy());
 		filename
 	}
 
-	fn write_module<O: io::Write>(&self, out: &mut O, context: &chom::gen::pseudo::Context, module: &chom::gen::pseudo::Module) -> io::Result<()> {
+	fn write_module<O: io::Write>(
+		&self,
+		out: &mut O,
+		context: &chom::gen::pseudo::Context,
+		module: &chom::gen::pseudo::Module,
+	) -> io::Result<()> {
 		match self {
-			Self::Rust(target) => write!(out, "{}", target.generate(context, module))
+			Self::Rust(target) => write!(out, "{}", target.generate(context, module)),
 		}
 	}
 }

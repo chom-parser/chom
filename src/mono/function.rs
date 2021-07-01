@@ -51,6 +51,18 @@ impl<'a> Function<'a> {
 		self.args.get(i as usize).cloned()
 	}
 
+	pub fn put_argument_on_heap(
+		&self,
+		grammar: &Grammar,
+		context_ty: super::Index,
+		i: u32,
+	) -> bool {
+		self.poly
+			.argument(i)
+			.map(|a| a.expr().depends_on(grammar.poly(), context_ty.0))
+			.unwrap_or(false)
+	}
+
 	pub fn instance(&self, grammar: &Grammar) -> String {
 		let mut string = String::new();
 

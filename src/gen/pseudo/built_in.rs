@@ -1,53 +1,39 @@
-use std::collections::HashMap;
-use crate::{
-	mono,
-	Ident,
-	lexing::Token
-};
 use super::{
-	ty::{
-		self,
-		Enum,
-		VariantDesc
-	},
-	Pattern,
-	Id,
-	Expr,
-	expr::BuildArgs
+	expr::BuildArgs,
+	ty::{self, Enum, VariantDesc},
+	Expr, Id, Pattern,
 };
+use crate::{lexing::Token, mono, Ident};
+use std::collections::HashMap;
 
-pub use crate::lexing::token::{
-	Delimiter,
-	Operator,
-	Punct
-};
+pub use crate::lexing::token::{Delimiter, Operator, Punct};
 
 /// Built-in types.
 pub struct Types {
 	/// Enum type of tokens.
-	/// 
+	///
 	/// Defined in the lexer.
 	pub tokens: super::Type,
 
 	/// Enum type of keyword tokens.
 	pub keywords: Option<super::Type>,
-	
+
 	/// Enum type operator tokens.
 	pub operators: Option<super::Type>,
 
 	/// Enum type of delimiter tokens.
 	pub delimiters: Option<super::Type>,
-	
+
 	/// Enum type of punctuation tokens.
 	pub puncts: Option<super::Type>,
 
 	/// Enum type of AST nodes (types/non terminals).
-	/// 
+	///
 	/// Defined in the parser.
 	pub nodes: super::Type,
 
 	/// Enum type of tokens or AST nodes.
-	/// 
+	///
 	/// Defined in the parser.
 	pub items: super::Type,
 
@@ -63,12 +49,18 @@ impl Types {
 		self.tokens_patterns.len()
 	}
 
-	pub fn token_pattern<F>(&self, index: u32, f: F) -> Pattern where F: Copy + Fn() -> Id {
+	pub fn token_pattern<F>(&self, index: u32, f: F) -> Pattern
+	where
+		F: Copy + Fn() -> Id,
+	{
 		let pattern = self.tokens_patterns.get(&index).unwrap();
 		pattern.bind_any(f)
 	}
 
-	pub fn token_expr<F>(&self, index: u32, f: F) -> Expr where F: Copy + Fn() -> Expr {
+	pub fn token_expr<F>(&self, index: u32, f: F) -> Expr
+	where
+		F: Copy + Fn() -> Expr,
+	{
 		let pattern = self.tokens_patterns.get(&index).unwrap();
 		pattern.as_expr(|_| f())
 	}
@@ -77,7 +69,7 @@ impl Types {
 		Pattern::Cons(
 			ty::Ref::BuiltIn(Type::Node),
 			*self.nodes_variants.get(&index).unwrap(),
-			vec![Pattern::Bind(id)]
+			vec![Pattern::BindAny(id)],
 		)
 	}
 
@@ -85,23 +77,29 @@ impl Types {
 		Expr::Cons(
 			ty::Ref::BuiltIn(Type::Node),
 			*self.nodes_variants.get(&index).unwrap(),
-			BuildArgs::Tuple(vec![e])
+			BuildArgs::Tuple(vec![e]),
 		)
 	}
 
-	pub fn item_token_pattern<F>(&self, index: u32, f: F) -> Pattern where F: Copy + Fn() -> Id {
+	pub fn item_token_pattern<F>(&self, index: u32, f: F) -> Pattern
+	where
+		F: Copy + Fn() -> Id,
+	{
 		Pattern::Cons(
 			ty::Ref::BuiltIn(Type::Item),
 			0,
-			vec![self.token_pattern(index, f)]
+			vec![self.token_pattern(index, f)],
 		)
 	}
 
-	pub fn item_token_expr<F>(&self, index: u32, f: F) -> Expr where F: Copy + Fn() -> Expr {
+	pub fn item_token_expr<F>(&self, index: u32, f: F) -> Expr
+	where
+		F: Copy + Fn() -> Expr,
+	{
 		Expr::Cons(
 			ty::Ref::BuiltIn(Type::Item),
 			0,
-			BuildArgs::Tuple(vec![self.token_expr(index, f)])
+			BuildArgs::Tuple(vec![self.token_expr(index, f)]),
 		)
 	}
 
@@ -109,7 +107,7 @@ impl Types {
 		Pattern::Cons(
 			ty::Ref::BuiltIn(Type::Item),
 			1,
-			vec![self.node_pattern(index, id)]
+			vec![self.node_pattern(index, id)],
 		)
 	}
 
@@ -117,16 +115,17 @@ impl Types {
 		Expr::Cons(
 			ty::Ref::BuiltIn(Type::Item),
 			1,
-			BuildArgs::Tuple(vec![self.node_expr(index, e)])
+			BuildArgs::Tuple(vec![self.node_expr(index, e)]),
 		)
 	}
 
 	pub fn new(
 		grammar: &mono::Grammar,
+		modules: &mut [super::Module],
 		lexer_module: u32,
 		parser_module: u32,
 		grammar_extern_type: &HashMap<u32, u32>,
-		grammar_type: &HashMap<u32, u32>
+		grammar_type: &HashMap<u32, u32>,
 	) -> Self {
 		let mut tokens = Enum::new();
 		let mut token_keyword_variant = None;
@@ -145,66 +144,124 @@ impl Types {
 		for (index, (terminal, _)) in grammar.terminals().iter().enumerate() {
 			let index = index as u32;
 			if let Some(token) = terminal.token(grammar.poly()) {
-				let ty = token.parameter_type().map(|t| grammar_extern_type.get(&t).cloned()).flatten().map(|i| ty::Expr::Defined(i, Vec::new()));
+				let ty = token
+					.parameter_type()
+					.map(|t| grammar_extern_type.get(&t).cloned())
+					.flatten()
+					.map(|i| ty::Expr::Defined(i, Vec::new()));
 				let desc = match ty {
 					Some(ty) => VariantDesc::Tuple(vec![ty]),
-					None => VariantDesc::Tuple(Vec::new())
+					None => VariantDesc::Tuple(Vec::new()),
 				};
 				let pattern = match token {
 					Token::Named(id, ty) => {
 						let v = tokens.add_variant(ty::Variant::Defined(id, desc));
-						Pattern::Cons(ty::Ref::BuiltIn(Type::Token), v, if ty.is_some() { vec![Pattern::Any] } else { Vec::new() })
-					},
+						Pattern::Cons(
+							ty::Ref::BuiltIn(Type::Token),
+							v,
+							if ty.is_some() {
+								vec![Pattern::Any]
+							} else {
+								Vec::new()
+							},
+						)
+					}
 					Token::Anonymous(i, ty) => {
 						let id = Ident::new(format!("token{}", i)).unwrap();
 						let v = tokens.add_variant(ty::Variant::Defined(id, desc));
-						Pattern::Cons(ty::Ref::BuiltIn(Type::Token), v, if ty.is_some() { vec![Pattern::Any] } else { Vec::new() })
-					},
+						Pattern::Cons(
+							ty::Ref::BuiltIn(Type::Token),
+							v,
+							if ty.is_some() {
+								vec![Pattern::Any]
+							} else {
+								Vec::new()
+							},
+						)
+					}
 					Token::Keyword(k) => {
 						let id = Ident::new(k).unwrap();
 						let kv = keywords.add_variant(ty::Variant::BuiltIn(Variant::Keyword(id)));
 						let v = *token_keyword_variant.get_or_insert_with(|| {
-							tokens.add_variant(ty::Variant::BuiltIn(Variant::Token(TokenVariant::Keyword)))
+							tokens.add_variant(ty::Variant::BuiltIn(Variant::Token(
+								TokenVariant::Keyword,
+							)))
 						});
-						Pattern::Cons(ty::Ref::BuiltIn(Type::Token), v, vec![
-							Pattern::Cons(ty::Ref::BuiltIn(Type::Keyword), kv, Vec::new())
-						])
-					},
+						Pattern::Cons(
+							ty::Ref::BuiltIn(Type::Token),
+							v,
+							vec![Pattern::Cons(
+								ty::Ref::BuiltIn(Type::Keyword),
+								kv,
+								Vec::new(),
+							)],
+						)
+					}
 					Token::Begin(d) => {
-						let dv = delimiters.add_variant(ty::Variant::BuiltIn(Variant::Delimiter(d)));
+						let dv =
+							delimiters.add_variant(ty::Variant::BuiltIn(Variant::Delimiter(d)));
 						let v = *token_begin_variant.get_or_insert_with(|| {
-							tokens.add_variant(ty::Variant::BuiltIn(Variant::Token(TokenVariant::Begin)))
+							tokens.add_variant(ty::Variant::BuiltIn(Variant::Token(
+								TokenVariant::Begin,
+							)))
 						});
-						Pattern::Cons(ty::Ref::BuiltIn(Type::Token), v, vec![
-							Pattern::Cons(ty::Ref::BuiltIn(Type::Delimiter), dv, Vec::new())
-						])
+						Pattern::Cons(
+							ty::Ref::BuiltIn(Type::Token),
+							v,
+							vec![Pattern::Cons(
+								ty::Ref::BuiltIn(Type::Delimiter),
+								dv,
+								Vec::new(),
+							)],
+						)
 					}
 					Token::End(d) => {
-						let dv = delimiters.add_variant(ty::Variant::BuiltIn(Variant::Delimiter(d)));
+						let dv =
+							delimiters.add_variant(ty::Variant::BuiltIn(Variant::Delimiter(d)));
 						let v = *token_end_variant.get_or_insert_with(|| {
-							tokens.add_variant(ty::Variant::BuiltIn(Variant::Token(TokenVariant::End)))
+							tokens.add_variant(ty::Variant::BuiltIn(Variant::Token(
+								TokenVariant::End,
+							)))
 						});
-						Pattern::Cons(ty::Ref::BuiltIn(Type::Token), v, vec![
-							Pattern::Cons(ty::Ref::BuiltIn(Type::Delimiter), dv, Vec::new())
-						])
-					},
+						Pattern::Cons(
+							ty::Ref::BuiltIn(Type::Token),
+							v,
+							vec![Pattern::Cons(
+								ty::Ref::BuiltIn(Type::Delimiter),
+								dv,
+								Vec::new(),
+							)],
+						)
+					}
 					Token::Operator(o) => {
 						let ov = operators.add_variant(ty::Variant::BuiltIn(Variant::Operator(o)));
 						let v = *token_operator_variant.get_or_insert_with(|| {
-							tokens.add_variant(ty::Variant::BuiltIn(Variant::Token(TokenVariant::Operator)))
+							tokens.add_variant(ty::Variant::BuiltIn(Variant::Token(
+								TokenVariant::Operator,
+							)))
 						});
-						Pattern::Cons(ty::Ref::BuiltIn(Type::Token), v, vec![
-							Pattern::Cons(ty::Ref::BuiltIn(Type::Operator), ov, Vec::new())
-						])
-					},
+						Pattern::Cons(
+							ty::Ref::BuiltIn(Type::Token),
+							v,
+							vec![Pattern::Cons(
+								ty::Ref::BuiltIn(Type::Operator),
+								ov,
+								Vec::new(),
+							)],
+						)
+					}
 					Token::Punct(p) => {
 						let pv = puncts.add_variant(ty::Variant::BuiltIn(Variant::Punct(p)));
 						let v = *token_punct_variant.get_or_insert_with(|| {
-							tokens.add_variant(ty::Variant::BuiltIn(Variant::Token(TokenVariant::Punct)))
+							tokens.add_variant(ty::Variant::BuiltIn(Variant::Token(
+								TokenVariant::Punct,
+							)))
 						});
-						Pattern::Cons(ty::Ref::BuiltIn(Type::Token), v, vec![
-							Pattern::Cons(ty::Ref::BuiltIn(Type::Punct), pv, Vec::new())
-						])
+						Pattern::Cons(
+							ty::Ref::BuiltIn(Type::Token),
+							v,
+							vec![Pattern::Cons(ty::Ref::BuiltIn(Type::Punct), pv, Vec::new())],
+						)
 					}
 				};
 
@@ -216,33 +273,35 @@ impl Types {
 			grammar: &mono::Grammar,
 			grammar_extern_type: &HashMap<u32, u32>,
 			grammar_type: &HashMap<u32, u32>,
-			index: mono::Index
+			index: mono::Index,
 		) -> ty::Expr {
 			let ty = grammar.ty(index).unwrap();
-			let params = ty.parameters().iter().filter_map(|p| match p {
-				mono::ty::Expr::Terminal(index) => {
-					let t = grammar.terminal(*index).unwrap();
-					t.extern_type(grammar.poly()).map(|i| {
-						let ty = *grammar_extern_type.get(&i).unwrap();
-						ty::Expr::Defined(ty, Vec::new())
-					})
-				},
-				mono::ty::Expr::Type(index) => {
-					Some(type_expr(
+			let params = ty
+				.parameters()
+				.iter()
+				.filter_map(|p| match p {
+					mono::ty::Expr::Terminal(index) => {
+						let t = grammar.terminal(*index).unwrap();
+						t.extern_type(grammar.poly()).map(|i| {
+							let ty = *grammar_extern_type.get(&i).unwrap();
+							ty::Expr::Defined(ty, Vec::new())
+						})
+					}
+					mono::ty::Expr::Type(index) => Some(type_expr(
 						grammar,
 						grammar_extern_type,
 						grammar_type,
-						*index
-					))
-				}
-			}).collect();
+						*index,
+					)),
+				})
+				.collect();
 			let generated_index = *grammar_type.get(&index.0).unwrap();
 			ty::Expr::Defined(generated_index, params)
 		}
 
 		let mut nodes = Enum::new();
 		let mut nodes_variants = HashMap::new();
-		for (index, ty) in grammar.enumerate_types() {
+		for (index, _ty) in grammar.enumerate_types() {
 			let expr = type_expr(grammar, grammar_extern_type, grammar_type, index);
 			let v = nodes.add_variant(ty::Variant::BuiltIn(Variant::Node(index, expr)));
 			nodes_variants.insert(index, v);
@@ -252,16 +311,34 @@ impl Types {
 		items.add_variant(ty::Variant::BuiltIn(Variant::Item(ItemVariant::Token)));
 		items.add_variant(ty::Variant::BuiltIn(Variant::Item(ItemVariant::Node)));
 
+		fn define_type(
+			modules: &mut [super::Module],
+			module: u32,
+			id: Type,
+			enm: Option<ty::Enum>,
+		) -> Option<super::Type> {
+			enm.map(|enm| {
+				let ty = super::Type::new(module, id.ident(), None, ty::Desc::Enum(enm));
+				modules[module as usize].add_type(ty::Ref::BuiltIn(id));
+				ty
+			})
+		}
+
 		Self {
-			tokens: super::Type::new(lexer_module, Ident::new("Token").unwrap(), None, ty::Desc::Enum(tokens)),
-			keywords: keywords.not_empty().map(|e| super::Type::new(lexer_module, Ident::new("Keyword").unwrap(), None, ty::Desc::Enum(e))),
-			operators: operators.not_empty().map(|e| super::Type::new(lexer_module, Ident::new("Operator").unwrap(), None, ty::Desc::Enum(e))),
-			delimiters: delimiters.not_empty().map(|e| super::Type::new(lexer_module, Ident::new("Delimiter").unwrap(), None, ty::Desc::Enum(e))),
-			puncts: puncts.not_empty().map(|e| super::Type::new(lexer_module, Ident::new("Punct").unwrap(), None, ty::Desc::Enum(e))),
-			nodes: super::Type::new(parser_module, Ident::new("Node").unwrap(), None, ty::Desc::Enum(nodes)),
-			items: super::Type::new(parser_module, Ident::new("Item").unwrap(), None, ty::Desc::Enum(items)),
+			tokens: define_type(modules, lexer_module, Type::Token, Some(tokens)).unwrap(),
+			keywords: define_type(modules, lexer_module, Type::Keyword, keywords.not_empty()),
+			operators: define_type(modules, lexer_module, Type::Operator, operators.not_empty()),
+			delimiters: define_type(
+				modules,
+				lexer_module,
+				Type::Delimiter,
+				delimiters.not_empty(),
+			),
+			puncts: define_type(modules, lexer_module, Type::Punct, puncts.not_empty()),
+			nodes: define_type(modules, parser_module, Type::Node, Some(nodes)).unwrap(),
+			items: define_type(modules, parser_module, Type::Item, Some(items)).unwrap(),
 			tokens_patterns,
-			nodes_variants
+			nodes_variants,
 		}
 	}
 }
@@ -288,7 +365,21 @@ pub enum Type {
 	Node,
 
 	/// Token or node.
-	Item
+	Item,
+}
+
+impl Type {
+	pub fn ident(&self) -> Ident {
+		match self {
+			Self::Token => Ident::new("Token").unwrap(),
+			Self::Keyword => Ident::new("Keyword").unwrap(),
+			Self::Operator => Ident::new("Operator").unwrap(),
+			Self::Delimiter => Ident::new("Delimiter").unwrap(),
+			Self::Punct => Ident::new("Punct").unwrap(),
+			Self::Node => Ident::new("Node").unwrap(),
+			Self::Item => Ident::new("Item").unwrap(),
+		}
+	}
 }
 
 #[derive(Clone)]
@@ -312,7 +403,7 @@ pub enum Variant {
 	Node(mono::Index, ty::Expr),
 
 	/// Item variant.
-	Item(ItemVariant)
+	Item(ItemVariant),
 }
 
 impl Variant {
@@ -324,7 +415,7 @@ impl Variant {
 			Self::Operator(_) => None,
 			Self::Punct(_) => None,
 			Self::Node(_, ty) => Some(&ty),
-			Self::Item(v) => Some(v.parameter())
+			Self::Item(v) => Some(v.parameter()),
 		}
 	}
 }
@@ -344,7 +435,7 @@ pub enum TokenVariant {
 	End,
 
 	/// Punctuation char token variant.
-	Punct
+	Punct,
 }
 
 impl TokenVariant {
@@ -354,7 +445,7 @@ impl TokenVariant {
 			Self::Operator => &ty::Expr::BuiltIn(Type::Operator),
 			Self::Begin => &ty::Expr::BuiltIn(Type::Delimiter),
 			Self::End => &ty::Expr::BuiltIn(Type::Delimiter),
-			Self::Punct => &ty::Expr::BuiltIn(Type::Punct)
+			Self::Punct => &ty::Expr::BuiltIn(Type::Punct),
 		}
 	}
 }
@@ -362,14 +453,14 @@ impl TokenVariant {
 #[derive(Clone, Copy)]
 pub enum ItemVariant {
 	Token,
-	Node
+	Node,
 }
 
 impl ItemVariant {
 	pub fn parameter(&self) -> &ty::Expr {
 		match self {
 			Self::Token => &ty::Expr::BuiltIn(Type::Token),
-			Self::Node => &ty::Expr::BuiltIn(Type::Node)
+			Self::Node => &ty::Expr::BuiltIn(Type::Node),
 		}
 	}
 }

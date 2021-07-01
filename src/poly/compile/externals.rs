@@ -41,9 +41,10 @@ impl ExternalTypes {
 	}
 
 	pub fn get(&self, id: &Loc<Ident>) -> Result<u32, Loc<Error>> {
-		self.map.get(id).cloned().ok_or_else(|| {
-			Loc::new(Error::UndefinedExternalType(id.as_ref().clone()), id.span())
-		})
+		self.map
+			.get(id)
+			.cloned()
+			.ok_or_else(|| Loc::new(Error::UndefinedExternalType(id.as_ref().clone()), id.span()))
 	}
 
 	pub fn into_vec(self) -> Vec<(Ident, Option<Span>)> {

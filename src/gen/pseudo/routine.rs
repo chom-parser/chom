@@ -5,5 +5,5 @@ pub mod lr0;
 
 pub enum Routine {
 	Lexer(super::Expr),
-	Parser(mono::Index, crate::gen::Parser)
+	Parser(mono::Index, crate::gen::Parser),
 }

@@ -31,9 +31,8 @@ impl Table {
 	}
 
 	pub fn sub_automaton(&self, terminal: u32) -> Option<&DetAutomaton<DetState>> {
-		self.sub_automaton_index(terminal).map(|i| {
-			&self.automata[i as usize]
-		})
+		self.sub_automaton_index(terminal)
+			.map(|i| &self.automata[i as usize])
 	}
 
 	pub fn new<'a>(grammar: &Grammar) -> Result<Self, Loc<Error>> {

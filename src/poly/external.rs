@@ -25,7 +25,7 @@ impl ExternalType {
 	pub fn is_unit(&self) -> bool {
 		match self {
 			Self::Unit => true,
-			_ => false
+			_ => false,
 		}
 	}
 

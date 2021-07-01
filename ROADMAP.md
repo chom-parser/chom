@@ -1,7 +1,7 @@
 # Roadmap to version 0.1
 
 - [x] Negative charset.
-- [ ] Subterminals.
+- [x] Subterminals.
 - [ ] Keywords optimiation.
 - [ ] Modules.
 - [ ] Generate grammar HTML doc.

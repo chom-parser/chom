@@ -1,4 +1,4 @@
-use crate::{Ident,CharSet};
+use crate::{CharSet, Ident};
 use source_span::Loc;
 use std::fmt;
 

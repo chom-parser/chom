@@ -1,8 +1,4 @@
-use super::{
-	ty,
-	Grammar,
-	Type
-};
+use super::{ty, Grammar, Type};
 use crate::Ident;
 
 /// Primitive type constructor.
@@ -43,7 +39,7 @@ impl Id {
 	pub fn as_defined(&self) -> &Ident {
 		match self {
 			Self::Defined(id) => id,
-			_ => panic!("invalid function id")
+			_ => panic!("invalid function id"),
 		}
 	}
 }
@@ -81,16 +77,20 @@ impl Function {
 		&self.args
 	}
 
-	pub fn argument(&self, offset: usize) -> Option<&ty::LabeledExpr> {
-		self.args.get(offset)
+	pub fn argument(&self, offset: u32) -> Option<&ty::LabeledExpr> {
+		self.args.get(offset as usize)
 	}
 
 	/// Checks if the function is "fully labeled".
-	/// 
+	///
 	/// That is when it is not a constant (it has some arguments)
 	/// and every typed (non unit) argument is labeled.
 	pub fn is_fully_labeled(&self, grammar: &Grammar, context: &Type) -> bool {
-		!self.args.is_empty() && self.args.iter().all(|a| a.is_labeled() || !a.is_typed(grammar, context))
+		!self.args.is_empty()
+			&& self
+				.args
+				.iter()
+				.all(|a| a.is_labeled() || !a.is_typed(grammar, context))
 	}
 }
 

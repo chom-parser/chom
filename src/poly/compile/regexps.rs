@@ -1,9 +1,5 @@
 use super::{Error, ExternalTypes};
-use crate::{
-	Ident,
-	lexing::regexp,
-	syntax,
-};
+use crate::{lexing::regexp, syntax, Ident};
 use source_span::{Loc, Span};
 use std::collections::BTreeMap;
 
@@ -35,7 +31,11 @@ impl RegExps {
 		let mut map = BTreeMap::new();
 
 		for def in ast {
-			let ty = def.ty.as_ref().map(|ty| external_types.get(ty)).transpose()?;
+			let ty = def
+				.ty
+				.as_ref()
+				.map(|ty| external_types.get(ty))
+				.transpose()?;
 
 			match map.entry(def.id.as_ref().clone()) {
 				Entry::Vacant(entry) => {
@@ -61,7 +61,15 @@ impl RegExps {
 				let i = list.len() as u32;
 				let exp =
 					regexp::RegExp::new(vec![regexp::Atom::CharSet(crate::CharSet::whitespace())]);
-				list.push((Some(regexp::Definition { id: ws_id, ty: None, exp }), None, None));
+				list.push((
+					Some(regexp::Definition {
+						id: ws_id,
+						ty: None,
+						exp,
+					}),
+					None,
+					None,
+				));
 				entry.insert(i);
 				i
 			}

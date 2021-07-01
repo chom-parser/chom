@@ -1,8 +1,5 @@
 use super::{token, Token};
-use crate::{
-	poly::Grammar,
-	CharSet, Ident,
-};
+use crate::{poly::Grammar, CharSet, Ident};
 use std::{
 	cmp::{Ord, Ordering, PartialOrd},
 	fmt,
@@ -29,8 +26,8 @@ impl<'g, 'd> fmt::Display for FormattedDefinition<'g, 'd> {
 			Some(ty) => {
 				let ty = self.0.extern_type(ty).unwrap();
 				write!(f, "regexp {}: {} = {}", self.1.id, ty, self.1.exp)
-			},
-			None => write!(f, "regexp {} = {}", self.1.id, self.1.exp)
+			}
+			None => write!(f, "regexp {} = {}", self.1.id, self.1.exp),
 		}
 	}
 }
@@ -86,7 +83,8 @@ impl RegExp {
 	}
 
 	pub fn id<'g>(&self, grammar: &'g Grammar) -> Option<&'g Ident> {
-		self.as_reference().map(|index| &grammar.regexp(index).unwrap().id)
+		self.as_reference()
+			.map(|index| &grammar.regexp(index).unwrap().id)
 	}
 
 	pub fn extern_type(&self, grammar: &Grammar) -> Option<u32> {
@@ -101,7 +99,7 @@ impl RegExp {
 		if self.len() == 1 {
 			match self.0.first().unwrap().token(grammar) {
 				Some(token) => token,
-				None => Token::Anonymous(0, None)
+				None => Token::Anonymous(0, None),
 			}
 		} else {
 			let mut id: Option<Ident> = None;
@@ -111,7 +109,7 @@ impl RegExp {
 					Some(Token::Keyword(k)) => Ident::new(k.clone()).unwrap(),
 					_ => return Token::Anonymous(0, None),
 				};
-				
+
 				if let Some(id) = &mut id {
 					id.push_ident(&atom_id)
 				} else {
@@ -121,7 +119,7 @@ impl RegExp {
 
 			match id {
 				Some(id) => Token::Named(id, None),
-				None => Token::Anonymous(0, None)
+				None => Token::Anonymous(0, None),
 			}
 		}
 	}
@@ -175,9 +173,9 @@ impl Atom {
 			Self::Ref(i) => {
 				let exp = grammar.regexp(*i).unwrap();
 				exp.ty
-			},
+			}
 			Self::Group(g) => g.extern_type(grammar),
-			_ => None
+			_ => None,
 		}
 	}
 
@@ -185,10 +183,7 @@ impl Atom {
 		match self {
 			Self::Ref(i) => {
 				let exp = grammar.regexp(*i).unwrap();
-				Some(Token::Named(
-					exp.id.clone(),
-					exp.ty
-				))
+				Some(Token::Named(exp.id.clone(), exp.ty))
 			}
 			Self::CharSet(set) => {
 				if set.len() == 1usize {

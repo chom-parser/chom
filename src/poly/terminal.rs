@@ -1,17 +1,18 @@
 use super::Grammar;
-use crate::{Ident,lexing::{regexp, RegExp, Token}};
+use crate::{
+	lexing::{regexp, RegExp, Token},
+	Ident,
+};
 use std::{cmp::Ordering, fmt};
 
 /// Grammar terminal.
 pub struct Terminal {
-	desc: Desc
+	desc: Desc,
 }
 
 impl Terminal {
 	pub fn new(desc: Desc) -> Self {
-		Self {
-			desc
-		}
+		Self { desc }
 	}
 
 	pub fn as_regexp_ref(&self) -> Option<u32> {
@@ -39,27 +40,27 @@ impl Terminal {
 	}
 
 	/// Returns the identifier associated to the terminal.
-	/// 
+	///
 	/// It corresponds to the identifier of the referenced regexp,
 	/// if the terminal is a direct regexp reference.
 	pub fn id<'g>(&self, grammar: &'g Grammar) -> Option<&'g Ident> {
 		match &self.desc {
 			Desc::RegExp(exp) => exp.id(grammar),
-			Desc::Whitespace(_) => None
+			Desc::Whitespace(_) => None,
 		}
 	}
 
 	pub fn token(&self, grammar: &Grammar) -> Option<Token> {
 		match &self.desc {
 			Desc::RegExp(exp) => Some(exp.token(grammar)),
-			Desc::Whitespace(_) => None
+			Desc::Whitespace(_) => None,
 		}
 	}
 
 	pub fn extern_type(&self, grammar: &Grammar) -> Option<u32> {
 		match &self.desc {
 			Desc::RegExp(exp) => exp.extern_type(grammar),
-			Desc::Whitespace(_) => None
+			Desc::Whitespace(_) => None,
 		}
 	}
 

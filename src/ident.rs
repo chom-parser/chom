@@ -1,18 +1,15 @@
 use std::{
-	fmt,
+	cmp::Ordering,
 	convert::TryFrom,
-	hash::{
-		Hasher,
-		Hash
-	},
-	cmp::Ordering
+	fmt,
+	hash::{Hash, Hasher},
 };
 
 /// Normalized identifier.
 #[derive(Clone, Eq, Debug)]
 pub struct Ident {
 	normalized: String,
-	prefered: Option<String>
+	prefered: Option<String>,
 }
 
 impl PartialEq for Ident {
@@ -23,13 +20,13 @@ impl PartialEq for Ident {
 
 impl PartialOrd for Ident {
 	fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-		self.normalized.partial_cmp(&self.normalized)
+		self.normalized.partial_cmp(&other.normalized)
 	}
 }
 
 impl Ord for Ident {
 	fn cmp(&self, other: &Self) -> Ordering {
-		self.normalized.cmp(&self.normalized)
+		self.normalized.cmp(&other.normalized)
 	}
 }
 
@@ -43,7 +40,9 @@ impl Hash for Ident {
 pub struct InvalidIdent;
 
 fn is_word_start(prev: Option<char>, c: char, next: Option<char>) -> bool {
-	c.is_uppercase() && prev.map(|p| p.is_lowercase()).unwrap_or(false) && next.map(|p| p.is_lowercase()).unwrap_or(false)
+	c.is_uppercase()
+		&& prev.map(|p| p.is_lowercase()).unwrap_or(false)
+		&& next.map(|p| p.is_lowercase()).unwrap_or(false)
 }
 
 fn normalize(id: &str) -> Result<String, InvalidIdent> {
@@ -80,7 +79,7 @@ fn normalize(id: &str) -> Result<String, InvalidIdent> {
 	}
 
 	if result.is_empty() {
-		return Err(InvalidIdent)
+		return Err(InvalidIdent);
 	}
 
 	Ok(result)
@@ -92,7 +91,7 @@ impl TryFrom<String> for Ident {
 	fn try_from(id: String) -> Result<Self, Self::Error> {
 		Ok(Self {
 			normalized: normalize(&id)?,
-			prefered: Some(id)
+			prefered: Some(id),
 		})
 	}
 }
@@ -101,7 +100,7 @@ impl Ident {
 	pub fn new<S: AsRef<str>>(id: S) -> Result<Self, InvalidIdent> {
 		Ok(Self {
 			normalized: normalize(id.as_ref())?,
-			prefered: None
+			prefered: None,
 		})
 	}
 
@@ -112,17 +111,21 @@ impl Ident {
 	pub fn to_snake_case(&self) -> String {
 		self.normalized.clone()
 	}
-	
+
 	pub fn to_caml_case(&self) -> String {
 		use itertools::Itertools;
-		self.normalized.split('_').map(|segment| {
-			let c = segment.chars().next().unwrap(); // segment is never empty.
-			let (_, rest) = segment.split_at(c.len_utf8());
-			IntoIterator::into_iter([
-				c.to_uppercase().next().unwrap().to_string(),
-				rest.to_string()
-			])
-		}).flatten().join("")
+		self.normalized
+			.split('_')
+			.map(|segment| {
+				let c = segment.chars().next().unwrap(); // segment is never empty.
+				let (_, rest) = segment.split_at(c.len_utf8());
+				IntoIterator::into_iter([
+					c.to_uppercase().next().unwrap().to_string(),
+					rest.to_string(),
+				])
+			})
+			.flatten()
+			.join("")
 	}
 
 	pub fn push(&mut self, id: &str) {
@@ -144,7 +147,7 @@ impl fmt::Display for Ident {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		match &self.prefered {
 			Some(id) => id.fmt(f),
-			None => self.normalized.fmt(f)
+			None => self.normalized.fmt(f),
 		}
 	}
 }

@@ -14,7 +14,7 @@ pub use non_deterministic::NonDeterministic;
 
 pub enum Table {
 	LR0(LR0),
-	LALR1(LALR1)
+	LALR1(LALR1),
 }
 
 /// Item rule.

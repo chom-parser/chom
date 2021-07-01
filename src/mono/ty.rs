@@ -1,5 +1,5 @@
 use super::{Grammar, Index};
-use crate::{Ident, poly};
+use crate::{poly, Ident};
 use std::fmt;
 
 /// Type instance identifier.
@@ -37,10 +37,10 @@ impl<'a> Type<'a> {
 				use poly::ty::Primitive;
 				match p {
 					Primitive::List => Ident::new("list").unwrap(),
-					Primitive::Option => Ident::new("option").unwrap()
+					Primitive::Option => Ident::new("option").unwrap(),
 				}
-			},
-			Id::Defined(id) => id.clone()
+			}
+			Id::Defined(id) => id.clone(),
 		};
 
 		for p in self.parameters() {
@@ -106,16 +106,16 @@ pub enum Expr {
 }
 
 impl Expr {
-	pub fn depends_on(&self, grammar: &Grammar, other: Expr) -> bool {
-		if *self == other {
-			true
-		} else if let Self::Type(i) = self {
-			let ty = grammar.ty(*i).unwrap();
-			ty.parameters().iter().any(|p| p.depends_on(grammar, other))
-		} else {
-			false
-		}
-	}
+	// pub fn depends_on(&self, grammar: &Grammar, other: Expr) -> bool {
+	// 	if *self == other {
+	// 		true
+	// 	} else if let Self::Type(i) = self {
+	// 		let ty = grammar.ty(*i).unwrap();
+	// 		ty.parameters().iter().any(|p| p.depends_on(grammar, other))
+	// 	} else {
+	// 		false
+	// 	}
+	// }
 
 	pub fn format<'a, 'g>(&self, grammar: &'g Grammar<'a>) -> FormattedExpr<'a, 'g, '_> {
 		FormattedExpr(grammar, self)

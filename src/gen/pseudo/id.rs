@@ -1,38 +1,73 @@
 /// Variable identifier.
 #[derive(Clone, Copy)]
 pub enum Id {
-	/// Source character stream.
-	Source,
+	Lexer(Lexer),
+	Parser(Parser),
+}
 
-	/// Optional character taken from the source.
-	CharOpt,
+/// Variables occuring in the lexer.
+#[derive(Clone, Copy)]
+pub enum Lexer {
+	/// The lexer itself.
+	Itself,
 
-	/// State identifier.
-	State,
-
-	/// Lexer buffer.
+	/// Buffer member.
 	Buffer,
 
-	/// lexer buffer characters iterator.
+	/// Location member.
+	Span,
+
+	/// Current state.
+	State,
+
+	/// An iterator over the characters of the buffer.
 	BufferChars,
 
-	/// Sub token.
+	/// An optional character.
+	CharOpt,
+
+	/// A character.
+	Char,
+
+	/// A sub-token emitted from a sub-automaton.
 	SubToken,
 
+	/// Unexpected character.
+	Unexpected,
+}
+
+/// Variable occuring in the parser.
+#[derive(Clone, Copy)]
+pub enum Parser {
 	/// Lexer.
 	Lexer,
 
-	/// Any optional token emitted by the parser.
-	AnyTokenOpt,
-
-	/// Token emitted by the parser.
-	Token,
-
-	/// Parsing stack.
+	/// Item stack.
 	Stack,
+
+	/// Current state.
+	State,
+
+	/// State popped on the stack.
+	SavedState,
 
 	/// Any optional AST node.
 	AnyNodeOpt,
+
+	/// Any optional AST node, without span information.
+	AnyNodeOptSpanless,
+
+	/// Any item popped from the stack.
+	AnyItem(u32),
+
+	/// Item without span information.
+	AnyItemSpanless(u32),
+
+	/// Item span information.
+	AnyItemSpan(u32),
+
+	/// Unwrapped item.
+	Item(u32),
 
 	/// Any AST node.
 	AnyNode,
@@ -40,17 +75,24 @@ pub enum Id {
 	/// AST node.
 	Node,
 
-	/// Popped stack item.
-	Item(u32),
+	/// Any optional token.
+	AnyTokenOpt,
 
-	/// State popped from the stack.
-	/// 
-	/// It is set by the [`StackPop`](super::expr::ParserOperation::StackPop) operation.
-	SavedState,
+	/// Any optional token, without span information.
+	AnyTokenOptSpanless,
 
-	/// Unexpected value.
+	/// Token.
+	Token,
+
+	/// Current position.
+	Position,
+
+	/// Last item location.
+	Span,
+
+	/// Parsed AST.
+	Result,
+
+	/// Unexpected token.
 	Unexpected,
-
-	/// Parser result.
-	Result
 }

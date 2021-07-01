@@ -1,8 +1,4 @@
-use crate::{
-	Ident,
-	lexing::RegExp,
-	poly::Grammar,
-};
+use crate::{lexing::RegExp, poly::Grammar, Ident};
 
 mod delimiter;
 mod operator;
@@ -73,7 +69,7 @@ pub enum Token {
 	Operator(Operator),
 	Punct(Punct),
 	Begin(Delimiter),
-	End(Delimiter)
+	End(Delimiter),
 }
 
 impl Token {
@@ -87,7 +83,7 @@ impl Token {
 	pub fn parameter_type(&self) -> Option<u32> {
 		match self {
 			Self::Anonymous(_, c) | Self::Named(_, c) => *c,
-			_ => None
+			_ => None,
 		}
 	}
 

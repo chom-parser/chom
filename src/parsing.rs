@@ -8,5 +8,5 @@ pub use table::Table;
 
 pub enum Algorithm {
 	LR0,
-	LALR1
+	LALR1,
 }

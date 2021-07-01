@@ -1,9 +1,6 @@
-pub use source_span::{Loc, Position, Span};
-use std::{
-	iter::Peekable,
-	convert::TryInto
-};
 use crate::Ident;
+pub use source_span::{Loc, Position, Span};
+use std::{convert::TryInto, iter::Peekable};
 
 mod ast;
 mod caused;
@@ -246,20 +243,14 @@ impl Parsable for Grammar {
 fn string_to_ident(name: String, span: Span) -> Result<Ident> {
 	match name.clone().try_into() {
 		Ok(id) => Ok(id),
-		Err(_) => Err(Loc::new(
-			Error::InvalidIdent(name),
-			span
-		))
+		Err(_) => Err(Loc::new(Error::InvalidIdent(name), span)),
 	}
 }
 
 fn string_to_loc_ident(name: String, span: Span) -> Result<Loc<Ident>> {
 	match name.clone().try_into() {
 		Ok(id) => Ok(Loc::new(id, span)),
-		Err(_) => Err(Loc::new(
-			Error::InvalidIdent(name),
-			span
-		))
+		Err(_) => Err(Loc::new(Error::InvalidIdent(name), span)),
 	}
 }
 
@@ -349,7 +340,10 @@ impl Parsable for ast::ty::Expr {
 		let token_span = token.span().clone();
 		let ast = match token.into_inner() {
 			lexer::Token::Ident(id) => {
-				let exp = RegExp(vec![Loc::new(regexp::Atom::Ref(string_to_ident(id, token_span)?), token_span)]);
+				let exp = RegExp(vec![Loc::new(
+					regexp::Atom::Ref(string_to_ident(id, token_span)?),
+					token_span,
+				)]);
 				ast::ty::Expr::Terminal(exp)
 			}
 			lexer::Token::String(s, case_sensitive) => {
@@ -489,7 +483,10 @@ impl Parsable for RegExp {
 					}
 					lexer::Token::Ident(id) => {
 						consume(lexer, &mut span)?;
-						atoms.push(Loc::new(regexp::Atom::Ref(string_to_ident(id.clone(), token_span)?), token_span));
+						atoms.push(Loc::new(
+							regexp::Atom::Ref(string_to_ident(id.clone(), token_span)?),
+							token_span,
+						));
 					}
 					lexer::Token::CharSet(set, false) => {
 						consume(lexer, &mut span)?;

@@ -1,5 +1,5 @@
-use crate::Ident;
 use super::built_in;
+use crate::Ident;
 
 pub struct Type {
 	/// Index of the containing module.
@@ -15,7 +15,7 @@ pub struct Type {
 	parameters: Vec<Ident>,
 
 	/// Description.
-	desc: Desc
+	desc: Desc,
 }
 
 impl Type {
@@ -26,7 +26,7 @@ impl Type {
 			id: Id::Defined(id.clone()),
 			grammar_ty: Some(GrammarType::Extern(grammar_extern_ty)),
 			parameters: Vec::new(),
-			desc: Desc::Opaque
+			desc: Desc::Opaque,
 		}
 	}
 
@@ -36,7 +36,7 @@ impl Type {
 			id: Id::Defined(id),
 			grammar_ty: grammar_ty.map(GrammarType::Intern),
 			parameters: Vec::new(),
-			desc
+			desc,
 		}
 	}
 
@@ -48,6 +48,10 @@ impl Type {
 		&self.id
 	}
 
+	pub fn parameters(&self) -> &[Ident] {
+		&self.parameters
+	}
+
 	pub fn grammar_type(&self) -> Option<GrammarType> {
 		self.grammar_ty
 	}
@@ -56,10 +60,14 @@ impl Type {
 		&self.desc
 	}
 
+	pub(crate) fn set_desc(&mut self, desc: Desc) {
+		self.desc = desc
+	}
+
 	pub fn as_enum(&self) -> &Enum {
 		match &self.desc {
 			Desc::Enum(enm) => enm,
-			_ => panic!("type is not an enum")
+			_ => panic!("type is not an enum"),
 		}
 	}
 }
@@ -67,37 +75,37 @@ impl Type {
 #[derive(Clone, Copy)]
 pub enum GrammarType {
 	Extern(u32),
-	Intern(u32)
+	Intern(u32),
 }
 
 #[derive(Clone)]
 pub enum Id {
 	BuiltIn(built_in::Type),
-	Defined(Ident)
+	Defined(Ident),
 }
 
 #[derive(Clone, Copy)]
 pub enum Ref {
 	BuiltIn(built_in::Type),
-	Defined(u32)
+	Defined(u32),
 }
 
 pub enum Desc {
 	Opaque,
 	Enum(Enum),
 	Struct(Struct),
-	TupleStruct(Vec<Expr>)
+	TupleStruct(Vec<Expr>),
 }
 
 /// Enumerator type.
 pub struct Enum {
-	variants: Vec<Variant>
+	variants: Vec<Variant>,
 }
 
 impl Enum {
 	pub fn new() -> Self {
 		Self {
-			variants: Vec::new()
+			variants: Vec::new(),
 		}
 	}
 
@@ -111,6 +119,10 @@ impl Enum {
 
 	pub fn variant(&self, index: u32) -> Option<&Variant> {
 		self.variants.get(index as usize)
+	}
+
+	pub fn variants(&self) -> &[Variant] {
+		&self.variants
 	}
 
 	pub fn add_variant(&mut self, v: Variant) -> u32 {
@@ -134,14 +146,14 @@ pub enum Variant {
 	BuiltIn(built_in::Variant),
 
 	/// Defined variant.
-	Defined(Ident, VariantDesc)
+	Defined(Ident, VariantDesc),
 }
 
 impl Variant {
 	pub fn is_empty(&self) -> bool {
 		match self {
 			Self::BuiltIn(t) => t.parameter().is_none(),
-			Self::Defined(_, desc) => desc.is_empty()
+			Self::Defined(_, desc) => desc.is_empty(),
 		}
 	}
 
@@ -149,37 +161,37 @@ impl Variant {
 		match self {
 			Self::BuiltIn(t) => t.parameter().map(|p| std::slice::from_ref(p)),
 			Self::Defined(_, VariantDesc::Tuple(params)) => Some(params.as_ref()),
-			_ => None
+			_ => None,
 		}
 	}
 
 	pub fn struct_parameter(&self) -> Option<&Struct> {
 		match self {
 			Self::Defined(_, VariantDesc::Struct(s)) => Some(s),
-			_ => None
+			_ => None,
 		}
 	}
 }
 
 pub enum VariantDesc {
 	/// The variant contains untagged parameters.
-	/// 
+	///
 	/// The given list is not empty.
 	Tuple(Vec<Expr>),
 
 	/// The variant contains only tagged parameters,
 	/// defining a structure.
-	Struct(Struct)
+	Struct(Struct),
 }
 
 impl VariantDesc {
 	pub fn len(&self) -> u32 {
 		match self {
 			Self::Tuple(args) => args.len() as u32,
-			Self::Struct(s) => s.len()
+			Self::Struct(s) => s.len(),
 		}
 	}
-	
+
 	pub fn is_empty(&self) -> bool {
 		self.len() == 0
 	}
@@ -187,14 +199,12 @@ impl VariantDesc {
 
 /// Structure type.
 pub struct Struct {
-	fields: Vec<Field>
+	fields: Vec<Field>,
 }
 
 impl Struct {
 	pub fn new() -> Self {
-		Self {
-			fields: Vec::new()
-		}
+		Self { fields: Vec::new() }
 	}
 
 	pub fn len(&self) -> u32 {
@@ -203,6 +213,10 @@ impl Struct {
 
 	pub fn is_empty(&self) -> bool {
 		self.fields.is_empty()
+	}
+
+	pub fn fields(&self) -> &[Field] {
+		&self.fields
 	}
 
 	pub fn add_field(&mut self, id: Ident, ty: Expr) -> u32 {
@@ -214,8 +228,8 @@ impl Struct {
 }
 
 pub struct Field {
-	id: Ident,
-	ty: Expr
+	pub id: Ident,
+	pub ty: Expr,
 }
 
 /// Type expression.
@@ -231,18 +245,18 @@ pub enum Expr {
 	BuiltIn(built_in::Type),
 
 	/// Defined type.
-	/// 
+	///
 	/// The first parameter is the index of the type definition in `Context`.
 	/// The second parameter is the list of type parameters.
 	Defined(u32, Vec<Expr>),
 
 	/// Located type.
-	/// 
+	///
 	/// In Rust, this will generally be translated into `::source_span::Loc<T>`.
 	Loc(Box<Expr>),
 
 	/// On-heap type.
-	/// 
+	///
 	/// In Rust, this will generally be translated into `Box`.
 	Heap(Box<Expr>),
 
@@ -250,16 +264,16 @@ pub enum Expr {
 	Option(Box<Expr>),
 
 	/// List type.
-	/// 
+	///
 	/// In Rust, this will generally be translated into `Vec`.
-	List(Box<Expr>)
+	List(Box<Expr>),
 }
 
 impl Expr {
 	pub fn as_defined(&self) -> Option<(u32, &[Expr])> {
 		match self {
 			Self::Defined(i, args) => Some((*i, args.as_ref())),
-			_ => None
+			_ => None,
 		}
 	}
 }
