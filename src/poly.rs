@@ -7,13 +7,11 @@ use source_span::{Loc, Span};
 use std::collections::HashSet;
 
 mod compile;
-mod external;
 pub mod function;
 pub mod terminal;
 pub mod ty;
 
 pub use compile::Error;
-// pub use external::ExternalType;
 pub use function::Function;
 pub use terminal::Terminal;
 pub use ty::Type;

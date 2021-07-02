@@ -20,139 +20,7 @@ pub enum Item {
 	Token(crate::test::lexer::Token),
 	Node(crate::test::parser::Node),
 }
-fn parse_term<
-	L: ::std::iter::Iterator<
-		Item = ::std::result::Result<
-			::source_span::Loc<crate::test::lexer::Token>,
-			::source_span::Loc<Error>,
-		>,
-	>,
->(
-	lexer: &mut L,
-) -> ::std::result::Result<::source_span::Loc<crate::test::ast::Term>, ::source_span::Loc<Error>> {
-	let mut position = ::source_span::Position::default();
-	let mut stack = Vec::new();
-	let mut any_node_opt = None;
-	let mut state = 1u32;
-	loop {
-		match state {
-			1u32 => {
-				let (any_node_opt_spanless, span) =
-					::source_span::Loc::transposed(any_node_opt, position.into()).into_raw_parts();
-				match any_node_opt_spanless {
-					Some(any_node) => match any_node {
-						crate::test::parser::Node::Term(node) => {
-							stack.push((
-								::source_span::Loc::new(
-									crate::test::parser::Item::Node(
-										crate::test::parser::Node::Term(node),
-									),
-									span,
-								),
-								state,
-							));
-							state = 3u32;
-						}
-						unexpected => {
-							break Err(::source_span::Loc::new(
-								Error::UnexpectedNode(unexpected),
-								span,
-							))
-						}
-					},
-					None => {
-						let any_token_opt = lexer.next().transpose().map_err(|e| e.inner_into())?;
-						let (any_token_opt_spanless, span) =
-							::source_span::Loc::transposed(any_token_opt, position.into())
-								.into_raw_parts();
-						match any_token_opt_spanless {
-							Some(crate::test::lexer::Token::Integer(token)) => {
-								stack.push((
-									::source_span::Loc::new(
-										crate::test::parser::Item::Token(
-											crate::test::lexer::Token::Integer(token),
-										),
-										span,
-									),
-									state,
-								));
-								state = 2u32;
-							}
-							unexpected => {
-								break Err(::source_span::Loc::new(
-									Error::UnexpectedToken(unexpected),
-									span,
-								))
-							}
-						}
-					}
-				}
-			}
-			3u32 => {
-				let (any_node_opt_spanless, span) =
-					::source_span::Loc::transposed(any_node_opt, position.into()).into_raw_parts();
-				match any_node_opt_spanless {
-					Some(any_node) => match any_node {
-						unexpected => {
-							break Err(::source_span::Loc::new(
-								Error::UnexpectedNode(unexpected),
-								span,
-							))
-						}
-					},
-					None => {
-						let any_token_opt = lexer.next().transpose().map_err(|e| e.inner_into())?;
-						let (any_token_opt_spanless, span) =
-							::source_span::Loc::transposed(any_token_opt, position.into())
-								.into_raw_parts();
-						match any_token_opt_spanless {
-							None => {
-								state = 4u32;
-							}
-							unexpected => {
-								break Err(::source_span::Loc::new(
-									Error::UnexpectedToken(unexpected),
-									span,
-								))
-							}
-						}
-					}
-				}
-			}
-			4u32 => {
-				let (any_item0, saved_state) = stack.pop().unwrap();
-				let (item0_spanless, item0_span) = any_item0.into_raw_parts();
-				if let crate::test::parser::Item::Node(crate::test::parser::Node::Term(result)) =
-					item0_spanless
-				{
-					let span = item0_span;
-					break Ok(::source_span::Loc::new(result, span));
-				} else {
-					unreachable!()
-				}
-			}
-			2u32 => {
-				let (any_item0, saved_state) = stack.pop().unwrap();
-				let (item0_spanless, item0_span) = any_item0.into_raw_parts();
-				if let crate::test::parser::Item::Token(crate::test::lexer::Token::Integer(item0)) =
-					item0_spanless
-				{
-					let span = item0_span;
-					any_node_opt = Some(::source_span::Loc::new(
-						crate::test::parser::Node::Term(crate::test::ast::Term(
-							::source_span::Loc::new(item0, item0_span),
-						)),
-						span,
-					));
-					state = saved_state;
-				} else {
-					unreachable!()
-				}
-			}
-		}
-	}
-}
-fn parse_expr<
+pub fn parse_expr<
 	L: ::std::iter::Iterator<
 		Item = ::std::result::Result<
 			::source_span::Loc<crate::test::lexer::Token>,
@@ -170,7 +38,8 @@ fn parse_expr<
 		match state {
 			0u32 => {
 				let (any_node_opt_spanless, span) =
-					::source_span::Loc::transposed(any_node_opt, position.into()).into_raw_parts();
+					::source_span::Loc::transposed(any_node_opt.take(), position.into())
+						.into_raw_parts();
 				match any_node_opt_spanless {
 					Some(any_node) => match any_node {
 						crate::test::parser::Node::Expr(node) => {
@@ -203,6 +72,7 @@ fn parse_expr<
 						let (any_token_opt_spanless, span) =
 							::source_span::Loc::transposed(any_token_opt, position.into())
 								.into_raw_parts();
+						position = span.end();
 						match any_token_opt_spanless {
 							Some(crate::test::lexer::Token::Integer(token)) => {
 								stack.push((
@@ -233,6 +103,7 @@ fn parse_expr<
 					item0_spanless
 				{
 					let span = item0_span;
+					position = span.end();
 					any_node_opt = Some(::source_span::Loc::new(
 						crate::test::parser::Node::Expr(crate::test::ast::Expr::Term(
 							::source_span::Loc::new(item0, item0_span),
@@ -246,7 +117,8 @@ fn parse_expr<
 			}
 			5u32 => {
 				let (any_node_opt_spanless, span) =
-					::source_span::Loc::transposed(any_node_opt, position.into()).into_raw_parts();
+					::source_span::Loc::transposed(any_node_opt.take(), position.into())
+						.into_raw_parts();
 				match any_node_opt_spanless {
 					Some(any_node) => match any_node {
 						unexpected => {
@@ -261,6 +133,7 @@ fn parse_expr<
 						let (any_token_opt_spanless, span) =
 							::source_span::Loc::transposed(any_token_opt, position.into())
 								.into_raw_parts();
+						position = span.end();
 						match any_token_opt_spanless {
 							None => {
 								state = 8u32;
@@ -293,7 +166,8 @@ fn parse_expr<
 			}
 			7u32 => {
 				let (any_node_opt_spanless, span) =
-					::source_span::Loc::transposed(any_node_opt, position.into()).into_raw_parts();
+					::source_span::Loc::transposed(any_node_opt.take(), position.into())
+						.into_raw_parts();
 				match any_node_opt_spanless {
 					Some(any_node) => match any_node {
 						crate::test::parser::Node::Term(node) => {
@@ -320,6 +194,7 @@ fn parse_expr<
 						let (any_token_opt_spanless, span) =
 							::source_span::Loc::transposed(any_token_opt, position.into())
 								.into_raw_parts();
+						position = span.end();
 						match any_token_opt_spanless {
 							Some(crate::test::lexer::Token::Integer(token)) => {
 								stack.push((
@@ -356,6 +231,7 @@ fn parse_expr<
 						item0_spanless
 					{
 						let span = item0_span.union(item2_span);
+						position = span.end();
 						any_node_opt = Some(::source_span::Loc::new(
 							crate::test::parser::Node::Expr(crate::test::ast::Expr::Add(
 								Box::new(::source_span::Loc::new(item0, item0_span)),
@@ -378,6 +254,7 @@ fn parse_expr<
 					item0_spanless
 				{
 					let span = item0_span;
+					position = span.end();
 					any_node_opt = Some(::source_span::Loc::new(
 						crate::test::parser::Node::Term(crate::test::ast::Term(
 							::source_span::Loc::new(item0, item0_span),
@@ -390,7 +267,7 @@ fn parse_expr<
 				}
 			}
 			8u32 => {
-				let (any_item0, saved_state) = stack.pop().unwrap();
+				let (any_item0, _) = stack.pop().unwrap();
 				let (item0_spanless, item0_span) = any_item0.into_raw_parts();
 				if let crate::test::parser::Item::Node(crate::test::parser::Node::Expr(result)) =
 					item0_spanless
@@ -400,6 +277,149 @@ fn parse_expr<
 				} else {
 					unreachable!()
 				}
+			}
+			_ => {
+				unreachable!()
+			}
+		}
+	}
+}
+pub fn parse_term<
+	L: ::std::iter::Iterator<
+		Item = ::std::result::Result<
+			::source_span::Loc<crate::test::lexer::Token>,
+			::source_span::Loc<Error>,
+		>,
+	>,
+>(
+	lexer: &mut L,
+) -> ::std::result::Result<::source_span::Loc<crate::test::ast::Term>, ::source_span::Loc<Error>> {
+	let mut position = ::source_span::Position::default();
+	let mut stack = Vec::new();
+	let mut any_node_opt = None;
+	let mut state = 1u32;
+	loop {
+		match state {
+			1u32 => {
+				let (any_node_opt_spanless, span) =
+					::source_span::Loc::transposed(any_node_opt.take(), position.into())
+						.into_raw_parts();
+				match any_node_opt_spanless {
+					Some(any_node) => match any_node {
+						crate::test::parser::Node::Term(node) => {
+							stack.push((
+								::source_span::Loc::new(
+									crate::test::parser::Item::Node(
+										crate::test::parser::Node::Term(node),
+									),
+									span,
+								),
+								state,
+							));
+							state = 3u32;
+						}
+						unexpected => {
+							break Err(::source_span::Loc::new(
+								Error::UnexpectedNode(unexpected),
+								span,
+							))
+						}
+					},
+					None => {
+						let any_token_opt = lexer.next().transpose().map_err(|e| e.inner_into())?;
+						let (any_token_opt_spanless, span) =
+							::source_span::Loc::transposed(any_token_opt, position.into())
+								.into_raw_parts();
+						position = span.end();
+						match any_token_opt_spanless {
+							Some(crate::test::lexer::Token::Integer(token)) => {
+								stack.push((
+									::source_span::Loc::new(
+										crate::test::parser::Item::Token(
+											crate::test::lexer::Token::Integer(token),
+										),
+										span,
+									),
+									state,
+								));
+								state = 2u32;
+							}
+							unexpected => {
+								break Err(::source_span::Loc::new(
+									Error::UnexpectedToken(unexpected),
+									span,
+								))
+							}
+						}
+					}
+				}
+			}
+			3u32 => {
+				let (any_node_opt_spanless, span) =
+					::source_span::Loc::transposed(any_node_opt.take(), position.into())
+						.into_raw_parts();
+				match any_node_opt_spanless {
+					Some(any_node) => match any_node {
+						unexpected => {
+							break Err(::source_span::Loc::new(
+								Error::UnexpectedNode(unexpected),
+								span,
+							))
+						}
+					},
+					None => {
+						let any_token_opt = lexer.next().transpose().map_err(|e| e.inner_into())?;
+						let (any_token_opt_spanless, span) =
+							::source_span::Loc::transposed(any_token_opt, position.into())
+								.into_raw_parts();
+						position = span.end();
+						match any_token_opt_spanless {
+							None => {
+								state = 4u32;
+							}
+							unexpected => {
+								break Err(::source_span::Loc::new(
+									Error::UnexpectedToken(unexpected),
+									span,
+								))
+							}
+						}
+					}
+				}
+			}
+			4u32 => {
+				let (any_item0, _) = stack.pop().unwrap();
+				let (item0_spanless, item0_span) = any_item0.into_raw_parts();
+				if let crate::test::parser::Item::Node(crate::test::parser::Node::Term(result)) =
+					item0_spanless
+				{
+					let span = item0_span;
+					break Ok(::source_span::Loc::new(result, span));
+				} else {
+					unreachable!()
+				}
+			}
+			2u32 => {
+				let (any_item0, saved_state) = stack.pop().unwrap();
+				let (item0_spanless, item0_span) = any_item0.into_raw_parts();
+				if let crate::test::parser::Item::Token(crate::test::lexer::Token::Integer(item0)) =
+					item0_spanless
+				{
+					let span = item0_span;
+					position = span.end();
+					any_node_opt = Some(::source_span::Loc::new(
+						crate::test::parser::Node::Term(crate::test::ast::Term(
+							::source_span::Loc::new(item0, item0_span),
+						)),
+						span,
+					));
+					state = saved_state;
+				} else {
+					unreachable!()
+				}
+			}
+			_ => {
+				unreachable!()
 			}
 		}
 	}

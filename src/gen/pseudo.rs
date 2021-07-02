@@ -474,6 +474,18 @@ impl<'a, 'p> Context<'a, 'p> {
 			function_variants,
 		};
 
+		for (i, _) in grammar.poly().types().iter().enumerate() {
+			let ty_index = i as u32;
+			let local_index = *context.grammar_type.get(&ty_index).unwrap();
+			let ty_ref = ty::Ref::Defined(local_index);
+			let debug_format =
+				Routine::Format(ty_ref, routine::format::generate_debug(&context, ty_ref));
+			context
+				.module_mut(context.ast_module)
+				.unwrap()
+				.add_routine(debug_format);
+		}
+
 		let lexer = Routine::Lexer(routine::lexer::generate(&context, lexing_table));
 		context
 			.module_mut(context.lexer_module)

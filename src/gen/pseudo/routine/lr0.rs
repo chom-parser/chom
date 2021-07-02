@@ -77,6 +77,11 @@ pub fn generate(context: &Context, table: &table::LR0, initial_state: u32) -> Ex
 		}
 	}
 
+	cases.push(MatchCase {
+		pattern: Pattern::Any,
+		expr: Expr::Unreachable,
+	});
+
 	let expr = Expr::Set(
 		Id::Parser(id::Parser::Stack),
 		Box::new(Expr::Parser(Operation::StackNew)),
@@ -114,11 +119,21 @@ pub fn generate(context: &Context, table: &table::LR0, initial_state: u32) -> Ex
 	}
 }
 
-fn stack_pop(context: &Context, patterns: &[Pattern], next: Expr) -> Expr {
+fn stack_pop(context: &Context, patterns: &[Pattern], next: Expr, returning: bool) -> Expr {
 	let mut expr = next;
 	let last = (patterns.len() - 1) as u32;
 
 	if context.config().locate {
+		if !returning {
+			expr = Expr::Set(
+				Id::Parser(id::Parser::Position),
+				Box::new(Expr::Parser(Operation::LocEnd(Box::new(Expr::Get(
+					Id::Parser(id::Parser::Span),
+				))))),
+				Box::new(expr),
+			);
+		}
+
 		expr = if last > 0 {
 			Expr::Set(
 				Id::Parser(id::Parser::Span),
@@ -179,7 +194,7 @@ fn stack_pop(context: &Context, patterns: &[Pattern], next: Expr) -> Expr {
 			None
 		};
 
-		let state = if i == 0 {
+		let state = if i == 0 && !returning {
 			Some(Id::Parser(id::Parser::SavedState))
 		} else {
 			None
@@ -213,7 +228,7 @@ fn generate_state(context: &Context, table: &table::LR0, stack: &mut Vec<u32>, q
 						Box::new(Expr::Get(Id::Parser(id::Parser::Span))),
 					)
 				}
-				stack_pop(context, &[pattern], Expr::Ok(Box::new(result)))
+				stack_pop(context, &[pattern], Expr::Ok(Box::new(result)), true)
 			}
 			Rule::Function(f_index) => {
 				let f = context.grammar.function(*f_index).unwrap();
@@ -273,6 +288,7 @@ fn generate_state(context: &Context, table: &table::LR0, stack: &mut Vec<u32>, q
 							Box::new(Expr::Recurse(Label::Parser, recurse_args.clone())),
 						)),
 					),
+					false,
 				)
 			}
 		},
@@ -330,7 +346,7 @@ fn generate_state(context: &Context, table: &table::LR0, stack: &mut Vec<u32>, q
 					)
 				}
 				action_cases.push(MatchCase {
-					pattern: Pattern::BindAny(Id::Parser(id::Parser::Unexpected)),
+					pattern: Pattern::Bind(Id::Parser(id::Parser::Unexpected)),
 					expr: Expr::Err(Box::new(err)),
 				})
 			}
@@ -378,7 +394,7 @@ fn generate_state(context: &Context, table: &table::LR0, stack: &mut Vec<u32>, q
 					)
 				}
 				goto_cases.push(MatchCase {
-					pattern: Pattern::BindAny(Id::Parser(id::Parser::Unexpected)),
+					pattern: Pattern::Bind(Id::Parser(id::Parser::Unexpected)),
 					expr: Expr::Err(Box::new(err)),
 				})
 			}
@@ -393,10 +409,16 @@ fn generate_state(context: &Context, table: &table::LR0, stack: &mut Vec<u32>, q
 							Expr::Get(Id::Parser(id::Parser::Position)),
 						)))),
 					))),
-					Box::new(Expr::Match {
-						expr: Box::new(Expr::Get(Id::Parser(id::Parser::AnyTokenOptSpanless))),
-						cases: action_cases,
-					}),
+					Box::new(Expr::Set(
+						Id::Parser(id::Parser::Position),
+						Box::new(Expr::Parser(Operation::LocEnd(Box::new(Expr::Get(
+							Id::Parser(id::Parser::Span),
+						))))),
+						Box::new(Expr::Match {
+							expr: Box::new(Expr::Get(Id::Parser(id::Parser::AnyTokenOptSpanless))),
+							cases: action_cases,
+						}),
+					)),
 				))
 			} else {
 				Expr::Match {
@@ -407,7 +429,7 @@ fn generate_state(context: &Context, table: &table::LR0, stack: &mut Vec<u32>, q
 
 			let cases = vec![
 				MatchCase {
-					pattern: Pattern::Some(Box::new(Pattern::BindAny(Id::Parser(
+					pattern: Pattern::Some(Box::new(Pattern::Bind(Id::Parser(
 						id::Parser::AnyNode,
 					)))),
 					expr: Expr::Match {

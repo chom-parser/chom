@@ -240,7 +240,7 @@ impl Table {
 		fn into_automaton(grammar: &Grammar, terminals: HashSet<u32>) -> DetAutomaton<DetState> {
 			let nd_table = NDTable::for_terminals(grammar, terminals.into_iter());
 			let det_automaton = nd_table.automaton().determinize();
-			simplify_det_automaton_without_conflicts(grammar, &det_automaton)
+			simplify_det_automaton_without_conflicts(&det_automaton)
 		}
 
 		// Automata.
@@ -282,7 +282,6 @@ impl Table {
 /// It is assumed that the automaton does not contains reduce-reduce conflicts:
 /// every deterministic state contains at most one terminal state.
 fn simplify_det_automaton_without_conflicts(
-	grammar: &Grammar,
 	aut: &DetAutomaton<BTreeSet<State>>,
 ) -> DetAutomaton<DetState> {
 	let mut terminal_map = HashMap::new();
@@ -321,74 +320,74 @@ fn simplify_det_automaton_without_conflicts(
 	minimal_aut.map(|q| det_states(&mut terminal_map, &mut intermediate_count, q))
 }
 
-fn simplify_det_automaton(
-	grammar: &Grammar,
-	aut: &DetAutomaton<BTreeSet<State>>,
-) -> Result<DetAutomaton<DetState>, Loc<Error>> {
-	let mut terminal_map = HashMap::new();
-	let mut intermediate_count = 0;
+// fn simplify_det_automaton(
+// 	grammar: &Grammar,
+// 	aut: &DetAutomaton<BTreeSet<State>>,
+// ) -> Result<DetAutomaton<DetState>, Loc<Error>> {
+// 	let mut terminal_map = HashMap::new();
+// 	let mut intermediate_count = 0;
 
-	#[derive(Hash, PartialEq, Eq)]
-	pub enum Partition {
-		Intermediate,
-		Final(u32),
-	}
+// 	#[derive(Hash, PartialEq, Eq)]
+// 	pub enum Partition {
+// 		Intermediate,
+// 		Final(u32),
+// 	}
 
-	let partition = aut.try_partition(|states| {
-		let mut terminal = None;
+// 	let partition = aut.try_partition(|states| {
+// 		let mut terminal = None;
 
-		for q in states {
-			match q {
-				State::Initial => {
-					// Note: we have already checked that there are no empty terminals.
-					return Ok(Partition::Intermediate);
-				}
-				State::Intermediate(_) => (),
-				State::Final(id) => {
-					if let Some(other_id) = terminal.replace(id) {
-						let span = grammar.terminals()[*id as usize]
-							.1
-							.iter()
-							.next()
-							.unwrap()
-							.span();
-						return Err(Loc::new(
-							Error::AmbiguousTerminals(
-								*id,
-								*other_id,
-								TerminalAmbiguity::ReduceReduce {
-									token: super::build_prefix_to(aut, states),
-								},
-							),
-							span,
-						));
-					}
-				}
-			}
-		}
+// 		for q in states {
+// 			match q {
+// 				State::Initial => {
+// 					// Note: we have already checked that there are no empty terminals.
+// 					return Ok(Partition::Intermediate);
+// 				}
+// 				State::Intermediate(_) => (),
+// 				State::Final(id) => {
+// 					if let Some(other_id) = terminal.replace(id) {
+// 						let span = grammar.terminals()[*id as usize]
+// 							.1
+// 							.iter()
+// 							.next()
+// 							.unwrap()
+// 							.span();
+// 						return Err(Loc::new(
+// 							Error::AmbiguousTerminals(
+// 								*id,
+// 								*other_id,
+// 								TerminalAmbiguity::ReduceReduce {
+// 									token: super::build_prefix_to(aut, states),
+// 								},
+// 							),
+// 							span,
+// 						));
+// 					}
+// 				}
+// 			}
+// 		}
 
-		match terminal {
-			Some(id) => Ok(Partition::Final(*id)),
-			None => Ok(Partition::Intermediate),
-		}
-	})?;
+// 		match terminal {
+// 			Some(id) => Ok(Partition::Final(*id)),
+// 			None => Ok(Partition::Intermediate),
+// 		}
+// 	})?;
 
-	let minimal_aut = aut.minimize(partition.into_iter().map(|(_, states)| states));
+// 	let minimal_aut = aut.minimize(partition.into_iter().map(|(_, states)| states));
 
-	let minimal_aut = minimal_aut.map(|class| {
-		let mut states: BTreeSet<State> = BTreeSet::new();
-		for q in class {
-			states.extend(q.into_iter().cloned());
-		}
-		states
-	});
+// 	let minimal_aut = minimal_aut.map(|class| {
+// 		let mut states: BTreeSet<State> = BTreeSet::new();
+// 		for q in class {
+// 			states.extend(q.into_iter().cloned());
+// 		}
+// 		states
+// 	});
 
-	// let stdout = std::io::stdout();
-	// let mut out = stdout.lock();
-	// minimal_aut.dot_write(grammar, &mut out).unwrap();
+// 	// let stdout = std::io::stdout();
+// 	// let mut out = stdout.lock();
+// 	// minimal_aut.dot_write(grammar, &mut out).unwrap();
 
-	Ok(minimal_aut.map(|q| det_states(&mut terminal_map, &mut intermediate_count, q)))
-}
+// 	Ok(minimal_aut.map(|q| det_states(&mut terminal_map, &mut intermediate_count, q)))
+// }
 
 fn det_states(
 	terminal_map: &mut HashMap<u32, u32>,

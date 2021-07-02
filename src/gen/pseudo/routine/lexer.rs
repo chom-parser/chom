@@ -142,10 +142,7 @@ fn generate_automaton(context: &Context, table: &Table, index: u32, default_toke
 					);
 
 					MatchCase {
-						pattern: Pattern::Some(Box::new(Pattern::Bind(
-							Id::Lexer(id::Lexer::Char),
-							Box::new(ranges_pattern(&ranges)),
-						))),
+						pattern: Pattern::Some(Box::new(ranges_pattern(&ranges))),
 						expr: if default_token {
 							next_state_expr
 						} else {
@@ -196,7 +193,7 @@ fn generate_automaton(context: &Context, table: &Table, index: u32, default_toke
 												cases: vec![
 													MatchCase {
 														pattern: Pattern::Some(Box::new(
-															Pattern::BindAny(Id::Lexer(
+															Pattern::Bind(Id::Lexer(
 																id::Lexer::SubToken,
 															)),
 														)),
@@ -245,7 +242,7 @@ fn generate_automaton(context: &Context, table: &Table, index: u32, default_toke
 							Id::Lexer(id::Lexer::Unexpected),
 						))));
 						MatchCase {
-							pattern: Pattern::BindAny(Id::Lexer(id::Lexer::Unexpected)),
+							pattern: Pattern::Bind(Id::Lexer(id::Lexer::Unexpected)),
 							expr: Expr::Err(Box::new(locate(context, err))),
 						}
 					}

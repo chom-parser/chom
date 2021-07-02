@@ -3,6 +3,7 @@
 pub enum Id {
 	Lexer(Lexer),
 	Parser(Parser),
+	Format(Format),
 }
 
 /// Variables occuring in the lexer.
@@ -25,9 +26,6 @@ pub enum Lexer {
 
 	/// An optional character.
 	CharOpt,
-
-	/// A character.
-	Char,
 
 	/// A sub-token emitted from a sub-automaton.
 	SubToken,
@@ -95,4 +93,13 @@ pub enum Parser {
 
 	/// Unexpected token.
 	Unexpected,
+}
+
+#[derive(Clone, Copy)]
+pub enum Format {
+	/// The value beeing printed.
+	Itself,
+
+	/// Argument.
+	Arg(u32),
 }

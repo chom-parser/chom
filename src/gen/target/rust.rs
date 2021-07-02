@@ -251,12 +251,12 @@ impl Rust {
 	fn generate_lexer_definition(&self) -> TokenStream {
 		quote! {
 			/// Lexer.
-			pub struct Lexer<I: ::std::iter::Iterator, M> {
+			pub struct Lexer<I: Iterator, M> {
 				/// Source character stream.
 				source: ::std::iter::Peekable<I>,
 
 				/// Token buffer.
-				buffer: ::std::string::String,
+				buffer: String,
 
 				/// Character metrics.
 				metrics: M,
@@ -302,14 +302,14 @@ impl Rust {
 
 		quote! {
 			impl<
-				E: ::std::convert::Into<#extern_module_path::Error>,
-				I: ::std::iter::Iterator<Item = ::std::result::Result<char, E>>,
+				E: Into<#extern_module_path::Error>,
+				I: Iterator<Item = Result<char, E>>,
 				M: ::source_span::Metrics,
 			> Lexer<I, M> {
 				fn peek_char(
 					&mut self
-				) -> ::std::result::Result<
-					::std::option::Option<char>,
+				) -> Result<
+					Option<char>,
 					::source_span::Loc<#extern_module_path::Error>,
 				> {
 					match self.source.peek() {
@@ -321,7 +321,7 @@ impl Rust {
 
 				fn consume_char(
 					&mut self,
-				) -> ::std::result::Result<(), ::source_span::Loc<#extern_module_path::Error>> {
+				) -> Result<(), ::source_span::Loc<#extern_module_path::Error>> {
 					match self.source.next() {
 						Some(Ok(c)) => {
 							self.buffer.push(c);
@@ -335,11 +335,26 @@ impl Rust {
 
 				fn next_token(
 					&mut self,
-				) -> ::std::result::Result<
-					::std::option::Option<::source_span::Loc<Token>>,
+				) -> Result<
+					Option<::source_span::Loc<Token>>,
 					::source_span::Loc<#extern_module_path::Error>,
 				> {
 					#body
+				}
+			}
+
+			impl<
+				E: Into<#extern_module_path::Error>,
+				I: Iterator<Item = Result<char, E>>,
+				M: ::source_span::Metrics,
+			> Iterator for Lexer<I, M> {
+				type Item = Result<
+					::source_span::Loc<Token>,
+					::source_span::Loc<#extern_module_path::Error>,
+				>;
+
+				fn next(&mut self) -> Option<Self::Item> {
+					self.next_token().transpose()
 				}
 			}
 		}
@@ -368,7 +383,7 @@ impl Rust {
 			Parser::LR0(expr) => {
 				let body = self.generate_in(context, scope, expr);
 				quote! {
-					fn #id<
+					pub fn #id<
 						L: ::std::iter::Iterator<
 							Item = ::std::result::Result<
 								::source_span::Loc<#token_type_path>,
@@ -384,6 +399,43 @@ impl Rust {
 			}
 			Parser::LALR1(expr) => {
 				unimplemented!()
+			}
+		}
+	}
+
+	fn generate_debug_formatter(
+		&self,
+		context: &pseudo::Context,
+		scope: Scope,
+		ty_ref: pseudo::ty::Ref,
+		expr: &pseudo::Expr,
+	) -> TokenStream {
+		let ty = context.ty(ty_ref).unwrap();
+		let id = self.generate(context, ty.id());
+
+		let mut args_def = None;
+		let mut args = None;
+
+		if !ty.parameters().is_empty() {
+			let mut defs = Vec::new();
+			let mut uses = Vec::new();
+			for p in ty.parameters() {
+				let id = quote::format_ident!("{}", p.to_caml_case());
+				defs.push(quote! { #id: std::fmt::Debug });
+				uses.push(quote! { #id });
+			}
+
+			args_def = Some(quote! { <#(#defs),*> });
+			args = Some(quote! { <#(#uses),*> });
+		}
+
+		let body = self.generate_in(context, scope, expr);
+
+		quote! {
+			impl #args_def std::fmt::Debug for #id #args {
+				fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+					#body
+				}
 			}
 		}
 	}
@@ -410,6 +462,7 @@ impl Generate<pseudo::Module> for Rust {
 		let routines = module.routines().map(|r| match r {
 			Routine::Lexer(expr) => self.generate_lexer_impl(context, scope, expr),
 			Routine::Parser(index, parser) => self.generate_parser(context, scope, *index, parser),
+			Routine::Format(r, expr) => self.generate_debug_formatter(context, scope, *r, expr),
 		});
 
 		let submodules = module.modules().map(|index| {
@@ -634,7 +687,25 @@ impl GenerateIn<pseudo::Expr> for Rust {
 		use pseudo::Expr;
 		let expr = match e {
 			Expr::Constant(c) => self.generate(context, c),
-			Expr::Get(id) => self.generate(context, id),
+			Expr::Get(id) => {
+				let expr = self.generate(context, id);
+				match id {
+					pseudo::Id::Parser(pseudo::id::Parser::AnyNodeOpt) => {
+						quote! { #expr.take() }
+					}
+					_ => expr,
+				}
+			}
+			Expr::GetField(value, id) => {
+				let id = quote::format_ident!("{}", id.to_caml_case());
+				let value = self.generate_in(context, scope.pure(), value);
+				quote! { #value . #id }
+			}
+			Expr::GetTupleField(value, n) => {
+				let value = self.generate_in(context, scope.pure(), value);
+				let n = proc_macro2::Literal::u32_unsuffixed(*n);
+				quote! { #value . #n }
+			}
 			Expr::Set(id, value, next) => {
 				let gid = self.generate(context, id);
 				let value = self.generate_in(context, scope.pure(), value);
@@ -658,6 +729,7 @@ impl GenerateIn<pseudo::Expr> for Rust {
 			}
 			Expr::Lexer(op) => self.generate_in(context, scope, op),
 			Expr::Parser(op) => self.generate_in(context, scope, op),
+			Expr::Format(op) => self.generate_in(context, scope, op),
 			Expr::New(ty, args) => {
 				let ty = self.generate(context, ty);
 				let args = self.generate_in(context, scope.pure(), args);
@@ -765,16 +837,7 @@ impl Generate<pseudo::Pattern> for Rust {
 		use pseudo::Pattern;
 		match pattern {
 			Pattern::Any => quote! { _ },
-			Pattern::BindAny(id) => self.generate(context, id),
-			Pattern::Bind(id, p) => {
-				let id = self.generate(context, id);
-				let gp = self.generate(context, p);
-				if p.is_union() {
-					quote! { #id @ ( #gp ) }
-				} else {
-					quote! { #id @ #gp }
-				}
-			}
+			Pattern::Bind(id) => self.generate(context, id),
 			Pattern::Constant(c) => self.generate(context, c),
 			Pattern::Cons(ty, v, args) => {
 				let variant = self.generate(
@@ -782,12 +845,26 @@ impl Generate<pseudo::Pattern> for Rust {
 					context.ty(*ty).unwrap().as_enum().variant(*v).unwrap(),
 				);
 				let ty = self.generate(context, ty);
-				if args.is_empty() {
-					quote! { #ty :: #variant }
+				let args = if args.is_empty() {
+					None
 				} else {
-					let args = args.iter().map(|a| self.generate(context, a));
-					quote! { #ty :: #variant ( #(#args),* ) }
-				}
+					use pseudo::pattern::ConsArgs;
+					Some(match args {
+						ConsArgs::Tuple(args) => {
+							let args = args.iter().map(|a| self.generate(context, a));
+							quote! { ( #(#args),* ) }
+						}
+						ConsArgs::Struct(bindings) => {
+							let bindings = bindings.iter().map(|b| {
+								let id = quote::format_ident!("{}", b.name.to_snake_case());
+								let pattern = self.generate(context, &b.pattern);
+								quote! { #id as #pattern }
+							});
+							quote! { { #(#bindings),* } }
+						}
+					})
+				};
+				quote! { #ty :: #variant #args }
 			}
 			Pattern::Some(p) => {
 				let p = self.generate(context, p);
@@ -930,6 +1007,10 @@ impl GenerateIn<pseudo::expr::ParserOperation> for Rust {
 				let expr = self.generate_in(context, scope.pure(), expr);
 				quote! { #expr . into() }
 			}
+			Operation::LocEnd(expr) => {
+				let expr = self.generate_in(context, scope.pure(), expr);
+				quote! { #expr . end() }
+			}
 			Operation::LocOptTranspose(value, default_span) => {
 				let value = self.generate_in(context, scope.pure(), value);
 				let default_span = self.generate_in(context, scope.pure(), default_span);
@@ -966,6 +1047,34 @@ impl GenerateIn<pseudo::expr::ParserOperation> for Rust {
 	}
 }
 
+impl GenerateIn<pseudo::expr::FormatOperation> for Rust {
+	fn generate_in(
+		&self,
+		context: &pseudo::Context,
+		scope: Scope,
+		op: &pseudo::expr::FormatOperation,
+	) -> TokenStream {
+		use pseudo::expr::FormatOperation as Operation;
+		match op {
+			Operation::Write(name, args) => {
+				let args_exprs = args.iter().map(|a| self.generate_in(context, scope, a));
+				let mut format_string = name.clone();
+				if !args.is_empty() {
+					format_string.push('(');
+					for i in 0..args.len() {
+						if i > 0 {
+							format_string.push_str(", ");
+						}
+						format_string.push_str("{:?}")
+					}
+					format_string.push(')');
+				}
+				quote! { write!(f, #format_string, #(#args_exprs),*) }
+			}
+		}
+	}
+}
+
 impl Generate<pseudo::Constant> for Rust {
 	fn generate(&self, _: &pseudo::Context, c: &pseudo::Constant) -> TokenStream {
 		use pseudo::Constant;
@@ -983,6 +1092,7 @@ impl Generate<pseudo::Id> for Rust {
 		match id {
 			Id::Lexer(id) => self.generate(context, id),
 			Id::Parser(id) => self.generate(context, id),
+			Id::Format(id) => self.generate(context, id),
 		}
 	}
 }
@@ -997,7 +1107,6 @@ impl Generate<pseudo::id::Lexer> for Rust {
 			Lexer::State => quote! { state },
 			Lexer::BufferChars => quote! { chars },
 			Lexer::CharOpt => quote! { c_opt },
-			Lexer::Char => quote! { c },
 			Lexer::SubToken => quote! { sub_token },
 			Lexer::Unexpected => quote! { unexpected },
 		}
@@ -1039,6 +1148,21 @@ impl Generate<pseudo::id::Parser> for Rust {
 			Parser::Span => quote! { span },
 			Parser::Result => quote! { result },
 			Parser::Unexpected => quote! { unexpected },
+		}
+	}
+}
+
+impl Generate<pseudo::id::Format> for Rust {
+	fn generate(&self, _: &pseudo::Context, id: &pseudo::id::Format) -> TokenStream {
+		use pseudo::id::Format;
+		match id {
+			Format::Itself => {
+				quote! { self }
+			}
+			Format::Arg(i) => {
+				let id = quote::format_ident!("arg{}", i);
+				quote! { #id }
+			}
 		}
 	}
 }

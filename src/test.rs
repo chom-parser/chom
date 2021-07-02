@@ -6,15 +6,15 @@ pub mod glue {
 	pub type Int = i32;
 	pub type String = std::string::String;
 
-	pub fn integer(s: &str) -> Result<Int, Error> {
+	pub fn integer(_s: &str) -> Result<Int, Error> {
 		unimplemented!()
 	}
 
-	pub fn ident(s: &str) -> Result<String, Error> {
+	pub fn ident(_s: &str) -> Result<String, Error> {
 		unimplemented!()
 	}
 
-	pub fn unexpected(c: Option<char>) -> Error {
+	pub fn unexpected(_c: Option<char>) -> Error {
 		unimplemented!()
 	}
 }

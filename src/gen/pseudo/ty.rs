@@ -84,6 +84,15 @@ pub enum Id {
 	Defined(Ident),
 }
 
+impl Id {
+	pub fn ident(&self) -> Ident {
+		match self {
+			Self::BuiltIn(ty) => ty.ident(),
+			Self::Defined(id) => id.clone(),
+		}
+	}
+}
+
 #[derive(Clone, Copy)]
 pub enum Ref {
 	BuiltIn(built_in::Type),

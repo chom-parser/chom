@@ -61,10 +61,6 @@ impl<'a> Type<'a> {
 		&self.parameters_instances
 	}
 
-	pub fn constructor_count(&self) -> u32 {
-		self.constructor_count()
-	}
-
 	pub fn constructors(&self) -> impl '_ + Iterator<Item = (u32, Instance)> {
 		self.poly
 			.constructors()

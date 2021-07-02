@@ -1,0 +1,5 @@
+grammar = "simple"
+
+[add]
+phrase = "1 + 1"
+tree = "expr.sum(expr.term(1), expr.term(1))"

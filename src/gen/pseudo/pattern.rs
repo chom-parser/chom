@@ -1,4 +1,5 @@
 use super::{expr, ty, Constant, Expr, Id};
+use crate::Ident;
 
 /// Pattern.
 #[derive(Clone)]
@@ -7,10 +8,7 @@ pub enum Pattern {
 	Any,
 
 	/// Matches any value and bind to the given ident.
-	BindAny(Id),
-
-	/// Matches the given pattern and bind to the given ident.
-	Bind(Id, Box<Pattern>),
+	Bind(Id),
 
 	/// `Some` variant of the option type.
 	Some(Box<Pattern>),
@@ -23,13 +21,34 @@ pub enum Pattern {
 	/// The first parameter is the type id.
 	/// The second is the variant index.
 	/// The third is the inner pattern if any.
-	Cons(ty::Ref, u32, Vec<Pattern>),
+	Cons(ty::Ref, u32, ConsArgs),
 
 	/// Constant value.
 	Constant(Constant),
 
 	/// Union.
 	Or(Vec<Pattern>),
+}
+
+#[derive(Clone)]
+pub enum ConsArgs {
+	Tuple(Vec<Pattern>),
+	Struct(Vec<Binding>),
+}
+
+impl ConsArgs {
+	pub fn is_empty(&self) -> bool {
+		match self {
+			Self::Tuple(args) => args.is_empty(),
+			Self::Struct(bindings) => bindings.is_empty(),
+		}
+	}
+}
+
+#[derive(Clone)]
+pub struct Binding {
+	pub name: Ident,
+	pub pattern: Pattern,
 }
 
 impl Pattern {
@@ -43,11 +62,13 @@ impl Pattern {
 	pub fn is_bound(&self) -> bool {
 		match self {
 			Self::Any => false,
-			Self::BindAny(_) => true,
-			Self::Bind(_, _) => true,
+			Self::Bind(_) => true,
 			Self::Some(p) => p.is_bound(),
 			Self::None => false,
-			Self::Cons(_, _, args) => args.iter().any(|a| a.is_bound()),
+			Self::Cons(_, _, args) => match args {
+				ConsArgs::Tuple(args) => args.iter().any(|a| a.is_bound()),
+				ConsArgs::Struct(bindings) => bindings.iter().any(|b| b.pattern.is_bound()),
+			},
 			Self::Constant(_) => false,
 			Self::Or(_) => false,
 		}
@@ -58,13 +79,25 @@ impl Pattern {
 		F: Copy + Fn() -> Id,
 	{
 		match self {
-			Self::Any => Self::BindAny(f()),
-			Self::BindAny(id) => Self::BindAny(*id),
-			Self::Bind(id, p) => Self::Bind(*id, Box::new(p.bind_any(f))),
+			Self::Any => Self::Bind(f()),
+			Self::Bind(id) => Self::Bind(*id),
 			Self::Some(p) => Self::Some(Box::new(p.bind_any(f))),
 			Self::None => Self::None,
 			Self::Cons(ty, v, args) => {
-				let args = args.iter().map(|p| p.bind_any(f)).collect();
+				let args = match args {
+					ConsArgs::Tuple(args) => {
+						ConsArgs::Tuple(args.iter().map(|p| p.bind_any(f)).collect())
+					}
+					ConsArgs::Struct(bindings) => ConsArgs::Struct(
+						bindings
+							.iter()
+							.map(|b| Binding {
+								name: b.name.clone(),
+								pattern: b.pattern.bind_any(f),
+							})
+							.collect(),
+					),
+				};
 				Self::Cons(*ty, *v, args)
 			}
 			Self::Constant(c) => Self::Constant(*c),
@@ -78,13 +111,25 @@ impl Pattern {
 	{
 		match self {
 			Self::Any => f(None),
-			Self::BindAny(id) => f(Some(*id)),
-			Self::Bind(_, p) => p.as_expr(f),
+			Self::Bind(id) => f(Some(*id)),
 			Self::Some(p) => Expr::Some(Box::new(p.as_expr(f))),
 			Self::None => Expr::None,
 			Self::Cons(ty, v, args) => {
-				let args = args.iter().map(|p| p.as_expr(f)).collect();
-				Expr::Cons(*ty, *v, expr::BuildArgs::Tuple(args))
+				let args = match args {
+					ConsArgs::Tuple(args) => {
+						expr::BuildArgs::Tuple(args.iter().map(|p| p.as_expr(f)).collect())
+					}
+					ConsArgs::Struct(bindings) => expr::BuildArgs::Struct(
+						bindings
+							.iter()
+							.map(|b| expr::Binding {
+								name: b.name.clone(),
+								expr: b.pattern.as_expr(f),
+							})
+							.collect(),
+					),
+				};
+				Expr::Cons(*ty, *v, args)
 			}
 			Self::Constant(c) => Expr::Constant(*c),
 			Self::Or(_) => panic!("union pattern cannot be made into an expression"),

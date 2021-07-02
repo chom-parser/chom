@@ -1,5 +1,6 @@
 use super::{
 	expr::BuildArgs,
+	pattern,
 	ty::{self, Enum, VariantDesc},
 	Expr, Id, Pattern,
 };
@@ -69,7 +70,7 @@ impl Types {
 		Pattern::Cons(
 			ty::Ref::BuiltIn(Type::Node),
 			*self.nodes_variants.get(&index).unwrap(),
-			vec![Pattern::BindAny(id)],
+			pattern::ConsArgs::Tuple(vec![Pattern::Bind(id)]),
 		)
 	}
 
@@ -88,7 +89,7 @@ impl Types {
 		Pattern::Cons(
 			ty::Ref::BuiltIn(Type::Item),
 			0,
-			vec![self.token_pattern(index, f)],
+			pattern::ConsArgs::Tuple(vec![self.token_pattern(index, f)]),
 		)
 	}
 
@@ -107,7 +108,7 @@ impl Types {
 		Pattern::Cons(
 			ty::Ref::BuiltIn(Type::Item),
 			1,
-			vec![self.node_pattern(index, id)],
+			pattern::ConsArgs::Tuple(vec![self.node_pattern(index, id)]),
 		)
 	}
 
@@ -159,11 +160,11 @@ impl Types {
 						Pattern::Cons(
 							ty::Ref::BuiltIn(Type::Token),
 							v,
-							if ty.is_some() {
+							pattern::ConsArgs::Tuple(if ty.is_some() {
 								vec![Pattern::Any]
 							} else {
 								Vec::new()
-							},
+							}),
 						)
 					}
 					Token::Anonymous(i, ty) => {
@@ -172,11 +173,11 @@ impl Types {
 						Pattern::Cons(
 							ty::Ref::BuiltIn(Type::Token),
 							v,
-							if ty.is_some() {
+							pattern::ConsArgs::Tuple(if ty.is_some() {
 								vec![Pattern::Any]
 							} else {
 								Vec::new()
-							},
+							}),
 						)
 					}
 					Token::Keyword(k) => {
@@ -190,11 +191,11 @@ impl Types {
 						Pattern::Cons(
 							ty::Ref::BuiltIn(Type::Token),
 							v,
-							vec![Pattern::Cons(
+							pattern::ConsArgs::Tuple(vec![Pattern::Cons(
 								ty::Ref::BuiltIn(Type::Keyword),
 								kv,
-								Vec::new(),
-							)],
+								pattern::ConsArgs::Tuple(Vec::new()),
+							)]),
 						)
 					}
 					Token::Begin(d) => {
@@ -208,11 +209,11 @@ impl Types {
 						Pattern::Cons(
 							ty::Ref::BuiltIn(Type::Token),
 							v,
-							vec![Pattern::Cons(
+							pattern::ConsArgs::Tuple(vec![Pattern::Cons(
 								ty::Ref::BuiltIn(Type::Delimiter),
 								dv,
-								Vec::new(),
-							)],
+								pattern::ConsArgs::Tuple(Vec::new()),
+							)]),
 						)
 					}
 					Token::End(d) => {
@@ -226,11 +227,11 @@ impl Types {
 						Pattern::Cons(
 							ty::Ref::BuiltIn(Type::Token),
 							v,
-							vec![Pattern::Cons(
+							pattern::ConsArgs::Tuple(vec![Pattern::Cons(
 								ty::Ref::BuiltIn(Type::Delimiter),
 								dv,
-								Vec::new(),
-							)],
+								pattern::ConsArgs::Tuple(Vec::new()),
+							)]),
 						)
 					}
 					Token::Operator(o) => {
@@ -243,11 +244,11 @@ impl Types {
 						Pattern::Cons(
 							ty::Ref::BuiltIn(Type::Token),
 							v,
-							vec![Pattern::Cons(
+							pattern::ConsArgs::Tuple(vec![Pattern::Cons(
 								ty::Ref::BuiltIn(Type::Operator),
 								ov,
-								Vec::new(),
-							)],
+								pattern::ConsArgs::Tuple(Vec::new()),
+							)]),
 						)
 					}
 					Token::Punct(p) => {
@@ -260,7 +261,11 @@ impl Types {
 						Pattern::Cons(
 							ty::Ref::BuiltIn(Type::Token),
 							v,
-							vec![Pattern::Cons(ty::Ref::BuiltIn(Type::Punct), pv, Vec::new())],
+							pattern::ConsArgs::Tuple(vec![Pattern::Cons(
+								ty::Ref::BuiltIn(Type::Punct),
+								pv,
+								pattern::ConsArgs::Tuple(Vec::new()),
+							)]),
 						)
 					}
 				};

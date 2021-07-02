@@ -96,6 +96,9 @@ pub enum ParserOperation {
 	/// Create a new span from a position.
 	PositionToSpan(Box<Expr>),
 
+	/// Return the first position after the given span.
+	LocEnd(Box<Expr>),
+
 	/// Transpose an optional located value into a located optional value.
 	///
 	/// The second expression gives the default span to apply when
@@ -124,6 +127,10 @@ impl ParserOperation {
 	}
 }
 
+pub enum FormatOperation {
+	Write(String, Vec<Expr>),
+}
+
 pub enum Error {
 	UnexpectedChar(Box<Expr>),
 	UnexpectedToken(Box<Expr>),
@@ -137,6 +144,12 @@ pub enum Expr {
 	/// Get the value of the given variable.
 	Get(Id),
 
+	/// Get a structure field of the given value.
+	GetField(Box<Expr>, Ident),
+
+	/// Get a tuple field of the given value.
+	GetTupleField(Box<Expr>, u32),
+
 	/// Set the value of the given variable.
 	Set(Id, Box<Expr>, Box<Expr>),
 
@@ -145,6 +158,9 @@ pub enum Expr {
 
 	/// Parser operation.
 	Parser(ParserOperation),
+
+	/// Formatter operation.
+	Format(FormatOperation),
 
 	/// Create a new instance of the given type using the given arguments.
 	New(ty::Ref, BuildArgs),
@@ -237,6 +253,15 @@ pub struct MatchCase {
 pub enum BuildArgs {
 	Tuple(Vec<Expr>),
 	Struct(Vec<Binding>),
+}
+
+impl BuildArgs {
+	pub fn is_empty(&self) -> bool {
+		match self {
+			Self::Tuple(args) => args.is_empty(),
+			Self::Struct(bindings) => bindings.is_empty(),
+		}
+	}
 }
 
 pub struct Binding {
