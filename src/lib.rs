@@ -12,7 +12,5 @@ pub mod poly;
 pub mod syntax;
 pub mod util;
 
-pub mod test;
-
 pub use charset::CharSet;
 pub use ident::Ident;

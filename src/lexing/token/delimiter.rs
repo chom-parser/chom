@@ -38,16 +38,6 @@ macro_rules! delimiter {
 				crate::Ident::new(self.name()).unwrap()
 			}
 		}
-
-		impl quote::ToTokens for Delimiter {
-			fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
-				match self {
-					$(
-						Self::$name => tokens.extend(quote::quote!{ $name })
-					),*
-				}
-			}
-		}
 	};
 }
 

@@ -5,28 +5,28 @@ authors = ["Timothée Haudebourg <timothee.haudebourg@ens-rennes.fr>"]
 edition = "2018"
 
 [features]
-rust = [ "chom-rust" ]
+bin = [
+	"chom-rust",
+	"stderrlog",
+	"clap"
+]
 
 [dependencies]
 chom-ir = { path = "../ir" }
 source-span = "^2.6"
+yansi = "*"
 once_cell = "*"
 btree-slab = { path = "../../../data-structures/btree-slab" }
 btree-range-map = { path = "../../../data-structures/btree-range-map" }
 itertools = "*"
 
-proc-macro2 = "*"
-quote = "*"
-
 utf8-decode = "*"
-stderrlog = "*"
 log = "*"
 
-clap = {version = "*", features = ["yaml"] }
-yansi = "*"
-
 chom-rust = { path = "../rust", optional = true }
+stderrlog = { version = "*", optional = true }
+clap = { version = "*", features = ["yaml"], optional = true }
 
 [[bin]]
 name = "chom"
-required-features = ["rust"]
+required-features = ["bin"]

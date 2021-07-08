@@ -29,16 +29,6 @@ macro_rules! operator {
 				crate::Ident::new(self.name()).unwrap()
 			}
 		}
-
-		impl quote::ToTokens for Operator {
-			fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
-				match self {
-					$(
-						Self::$name => tokens.extend(quote::quote!{ $name })
-					),*
-				}
-			}
-		}
 	};
 }
 
