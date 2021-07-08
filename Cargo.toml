@@ -14,18 +14,17 @@ bin = [
 [dependencies]
 chom-ir = { path = "../ir" }
 source-span = "^2.6"
-yansi = "*"
-once_cell = "*"
+yansi = "^0.5"
 btree-slab = { path = "../../../data-structures/btree-slab" }
 btree-range-map = { path = "../../../data-structures/btree-range-map" }
-itertools = "*"
+itertools = "^0.10"
 
-utf8-decode = "*"
-log = "*"
+utf8-decode = "^1.0"
+log = "^0.4"
 
 chom-rust = { path = "../rust", optional = true }
-stderrlog = { version = "*", optional = true }
-clap = { version = "*", features = ["yaml"], optional = true }
+stderrlog = { version = "^0.5", optional = true }
+clap = { version = "^2.33", features = ["yaml"], optional = true }
 
 [[bin]]
 name = "chom"
