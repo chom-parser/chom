@@ -12,6 +12,16 @@ pub struct Definition {
 #[derive(Clone, Hash, PartialEq, Eq)]
 pub struct RegExp(pub Vec<Loc<Atom>>);
 
+impl RegExp {
+	pub fn as_reference(&self) -> Option<&Ident> {
+		if self.0.len() == 1 {
+			self.0[0].as_reference()
+		} else {
+			None
+		}
+	}
+}
+
 impl fmt::Display for RegExp {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		use itertools::Itertools;
@@ -28,6 +38,16 @@ pub enum Atom {
 	Repeat(Box<Loc<Atom>>, usize, usize),
 	Or(Vec<Loc<RegExp>>),
 	Group(Loc<RegExp>),
+}
+
+impl Atom {
+	pub fn as_reference(&self) -> Option<&Ident> {
+		match self {
+			Self::Ref(id) => Some(id),
+			Self::Group(g) => g.as_reference(),
+			_ => None
+		}
+	}
 }
 
 impl fmt::Display for Atom {

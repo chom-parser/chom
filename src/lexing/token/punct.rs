@@ -24,6 +24,10 @@ macro_rules! punct {
 					),*
 				}
 			}
+
+			pub fn ident(&self) -> crate::Ident {
+				crate::Ident::new(self.name()).unwrap()
+			}
 		}
 
 		impl quote::ToTokens for Punct {

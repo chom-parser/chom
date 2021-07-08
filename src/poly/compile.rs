@@ -78,6 +78,7 @@ fn compile_loc_terminal(
 }
 
 fn compile_ty_expr(
+	context_ty: u32,
 	regexps: &RegExps,
 	types: &mut Types,
 	terminals: &mut Terminals,
@@ -85,25 +86,39 @@ fn compile_ty_expr(
 ) -> Result<ty::Expr, Loc<Error>> {
 	let span = ast.span();
 	match ast.into_inner() {
-		syntax::ty::Expr::Terminal(t) => Ok(ty::Expr::Terminal(compile_loc_terminal(
-			regexps,
-			terminals,
-			Loc::new(t, span),
-		)?)),
-		syntax::ty::Expr::NonTerminal(id, args) => {
-			let index = types.get_by_id(&id)?;
-
-			let mut compiled_args = Vec::with_capacity(args.len());
-			for a in args {
-				compiled_args.push(compile_ty_expr(regexps, types, terminals, a)?)
+		syntax::ty::Expr::Terminal(t) => {
+			if let Some(id) = t.as_reference() {
+				if let Some(x) = types.get_terminal_parameter(context_ty, &id) {
+					return Ok(ty::Expr::Var(x))
+				}
 			}
+			
+			Ok(ty::Expr::Terminal(compile_loc_terminal(
+				regexps,
+				terminals,
+				Loc::new(t, span),
+			)?))
+		},
+		syntax::ty::Expr::NonTerminal(id, args) => {
+			match types.get_type_parameter(context_ty, &id) {
+				Some(x) => Ok(ty::Expr::Var(x)),
+				None => {
+					let index = types.get_by_id(&id)?;
 
-			Ok(ty::Expr::Type(index, compiled_args))
+					let mut compiled_args = Vec::with_capacity(args.len());
+					for a in args {
+						compiled_args.push(compile_ty_expr(context_ty, regexps, types, terminals, a)?)
+					}
+
+					Ok(ty::Expr::Type(index, compiled_args))
+				}
+			}
 		}
 	}
 }
 
 fn compile_labeled_ty_expr(
+	context_ty: u32,
 	regexps: &RegExps,
 	types: &mut Types,
 	terminals: &mut Terminals,
@@ -112,7 +127,7 @@ fn compile_labeled_ty_expr(
 	let (ast, _) = ast.into_raw_parts();
 	Ok(ty::LabeledExpr::new(
 		ast.label.map(|label| label.into_inner()),
-		compile_ty_expr(regexps, types, terminals, ast.expr)?,
+		compile_ty_expr(context_ty, regexps, types, terminals, ast.expr)?,
 	))
 }
 
@@ -135,7 +150,7 @@ fn compile_rule(
 	let ast = ast.into_inner();
 	let mut args = Vec::new();
 	for a in ast.args.into_iter() {
-		args.push(compile_labeled_ty_expr(regexps, types, terminals, a)?);
+		args.push(compile_labeled_ty_expr(ty, regexps, types, terminals, a)?);
 	}
 
 	let fun = Function::new(compile_function_id(ast.id)?, ty, args);
@@ -179,8 +194,14 @@ impl syntax::Grammar {
 		for ast in ast.types.into_iter() {
 			let id = ast.id.clone();
 			let i = types.get_by_id(&id).unwrap();
-
 			let ast = ast.into_inner();
+
+			for p in ast.parameters {
+				match p.into_inner() {
+					syntax::ty::Parameter::Terminal(id) => types.add_terminal_parameter(i, id.into_inner()),
+					syntax::ty::Parameter::NonTerminal(id) => types.add_type_parameter(i, id.into_inner())
+				}
+			}
 
 			for f in ast.constructors {
 				let compiled_f =

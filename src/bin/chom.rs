@@ -13,7 +13,6 @@ use std::{
 use utf8_decode::UnsafeDecoder;
 
 use chom::{
-	gen::{Generate, Target as GenTarget},
 	mono, out, poly,
 	syntax::{self, Parsable},
 };
@@ -31,7 +30,7 @@ fn parse_path(s: &str) -> Vec<String> {
 
 fn main() -> io::Result<()> {
 	// Parse options.
-	let yaml = load_yaml!("cli.yml");
+	let yaml = load_yaml!("chom.yml");
 	let matches = clap::App::from_yaml(yaml).get_matches();
 
 	// Init logger.
@@ -54,6 +53,7 @@ fn main() -> io::Result<()> {
 			log::info!("compiling grammar...");
 			match ast.compile() {
 				Ok(grammar) => {
+					log::info!("monomorphizing...");
 					let mono_grammar = mono::Grammar::new(&grammar);
 					if let Err(e) = run_subcommand(&matches, &mono_grammar) {
 						e.format(&buffer, &metrics)?;
@@ -88,7 +88,8 @@ fn run_subcommand<'a, 'p>(
 ) -> Result<(), Error<'a, 'p>> {
 	match matches.subcommand() {
 		("table", Some(_m)) => generate_parse_table(grammar.poly(), &mut Output::std()?),
-		("parser", Some(m)) => {
+		("generate", Some(m)) => {
+			log::info!("entering parser generation.");
 			let config = chom::gen::Config { locate: true };
 
 			let extern_mod_path = parse_path(m.value_of("EXTERN").unwrap());
@@ -96,7 +97,7 @@ fn run_subcommand<'a, 'p>(
 			let lexer_mod_path = parse_path(m.value_of("LEXER").unwrap());
 			let parser_mod_path = parse_path(m.value_of("PARSER").unwrap());
 
-			let context = generate_pseudo_context(
+			let context = generate_context(
 				config,
 				grammar,
 				&extern_mod_path,
@@ -105,50 +106,35 @@ fn run_subcommand<'a, 'p>(
 				&parser_mod_path,
 			)?;
 
-			let mut lexer_output = None;
-			let mut ast_output = None;
-			let mut parser_output = None;
+			let root = m.value_of("root").unwrap_or("");
 
-			let target = Target::rust();
-
-			match m.value_of("std-output") {
-				None => {
-					let root = m
-						.value_of("root")
-						.map(|d| Path::new(d))
-						.unwrap_or(Path::new(""));
-					let create_parents = m.is_present("create-parents");
-					ast_output = Some(Output::file(
-						target.module_filename(root, context.ast_module_path()),
-						create_parents,
-					)?);
-					lexer_output = Some(Output::file(
-						target.module_filename(root, context.lexer_module_path()),
-						create_parents,
-					)?);
-					parser_output = Some(Output::file(
-						target.module_filename(root, context.parser_module_path()),
-						create_parents,
-					)?);
-				}
-				Some(component) => match component {
-					"lexer" => lexer_output = Some(Output::std()?),
-					"ast" => ast_output = Some(Output::std()?),
-					"parser" => parser_output = Some(Output::std()?),
-					_ => {
-						log::error!("unknown component `{}`", component);
-						std::process::exit(1)
+			let std_output = m.is_present("std-output");
+			for module_path_string in m.values_of("PATH").into_iter().flatten() {
+				let module_path = parse_path(module_path_string);
+				match context.module_index_from_path(&module_path) {
+					Some(m) => {
+						log::info!("generating module `{}`...", module_path_string);
+						let code = chom_rust::generate_module(context.ir_context(), context.module(m).unwrap());
+						
+						use std::io::Write;
+						if std_output {
+							let stdout = std::io::stdout();
+							let mut out = stdout.lock();
+							write!(out, "{}", code)?
+						} else {
+							let ir_path = context.module_path(m).unwrap();
+							let filename = chom_rust::module_filename(context.namespace(), root, ir_path);
+							let mut file = File::create(filename)?;
+							write!(file, "{}", code)?
+						}
+					},
+					None => {
+						log::warn!("no module `{}` found!", module_path_string)
 					}
-				},
+				}
 			}
 
-			Ok(generate_parser(
-				context,
-				target,
-				lexer_output.as_mut(),
-				ast_output.as_mut(),
-				parser_output.as_mut(),
-			)?)
+			Ok(())
 		}
 		(name, _) => Err(Error::UnknownCommand(name.to_string())),
 	}
@@ -224,29 +210,35 @@ fn generate_parse_table<'a, 'p>(
 	// }
 }
 
-fn generate_pseudo_context<'a, 'g>(
+fn generate_context<'a, 'g>(
 	config: chom::gen::Config,
 	grammar: &'a mono::Grammar<'g>,
 	extern_module_path: &[String],
 	ast_module_path: &[String],
 	lexer_module_path: &[String],
 	parser_module_path: &[String],
-) -> Result<chom::gen::pseudo::Context<'a, 'g>, Error<'a, 'g>> {
+) -> Result<chom::gen::Context<'a, 'g>, Error<'a, 'g>> {
+	log::info!("building lexing table...");
 	match chom::lexing::Table::new(grammar.poly()) {
 		Ok(lexing_table) => {
+			log::info!("building non-deterministic parsing table...");
 			let parsing_table = chom::parsing::table::NonDeterministic::new(grammar);
 
+			log::info!("building LR0 parsing table...");
 			match chom::parsing::table::LR0::from_non_deterministic(grammar, &parsing_table) {
-				Ok(lr0_table) => Ok(chom::gen::pseudo::Context::new(
-					config,
-					grammar,
-					extern_module_path,
-					ast_module_path,
-					lexer_module_path,
-					&lexing_table,
-					parser_module_path,
-					&chom::parsing::Table::LR0(lr0_table),
-				)),
+				Ok(lr0_table) => {
+					log::info!("IR generation...");
+					Ok(chom::gen::Context::new(
+						config,
+						grammar,
+						extern_module_path,
+						ast_module_path,
+						lexer_module_path,
+						&lexing_table,
+						parser_module_path,
+						&chom::parsing::Table::LR0(lr0_table),
+					))
+				},
 				Err(e) => Err(Error::LR0Ambiguity(grammar, e)),
 			}
 		}
@@ -254,67 +246,67 @@ fn generate_pseudo_context<'a, 'g>(
 	}
 }
 
-fn generate_parser<'a, 'p>(
-	context: chom::gen::pseudo::Context<'a, 'p>,
-	target: Target,
-	lexer_output: Option<&mut Output>,
-	ast_output: Option<&mut Output>,
-	parser_output: Option<&mut Output>,
-) -> io::Result<()> {
-	if let Some(ast_output) = ast_output {
-		// Generate the AST
-		log::info!("writing AST module");
-		target.write_module(&mut ast_output.lock(), &context, context.ast_module())?
-	}
+// fn generate_parser<'a, 'p>(
+// 	context: chom::gen::Context<'a, 'p>,
+// 	target: Target,
+// 	lexer_output: Option<&mut Output>,
+// 	ast_output: Option<&mut Output>,
+// 	parser_output: Option<&mut Output>,
+// ) -> io::Result<()> {
+// 	if let Some(ast_output) = ast_output {
+// 		// Generate the AST
+// 		log::info!("writing AST module");
+// 		target.write_module(&mut ast_output.lock(), &context, context.ast_module())?
+// 	}
 
-	if let Some(lexer_output) = lexer_output {
-		// Generate the lexer
-		log::info!("writing lexer module");
-		target.write_module(&mut lexer_output.lock(), &context, context.lexer_module())?
-	}
+// 	if let Some(lexer_output) = lexer_output {
+// 		// Generate the lexer
+// 		log::info!("writing lexer module");
+// 		target.write_module(&mut lexer_output.lock(), &context, context.lexer_module())?
+// 	}
 
-	if let Some(parser_output) = parser_output {
-		// Generate the parser
-		log::info!("writing parser module");
-		target.write_module(&mut parser_output.lock(), &context, context.parser_module())?
-	}
+// 	if let Some(parser_output) = parser_output {
+// 		// Generate the parser
+// 		log::info!("writing parser module");
+// 		target.write_module(&mut parser_output.lock(), &context, context.parser_module())?
+// 	}
 
-	Ok(())
-}
+// 	Ok(())
+// }
 
-pub enum Target {
-	Rust(chom::gen::target::Rust),
-}
+// pub enum Target {
+// 	Rust(chom::gen::target::Rust),
+// }
 
-impl Target {
-	fn rust() -> Self {
-		Self::Rust(chom::gen::target::Rust)
-	}
+// impl Target {
+// 	fn rust() -> Self {
+// 		Self::Rust(chom::gen::target::Rust)
+// 	}
 
-	fn module_filename<P: AsRef<Path>>(
-		&self,
-		root: P,
-		path: chom::gen::pseudo::module::Path,
-	) -> PathBuf {
-		let filename = match self {
-			Self::Rust(target) => target.module_filename(root, path),
-		};
+// 	fn module_filename<P: AsRef<Path>>(
+// 		&self,
+// 		root: P,
+// 		path: chom::gen::pseudo::module::Path,
+// 	) -> PathBuf {
+// 		let filename = match self {
+// 			Self::Rust(target) => target.module_filename(root, path),
+// 		};
 
-		log::info!("will write to `{}`", filename.to_string_lossy());
-		filename
-	}
+// 		log::info!("will write to `{}`", filename.to_string_lossy());
+// 		filename
+// 	}
 
-	fn write_module<O: io::Write>(
-		&self,
-		out: &mut O,
-		context: &chom::gen::pseudo::Context,
-		module: &chom::gen::pseudo::Module,
-	) -> io::Result<()> {
-		match self {
-			Self::Rust(target) => write!(out, "{}", target.generate(context, module)),
-		}
-	}
-}
+// 	fn write_module<O: io::Write>(
+// 		&self,
+// 		out: &mut O,
+// 		context: &chom::gen::pseudo::Context,
+// 		module: &chom::gen::pseudo::Module,
+// 	) -> io::Result<()> {
+// 		match self {
+// 			Self::Rust(target) => write!(out, "{}", target.generate(context, module)),
+// 		}
+// 	}
+// }
 
 pub enum Output {
 	Std(std::io::Stdout),

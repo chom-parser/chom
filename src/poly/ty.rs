@@ -1,6 +1,9 @@
 use super::Grammar;
 use crate::Ident;
-use std::fmt;
+use std::{
+	fmt,
+	collections::HashSet
+};
 
 /// Polymorphic type identifier.
 #[derive(Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -17,10 +20,10 @@ impl Id {
 		}
 	}
 
-	pub fn as_defined(&self) -> &Ident {
+	pub fn as_defined(&self) -> Option<&Ident> {
 		match self {
-			Self::Defined(id) => id,
-			_ => panic!("invalid type id"),
+			Self::Defined(id) => Some(id),
+			_ => None,
 		}
 	}
 }
@@ -83,6 +86,47 @@ impl Parameters {
 
 	pub fn get(&self, i: u32) -> Option<Parameter> {
 		self.list.get(i as usize).cloned()
+	}
+
+	pub fn index_from_id(&self, id: &Ident) -> Option<u32> {
+		for (i, p) in self.list.iter().enumerate().rev() {
+			let pid = match p {
+				Parameter::Terminal(t) => &self.terminal_parameters[*t as usize],
+				Parameter::Type(t) => &self.type_parameters[*t as usize]
+			};
+
+			if pid == id {
+				return Some(i as u32)
+			}
+		}
+
+		None
+	}
+
+	pub fn type_index_from_id(&self, id: &Ident) -> Option<u32> {
+		for (i, p) in self.list.iter().enumerate().rev() {
+			if let Parameter::Type(t) = p {
+				let pid = &self.type_parameters[*t as usize];
+				if pid == id {
+					return Some(i as u32)
+				}
+			}
+		}
+
+		None
+	}
+
+	pub fn terminal_index_from_id(&self, id: &Ident) -> Option<u32> {
+		for (i, p) in self.list.iter().enumerate().rev() {
+			if let Parameter::Terminal(t) = p {
+				let pid = &self.terminal_parameters[*t as usize];
+				if pid == id {
+					return Some(i as u32)
+				}
+			}
+		}
+
+		None
 	}
 
 	pub fn type_parameter(&self, i: u32) -> Option<&Ident> {
@@ -215,6 +259,10 @@ impl Type {
 		&self.parameters
 	}
 
+	pub fn parameters_mut(&mut self) -> &mut Parameters {
+		&mut self.parameters
+	}
+
 	pub fn parameter(&self, i: u32) -> Option<Parameter> {
 		self.parameters.get(i)
 	}
@@ -293,17 +341,26 @@ impl Expr {
 	/// This is used to decide when to put a parameter on the heap to avoid
 	/// infinitely sized types.
 	pub fn depends_on(&self, grammar: &Grammar, ty_index: u32) -> bool {
+		let mut visited = HashSet::new();
+		self.depends_on_under(grammar, ty_index, &mut visited)
+	}
+
+	fn depends_on_under(&self, grammar: &Grammar, ty_index: u32, visited: &mut HashSet<u32>) -> bool {
 		if let Self::Type(other_ty_index, args) = self {
-			if *other_ty_index == ty_index {
-				true
-			} else if *other_ty_index > ty_index {
-				let other_ty = grammar.ty(*other_ty_index).unwrap();
-				other_ty.constructors().iter().any(|&c_index| {
-					let c = grammar.function(c_index).unwrap();
-					c.arguments()
-						.iter()
-						.any(|a| a.expr().depends_on(grammar, ty_index))
-				}) || args.iter().any(|a| a.depends_on(grammar, ty_index))
+			if visited.insert(*other_ty_index) {
+				if *other_ty_index == ty_index {
+					true
+				} else if *other_ty_index > ty_index {
+					let other_ty = grammar.ty(*other_ty_index).unwrap();
+					other_ty.constructors().iter().any(|&c_index| {
+						let c = grammar.function(c_index).unwrap();
+						c.arguments()
+							.iter()
+							.any(|a| a.expr().depends_on_under(grammar, ty_index, visited))
+					}) || args.iter().any(|a| a.depends_on_under(grammar, ty_index, visited))
+				} else {
+					false
+				}
 			} else {
 				false
 			}

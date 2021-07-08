@@ -18,7 +18,7 @@ pub struct State {
 
 impl State {
 	pub fn is_initial(&self) -> bool {
-		self.items.iter().all(|item| item.is_initial())
+		self.items.iter().any(|item| item.is_initial())
 	}
 
 	pub fn add_predecessor(&mut self, symbol: Symbol, q: u32) {
@@ -175,7 +175,7 @@ impl NonDeterministic {
 				f,
 				"\tq{} [ shape=plaintext, label=<{}> ]\n",
 				q,
-				state.items.dot_format(grammar)
+				state.items.dot_format(grammar, format!("{}", q))
 			)?;
 
 			for (symbol, r) in self.transitions_for(q) {

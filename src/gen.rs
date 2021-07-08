@@ -1,7 +1,20 @@
-pub mod pseudo;
-pub mod target;
+mod context;
+pub mod lexer;
+pub mod parser;
 
-pub use target::{Generate, Target};
+pub use context::*;
+
+pub type Pattern<'p> = chom_ir::Pattern<Namespace<'p>>;
+pub type Expr<'p> = chom_ir::Expr<Namespace<'p>>;
+pub type Module<'p> = chom_ir::Module<Namespace<'p>>;
+pub type Type<'p> = chom_ir::Type<Namespace<'p>>;
+pub type TypeExpr<'p> = chom_ir::ty::Expr<Namespace<'p>>;
+pub type Path<'a, 'p> = chom_ir::Path<'a, Namespace<'p>>;
+
+// pub mod pseudo;
+// pub mod target;
+
+// pub use target::{Generate, Target};
 
 /// Generation configuration.
 pub struct Config {
@@ -12,7 +25,7 @@ pub struct Config {
 	pub locate: bool,
 }
 
-pub enum Parser {
-	LR0(pseudo::Expr),
-	LALR1(pseudo::Expr),
-}
+// pub enum Parser {
+// 	LR0(pseudo::Expr),
+// 	LALR1(pseudo::Expr),
+// }

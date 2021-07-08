@@ -75,6 +75,22 @@ impl Types {
 		}
 	}
 
+	pub fn add_terminal_parameter(&mut self, index: u32, id: Ident) {
+		self.list[index as usize].parameters_mut().add_terminal_parameter(id)
+	}
+
+	pub fn add_type_parameter(&mut self, index: u32, id: Ident) {
+		self.list[index as usize].parameters_mut().add_type_parameter(id)
+	}
+
+	pub fn get_type_parameter(&mut self, index: u32, id: &Ident) -> Option<u32> {
+		self.list[index as usize].parameters().type_index_from_id(id)
+	}
+
+	pub fn get_terminal_parameter(&mut self, index: u32, id: &Ident) -> Option<u32> {
+		self.list[index as usize].parameters().terminal_index_from_id(id)
+	}
+
 	// pub fn get_by_desc(&mut self, id: ty::Id, span: Span) -> u32 {
 	// 	match id {
 	// 		ty::Id::Defined(id) => self.id_map.get(&id).cloned().unwrap(),

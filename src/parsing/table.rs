@@ -351,8 +351,8 @@ impl ItemSet {
 		FormattedItemSet(grammar, self)
 	}
 
-	pub fn dot_format<'a, 'g>(&self, grammar: &'g Grammar<'a>) -> DotFormattedItemSet<'a, 'g, '_> {
-		DotFormattedItemSet(grammar, self)
+	pub fn dot_format<'a, 'g>(&self, grammar: &'g Grammar<'a>, title: String) -> DotFormattedItemSet<'a, 'g, '_> {
+		DotFormattedItemSet(grammar, self, title)
 	}
 }
 
@@ -377,11 +377,12 @@ impl<'a, 'g, 's> fmt::Display for FormattedItemSet<'a, 'g, 's> {
 	}
 }
 
-pub struct DotFormattedItemSet<'a, 'g, 's>(&'g Grammar<'a>, &'s ItemSet);
+pub struct DotFormattedItemSet<'a, 'g, 's>(&'g Grammar<'a>, &'s ItemSet, String);
 
 impl<'a, 'g, 's> fmt::Display for DotFormattedItemSet<'a, 'g, 's> {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		write!(f, "<table>")?;
+		write!(f, "<tr><td>{}</td></tr>", self.2)?;
 
 		for item in &self.1.items {
 			write!(f, "<tr><td>{}</td></tr>", item.format(self.0))?

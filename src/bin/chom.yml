@@ -13,7 +13,7 @@ args:
 subcommands:
     - table:
         about: Generate a parsing table for the input grammar.
-    - parser:
+    - generate:
         about: Generate a parser for the input grammar.
         args:
             - EXTERN:
@@ -28,6 +28,9 @@ subcommands:
             - PARSER:
                 required: true
                 help: The parser module path.
+            - PATH:
+                multiple: true
+                help: Path to a module to write.
             - root:
                 takes_value: true
                 short: r
@@ -39,8 +42,6 @@ subcommands:
                 short: p
                 help: Create parent directories.
             - std-output:
-                takes_value: true
                 short: o
                 long: std-output
-                help: Output the desired component on the standard output.
-                    The component value may be `lexer`, `ast` or `parser`.
+                help: Output the desired modules on the standard output.

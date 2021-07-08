@@ -17,6 +17,35 @@ pub type Index = (u32, ty::Instance);
 
 pub use poly::{terminal, Terminal};
 
+pub struct OwnedGrammar {
+	poly: Box<poly::Grammar>,
+	mono: Grammar<'static>
+}
+
+impl OwnedGrammar {
+	pub fn new(poly: poly::Grammar) -> Self {
+		let poly = Box::new(poly);
+		let static_poly: &'static poly::Grammar = unsafe { &*(poly.as_ref() as *const _) };
+		let mono = Grammar::new(static_poly);
+		Self {
+			poly,
+			mono
+		}
+	}
+
+	pub fn poly(&self) -> &poly::Grammar {
+		self.poly.as_ref()
+	}
+
+	pub fn mono(&self) -> &Grammar<'_> {
+		&self.mono
+	}
+
+	pub fn as_ref(&self) -> &Grammar<'_> {
+		self.mono()
+	}
+}
+
 pub struct Grammar<'a> {
 	poly: &'a poly::Grammar,
 
