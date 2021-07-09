@@ -1,6 +1,4 @@
 use chom_ir::{
-	expr::BuildArgs,
-	pattern,
 	ty::{self, Enum, VariantDesc},
 	Function,
 	function
@@ -103,7 +101,7 @@ impl<'p> Types<'p> {
 		Pattern::Cons(
 			ty::Ref::Defined(self.node_ty),
 			*self.nodes_variants_map.get(&index).unwrap(),
-			pattern::ConsArgs::Tuple(vec![Pattern::Bind(id)]),
+			vec![Pattern::Bind(id)],
 		)
 	}
 
@@ -111,7 +109,7 @@ impl<'p> Types<'p> {
 		Expr::Cons(
 			ty::Ref::Defined(self.node_ty),
 			*self.nodes_variants_map.get(&index).unwrap(),
-			BuildArgs::Tuple(vec![e]),
+			vec![e],
 		)
 	}
 
@@ -127,7 +125,7 @@ impl<'p> Types<'p> {
 		Pattern::Cons(
 			ty::Ref::Defined(self.item_ty),
 			0,
-			pattern::ConsArgs::Tuple(vec![self.token_pattern(index, f)]),
+			vec![self.token_pattern(index, f)],
 		)
 	}
 
@@ -138,7 +136,7 @@ impl<'p> Types<'p> {
 		Expr::Cons(
 			ty::Ref::Defined(self.item_ty),
 			0,
-			BuildArgs::Tuple(vec![self.token_expr(index, f)]),
+			vec![self.token_expr(index, f)],
 		)
 	}
 
@@ -146,7 +144,7 @@ impl<'p> Types<'p> {
 		Pattern::Cons(
 			ty::Ref::Defined(self.item_ty),
 			1,
-			pattern::ConsArgs::Tuple(vec![self.node_pattern(index, id)]),
+			vec![self.node_pattern(index, id)],
 		)
 	}
 
@@ -154,7 +152,7 @@ impl<'p> Types<'p> {
 		Expr::Cons(
 			ty::Ref::Defined(self.item_ty),
 			1,
-			BuildArgs::Tuple(vec![self.node_expr(index, e)]),
+			vec![self.node_expr(index, e)],
 		)
 	}
 
@@ -223,11 +221,11 @@ impl<'p> Types<'p> {
 						Pattern::Cons(
 							ty::Ref::Defined(token_ty),
 							v,
-							pattern::ConsArgs::Tuple(if ty.is_some() {
+							if ty.is_some() {
 								vec![Pattern::Any]
 							} else {
 								Vec::new()
-							}),
+							},
 						)
 					}
 					Token::Anonymous(i, ty) => {
@@ -244,11 +242,11 @@ impl<'p> Types<'p> {
 						Pattern::Cons(
 							ty::Ref::Defined(token_ty),
 							v,
-							pattern::ConsArgs::Tuple(if ty.is_some() {
+							if ty.is_some() {
 								vec![Pattern::Any]
 							} else {
 								Vec::new()
-							}),
+							},
 						)
 					}
 					Token::Keyword(k) => {
@@ -275,11 +273,11 @@ impl<'p> Types<'p> {
 						Pattern::Cons(
 							ty::Ref::Defined(token_ty),
 							token_keyword_variant,
-							pattern::ConsArgs::Tuple(vec![Pattern::Cons(
+							vec![Pattern::Cons(
 								ty::Ref::Defined(keyword_ty),
 								keyword_variant,
-								pattern::ConsArgs::Tuple(Vec::new()),
-							)]),
+								Vec::new(),
+							)],
 						)
 					}
 					Token::Begin(d) => {
@@ -311,11 +309,11 @@ impl<'p> Types<'p> {
 						Pattern::Cons(
 							ty::Ref::Defined(token_ty),
 							token_begin_variant,
-							pattern::ConsArgs::Tuple(vec![Pattern::Cons(
+							vec![Pattern::Cons(
 								ty::Ref::Defined(delimiter_ty),
 								delimiter_variant,
-								pattern::ConsArgs::Tuple(Vec::new()),
-							)]),
+								Vec::new(),
+							)],
 						)
 					}
 					Token::End(d) => {
@@ -347,11 +345,11 @@ impl<'p> Types<'p> {
 						Pattern::Cons(
 							ty::Ref::Defined(token_ty),
 							token_end_variant,
-							pattern::ConsArgs::Tuple(vec![Pattern::Cons(
+							vec![Pattern::Cons(
 								ty::Ref::Defined(delimiter_ty),
 								delimiter_variant,
-								pattern::ConsArgs::Tuple(Vec::new()),
-							)]),
+								Vec::new(),
+							)],
 						)
 					}
 					Token::Operator(o) => {
@@ -375,11 +373,11 @@ impl<'p> Types<'p> {
 						Pattern::Cons(
 							ty::Ref::Defined(token_ty),
 							token_operator_variant,
-							pattern::ConsArgs::Tuple(vec![Pattern::Cons(
+							vec![Pattern::Cons(
 								ty::Ref::Defined(operator_ty),
 								operator_variant,
-								pattern::ConsArgs::Tuple(Vec::new()),
-							)]),
+								Vec::new(),
+							)],
 						)
 					}
 					Token::Punct(p) => {
@@ -403,11 +401,11 @@ impl<'p> Types<'p> {
 						Pattern::Cons(
 							ty::Ref::Defined(token_ty),
 							token_punct_variant,
-							pattern::ConsArgs::Tuple(vec![Pattern::Cons(
+							vec![Pattern::Cons(
 								ty::Ref::Defined(punct_ty),
 								punct_variant,
-								pattern::ConsArgs::Tuple(Vec::new()),
-							)]),
+								Vec::new(),
+							)],
 						)
 					}
 				};

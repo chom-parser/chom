@@ -198,40 +198,20 @@ impl<'a, 'p> Context<'a, 'p> {
 		let grammar_ty = self.grammar.poly().ty(ty_index.0).unwrap();
 		let ir_ty = *self.grammar_type.get(&ty_index.0).unwrap();
 
-		let args = if f.poly().is_fully_labeled(self.grammar.poly(), grammar_ty) {
-			let bindings = f
-				.poly()
-				.arguments()
-				.iter()
-				.enumerate()
-				.filter_map(|(i, labeled_a)| {
-					let i = i as u32;
-					if labeled_a.is_typed(self.grammar.poly(), grammar_ty) {
-						Some(expr::Binding {
-							id: FieldId(index.0, i),
-							expr: build_arg(i),
-						})
-					} else {
-						None
-					}
-				});
-			expr::BuildArgs::Struct(bindings.collect())
-		} else {
-			let args = f
-				.poly()
-				.arguments()
-				.iter()
-				.enumerate()
-				.filter_map(|(i, labeled_a)| {
-					let i = i as u32;
-					if labeled_a.is_typed(self.grammar.poly(), grammar_ty) {
-						Some(build_arg(i))
-					} else {
-						None
-					}
-				});
-			expr::BuildArgs::Tuple(args.collect())
-		};
+		let args = f
+			.poly()
+			.arguments()
+			.iter()
+			.enumerate()
+			.filter_map(|(i, labeled_a)| {
+				let i = i as u32;
+				if labeled_a.is_typed(self.grammar.poly(), grammar_ty) {
+					Some(build_arg(i))
+				} else {
+					None
+				}
+			})
+			.collect();
 
 		match self.function_variants.get(&index.0) {
 			Some(&v) => Expr::Cons(ty::Ref::Defined(ir_ty), v, args),

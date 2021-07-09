@@ -81,6 +81,11 @@ impl Function {
 		self.args.get(offset as usize)
 	}
 
+	/// Returns an iterator over the typed arguments.
+	pub fn typed_arguments<'a>(&'a self, grammar: &'a Grammar, context: &'a Type) -> impl 'a + Iterator<Item=&'a ty::LabeledExpr> {
+		self.args.iter().filter(move |a| a.is_typed(grammar, context))
+	}
+
 	/// Checks if the function is "fully labeled".
 	///
 	/// That is when it is not a constant (it has some arguments)
@@ -91,6 +96,15 @@ impl Function {
 				.args
 				.iter()
 				.all(|a| a.is_labeled() || !a.is_typed(grammar, context))
+	}
+
+	/// Returns an iterator over the fields of the structure defined by this function, if any.
+	pub fn fields<'a>(&'a self, grammar: &'a Grammar, context: &'a Type) -> Option<impl 'a + Iterator<Item=&'a ty::LabeledExpr>> {
+		if self.is_fully_labeled(grammar, context) {
+			Some(self.typed_arguments(grammar, context))
+		} else {
+			None
+		}
 	}
 }
 

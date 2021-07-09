@@ -1,7 +1,7 @@
 use crate::Ident;
 
 /// Variable identifier.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Id {
 	Lexer(Lexer),
 	Parser(Parser),
@@ -19,7 +19,7 @@ impl Id {
 }
 
 /// Variables occuring in the lexer.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Lexer {
 	// /// Buffer member.
 	// Buffer,
@@ -56,7 +56,7 @@ impl Lexer {
 }
 
 /// Variable occuring in the parser.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Parser {
 	/// Lexer.
 	Lexer,
@@ -142,7 +142,7 @@ impl Parser {
 	}
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Format {
 	/// Argument.
 	Arg(u32),
