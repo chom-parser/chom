@@ -6,6 +6,7 @@ pub enum Id {
 	Lexer(Lexer),
 	Parser(Parser),
 	Format(Format),
+	Extern(Extern)
 }
 
 impl Id {
@@ -13,7 +14,8 @@ impl Id {
 		match self {
 			Self::Lexer(id) => id.to_ident(),
 			Self::Parser(id) => id.to_ident(),
-			Self::Format(id) => id.to_ident()
+			Self::Format(id) => id.to_ident(),
+			Self::Extern(id) => id.to_ident()
 		}
 	}
 }
@@ -36,6 +38,9 @@ pub enum Lexer {
 	/// An optional character.
 	CharOpt,
 
+	/// An optional character or an error.
+	UnsafeCharOpt,
+
 	/// A sub-token emitted from a sub-automaton.
 	SubToken,
 
@@ -49,6 +54,7 @@ impl Lexer {
 			Self::State => Ident::new("state").unwrap(),
 			Self::BufferChars => Ident::new("chars").unwrap(),
 			Self::CharOpt => Ident::new("char_opt").unwrap(),
+			Self::UnsafeCharOpt => Ident::new("unsafe_char_opt").unwrap(),
 			Self::SubToken => Ident::new("sub_token").unwrap(),
 			Self::Unexpected => Ident::new("unexpected").unwrap()
 		}
@@ -94,6 +100,9 @@ pub enum Parser {
 	/// AST node.
 	Node,
 
+	/// Any optional token, or an error.
+	UnsafeTokenOpt,
+
 	/// Any optional token.
 	AnyTokenOpt,
 
@@ -131,6 +140,7 @@ impl Parser {
 			Self::Item(i) => Ident::new(format!("item{}", i)).unwrap(),
 			Self::AnyNode => Ident::new("any_node").unwrap(),
 			Self::Node => Ident::new("node").unwrap(),
+			Self::UnsafeTokenOpt => Ident::new("unsafe_token_opt").unwrap(),
 			Self::AnyTokenOpt => Ident::new("any_token_opt").unwrap(),
 			Self::AnyTokenOptSpanless => Ident::new("any_token_opt_spanless").unwrap(),
 			Self::Token => Ident::new("token").unwrap(),
@@ -152,6 +162,21 @@ impl Format {
 	pub fn to_ident(&self) -> Ident {
 		match self {
 			Self::Arg(i) => Ident::new(format!("a{}", i)).unwrap(),
+		}
+	}
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Extern {
+	CharOpt,
+	String
+}
+
+impl Extern {
+	pub fn to_ident(&self) -> Ident {
+		match self {
+			Self::CharOpt => Ident::new("c_opt").unwrap(),
+			Self::String => Ident::new("string").unwrap()
 		}
 	}
 }

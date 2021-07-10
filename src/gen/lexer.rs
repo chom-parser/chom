@@ -183,7 +183,7 @@ fn generate_automaton<'a, 'p>(context: &Context<'a, 'p>, table: &Table, index: u
 						)),
 						terminal::Desc::RegExp(_) => {
 							let expr = context.provided().token_expr(*terminal_index, |ir_function| {
-								Expr::Lexer(Var::This, LexerExpr::Parse(ir_function))
+								Expr::Call(ir_function, None, vec![Expr::Lexer(Var::This, LexerExpr::Buffer)])
 							});
 							let result = if default_token {
 								Expr::some(expr)
@@ -255,7 +255,7 @@ fn generate_automaton<'a, 'p>(context: &Context<'a, 'p>, table: &Table, index: u
 							expr: Expr::none(),
 						}
 					} else {
-						let err = Expr::Call(context.lexing_error_function(), vec![
+						let err = Expr::Call(context.lexing_error_function(), None, vec![
 							Expr::Get(
 								Var::Defined(Id::Lexer(id::Lexer::Unexpected)),
 							)
@@ -280,10 +280,19 @@ fn generate_automaton<'a, 'p>(context: &Context<'a, 'p>, table: &Table, index: u
 					))
 				)
 			} else {
-				Expr::Match {
-					expr: Box::new(Expr::Lexer(Var::This, LexerExpr::Peek)),
-					cases: state_cases,
-				}
+				Expr::Let(
+					Id::Lexer(id::Lexer::UnsafeCharOpt),
+					false,
+					Box::new(Expr::Lexer(Var::This, LexerExpr::Peek)),
+					Box::new(Expr::Check(
+						Id::Lexer(id::Lexer::CharOpt),
+						Box::new(Expr::Get(Var::Defined(Id::Lexer(id::Lexer::UnsafeCharOpt)))),
+						Box::new(Expr::Match {
+							expr: Box::new(Expr::Get(Var::Defined(Id::Lexer(id::Lexer::CharOpt)))),
+							cases: state_cases,
+						})
+					))
+				)
 			};
 
 			MatchCase {

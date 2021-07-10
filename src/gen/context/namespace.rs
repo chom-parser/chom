@@ -10,7 +10,7 @@ use super::{
 #[derive(Clone, Copy)]
 pub struct ModuleId(u32);
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub enum TypeId {
 	/// Extern type.
 	Extern(u32),
@@ -118,7 +118,7 @@ impl<'p> Namespace<'p> {
 	}
 }
 
-impl<'p> chom_ir::Ids for Namespace<'p> {
+impl<'p> chom_ir::Namespace for Namespace<'p> {
 	type Var = Id;
 
 	type Module = ModuleId;

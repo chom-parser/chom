@@ -3,7 +3,7 @@ use chom_ir::{
 	Function,
 	function
 };
-use crate::{lexing::Token, mono, Ident, gen::Id};
+use crate::{lexing::Token, mono, Ident, gen::{id, Id}};
 use super::{Namespace,Expr,Pattern,TypeExpr,TypeId};
 use std::collections::{
 	HashMap,
@@ -199,7 +199,7 @@ impl<'p> Types<'p> {
 						let desc = VariantDesc::Tuple(vec![ty_expr]);
 						let ir_function = ir.add_function(Function::new(
 							function::Owner::Module(extern_module),
-							function::Signature::ExternParser(extern_ty_id),
+							function::Signature::ExternParser(Id::Extern(id::Extern::String), extern_ty_id),
 							None
 						));
 						(desc, Some(ir_function))
@@ -511,7 +511,7 @@ impl<'p> Types<'p> {
 }
 
 /// Built-in types.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub enum Type {
 	/// Lexer type.
 	Lexer,

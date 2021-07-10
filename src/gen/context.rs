@@ -239,30 +239,30 @@ impl<'a, 'p> Context<'a, 'p> {
 		ty::Expr::Instance(ty::Ref::Defined(ir_ty), params)
 	}
 
-	pub fn new(
+	pub fn new<S: AsRef<str>>(
 		config: super::Config,
 		grammar: &'a mono::Grammar<'p>,
-		extern_module_path: &[String],
-		ast_module_path: &[String],
-		lexer_module_path: &[String],
+		extern_module_path: &[S],
+		ast_module_path: &[S],
+		lexer_module_path: &[S],
 		lexing_table: &lexing::Table,
-		parser_module_path: &[String],
+		parser_module_path: &[S],
 		parsing_table: &parsing::Table,
 	) -> Self {
 		let mut ir = chom_ir::Context::new(Namespace::new(grammar.poly()));
 		let mut submodules = vec![HashMap::new()];
 
-		fn declare_module<'p>(
+		fn declare_module<'p, S: AsRef<str>>(
 			ir: &mut chom_ir::Context<Namespace<'p>>,
 			submodules: &mut Vec<HashMap<String, u32>>,
-			path: &[String],
+			path: &[S],
 			is_extern: bool
 		) -> u32 {
 			use std::collections::hash_map::Entry;
 			let index = match path.split_last() {
 				Some((name, parent_path)) => {
 					let parent_index = declare_module(ir, submodules, parent_path, false);
-					match submodules[parent_index as usize].entry(name.to_string()) {
+					match submodules[parent_index as usize].entry(name.as_ref().to_string()) {
 						Entry::Vacant(entry) => {
 							let id = ir.id_mut().new_module_id(Ident::new(name).unwrap());
 							let index = ir.add_module(Module::new(parent_index, id));
@@ -318,6 +318,7 @@ impl<'a, 'p> Context<'a, 'p> {
 
 		let lexing_error_ty = ir.add_type(Type::opaque(extern_module, TypeId::ExternError));
 		let lexing_error_fn = ir.add_function(Function::new(function::Owner::Module(extern_module), function::Signature::UndefinedChar(
+			Id::Extern(id::Extern::CharOpt),
 			ty::Expr::Instance(ty::Ref::Defined(lexing_error_ty), Vec::new())
 		), None));
 
@@ -529,7 +530,7 @@ impl<'a, 'p> Context<'a, 'p> {
 					let ir_type = context.type_expr(ty_index);
 					context.ir.add_function(Function::new(
 						function::Owner::Module(parser_module),
-						function::Signature::Parser(context.provided().token_type_expr(), ir_type),
+						function::Signature::Parser(Id::Parser(id::Parser::Lexer), context.provided().token_type_expr(), ir_type),
 						Some(parser)
 					));
 				}

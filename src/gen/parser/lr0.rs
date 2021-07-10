@@ -109,19 +109,22 @@ pub fn generate<'a, 'p>(context: &Context<'a, 'p>, table: &table::LR0, initial_s
 				Id::Parser(id::Parser::State),
 				true,
 				Box::new(Expr::Literal(Constant::Int(initial_state))),
-				Box::new(Expr::TailRecursion {
-					label: Label::Parser,
-					args: vec![
-						Var::Defined(Id::Parser(id::Parser::Lexer)),
-						Var::Defined(Id::Parser(id::Parser::Stack)),
-						Var::Defined(Id::Parser(id::Parser::AnyNodeOpt)),
-						Var::Defined(Id::Parser(id::Parser::State)),
-					],
-					body: Box::new(Expr::Match {
-						expr: Box::new(Expr::Get(Var::Defined(Id::Parser(id::Parser::State)))),
-						cases,
-					}),
-				}),
+				Box::new(Expr::Print(
+					"init done!".to_string(),
+					Box::new(Expr::TailRecursion {
+						label: Label::Parser,
+						args: vec![
+							Var::Defined(Id::Parser(id::Parser::Lexer)),
+							Var::Defined(Id::Parser(id::Parser::Stack)),
+							Var::Defined(Id::Parser(id::Parser::AnyNodeOpt)),
+							Var::Defined(Id::Parser(id::Parser::State)),
+						],
+						body: Box::new(Expr::Match {
+							expr: Box::new(Expr::Get(Var::Defined(Id::Parser(id::Parser::State)))),
+							cases,
+						}),
+					})
+				)),
 			)),
 		)),
 	);
@@ -473,7 +476,14 @@ fn generate_state<'a, 'p>(context: &Context<'a, 'p>, table: &table::LR0, stack: 
 					pattern: Pattern::none(),
 					expr: Expr::Stream(
 						Var::Defined(Id::Parser(id::Parser::Lexer)),
-						StreamExpr::Pull(Id::Parser(id::Parser::AnyTokenOpt), Box::new(action_case))
+						StreamExpr::Pull(
+							Id::Parser(id::Parser::UnsafeTokenOpt),
+							Box::new(Expr::Check(
+								Id::Parser(id::Parser::AnyTokenOpt),
+								Box::new(Expr::Get(Var::Defined(Id::Parser(id::Parser::UnsafeTokenOpt)))),
+								Box::new(action_case)
+							))
+						)
 					),
 				},
 			];
