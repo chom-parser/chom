@@ -33,14 +33,11 @@ pub struct Context<'a, 'p> {
 	/// Generation configuration.
 	config: super::Config,
 
-	/// Grammar.
-	grammar: &'a mono::Grammar<'p>,
-
 	/// Intermediate representation context.
-	ir: chom_ir::Context<Namespace<'p>>,
+	ir: chom_ir::Context<Namespace<'a, 'p>>,
 
 	/// Provided types.
-	provided: provided::Types<'p>,
+	provided: provided::Types<'a, 'p>,
 
 	/// Index of the extern module.
 	extern_module: u32,
@@ -83,22 +80,22 @@ impl<'a, 'p> Context<'a, 'p> {
 	}
 
 	pub fn grammar(&self) -> &'a mono::Grammar<'p> {
-		self.grammar
+		self.ir.id().grammar()
 	}
 
-	pub fn namespace(&self) -> &Namespace<'p> {
+	pub fn namespace(&self) -> &Namespace<'a, 'p> {
 		self.ir.id()
 	}
 
-	pub fn ir_context(&self) -> &chom_ir::Context<Namespace<'p>> {
+	pub fn ir_context(&self) -> &chom_ir::Context<Namespace<'a, 'p>> {
 		&self.ir
 	}
 
-	pub fn into_ir_context(self) -> chom_ir::Context<Namespace<'p>> {
+	pub fn into_ir_context(self) -> chom_ir::Context<Namespace<'a, 'p>> {
 		self.ir
 	}
 
-	pub fn module(&self, index: u32) -> Option<&Module<'p>> {
+	pub fn module(&self, index: u32) -> Option<&Module<'a, 'p>> {
 		self.ir.module(index)
 	}
 
@@ -106,35 +103,35 @@ impl<'a, 'p> Context<'a, 'p> {
 	// 	self.modules.get_mut(index as usize)
 	// }
 
-	pub fn root_module(&self) -> &Module<'p> {
+	pub fn root_module(&self) -> &Module<'a, 'p> {
 		self.module(0).unwrap()
 	}
 
-	pub fn extern_module(&self) -> &Module<'p> {
+	pub fn extern_module(&self) -> &Module<'a, 'p> {
 		self.module(self.extern_module).unwrap()
 	}
 
-	pub fn ast_module(&self) -> &Module<'p> {
+	pub fn ast_module(&self) -> &Module<'a, 'p> {
 		self.module(self.ast_module).unwrap()
 	}
 
-	pub fn lexer_module(&self) -> &Module<'p> {
+	pub fn lexer_module(&self) -> &Module<'a, 'p> {
 		self.module(self.lexer_module).unwrap()
 	}
 
-	pub fn parser_module(&self) -> &Module<'p> {
+	pub fn parser_module(&self) -> &Module<'a, 'p> {
 		self.module(self.parser_module).unwrap()
 	}
 
-	pub fn module_path(&self, index: u32) -> Option<Path<'_, 'p>> {
+	pub fn module_path(&self, index: u32) -> Option<Path<'_, 'a, 'p>> {
 		self.ir.module_path(index)
 	}
 
-	pub fn extern_module_path(&self) -> Path<'_, 'p> {
+	pub fn extern_module_path(&self) -> Path<'_, 'a, 'p> {
 		self.module_path(self.extern_module).unwrap()
 	}
 
-	pub fn lexing_error_type_expr(&self) -> TypeExpr<'p> {
+	pub fn lexing_error_type_expr(&self) -> TypeExpr<'a, 'p> {
 		TypeExpr::Instance(ty::Ref::Defined(self.lexing_error_ty), Vec::new())
 	}
 
@@ -142,19 +139,19 @@ impl<'a, 'p> Context<'a, 'p> {
 		self.lexing_error_fn
 	}
 
-	pub fn ast_module_path(&self) -> Path<'_, 'p> {
+	pub fn ast_module_path(&self) -> Path<'_, 'a, 'p> {
 		self.module_path(self.ast_module).unwrap()
 	}
 
-	pub fn lexer_module_path(&self) -> Path<'_, 'p> {
+	pub fn lexer_module_path(&self) -> Path<'_, 'a, 'p> {
 		self.module_path(self.lexer_module).unwrap()
 	}
 
-	pub fn parser_module_path(&self) -> Path<'_, 'p> {
+	pub fn parser_module_path(&self) -> Path<'_, 'a, 'p> {
 		self.module_path(self.parser_module).unwrap()
 	}
 
-	pub fn provided(&self) -> &provided::Types<'p> {
+	pub fn provided(&self) -> &provided::Types<'a, 'p> {
 		&self.provided
 	}
 
@@ -189,13 +186,13 @@ impl<'a, 'p> Context<'a, 'p> {
 	// }
 
 	/// Creates a expression that calls the given constructor function.
-	pub fn constructor_expr<F>(&self, index: mono::Index, build_arg: F) -> Expr<'p>
+	pub fn constructor_expr<F>(&self, index: mono::Index, build_arg: F) -> Expr<'a, 'p>
 	where
-		F: Fn(u32) -> Expr<'p>,
+		F: Fn(u32) -> Expr<'a, 'p>,
 	{
-		let f = self.grammar.function(index).unwrap();
+		let f = self.grammar().function(index).unwrap();
 		let ty_index = f.return_ty();
-		let grammar_ty = self.grammar.poly().ty(ty_index.0).unwrap();
+		let grammar_ty = self.grammar().poly().ty(ty_index.0).unwrap();
 		let ir_ty = *self.grammar_type.get(&ty_index.0).unwrap();
 
 		let args = f
@@ -205,7 +202,7 @@ impl<'a, 'p> Context<'a, 'p> {
 			.enumerate()
 			.filter_map(|(i, labeled_a)| {
 				let i = i as u32;
-				if labeled_a.is_typed(self.grammar.poly(), grammar_ty) {
+				if labeled_a.is_typed(self.grammar().poly(), grammar_ty) {
 					Some(build_arg(i))
 				} else {
 					None
@@ -219,15 +216,15 @@ impl<'a, 'p> Context<'a, 'p> {
 		}
 	}
 
-	pub fn type_expr(&self, index: mono::Index) -> TypeExpr<'p> {
-		let ty = self.grammar.ty(index).unwrap();
+	pub fn type_expr(&self, index: mono::Index) -> TypeExpr<'a, 'p> {
+		let ty = self.grammar().ty(index).unwrap();
 		let params = ty
 			.parameters()
 			.iter()
 			.filter_map(|p| match p {
 				mono::ty::Expr::Terminal(index) => {
-					let t = self.grammar.terminal(*index).unwrap();
-					t.extern_type(self.grammar.poly()).map(|i| {
+					let t = self.grammar().terminal(*index).unwrap();
+					t.extern_type(self.grammar().poly()).map(|i| {
 						let ir_ty = *self.grammar_extern_type.get(&i).unwrap();
 						ty::Expr::Instance(ty::Ref::Defined(ir_ty), Vec::new())
 					})
@@ -249,11 +246,11 @@ impl<'a, 'p> Context<'a, 'p> {
 		parser_module_path: &[S],
 		parsing_table: &parsing::Table,
 	) -> Self {
-		let mut ir = chom_ir::Context::new(Namespace::new(grammar.poly()));
+		let mut ir = chom_ir::Context::new(Namespace::new(grammar));
 		let mut submodules = vec![HashMap::new()];
 
-		fn declare_module<'p, S: AsRef<str>>(
-			ir: &mut chom_ir::Context<Namespace<'p>>,
+		fn declare_module<'a, 'p, S: AsRef<str>>(
+			ir: &mut chom_ir::Context<Namespace<'a, 'p>>,
 			submodules: &mut Vec<HashMap<String, u32>>,
 			path: &[S],
 			is_extern: bool
@@ -317,25 +314,30 @@ impl<'a, 'p> Context<'a, 'p> {
 		}
 
 		let lexing_error_ty = ir.add_type(Type::opaque(extern_module, TypeId::ExternError));
-		let lexing_error_fn = ir.add_function(Function::new(function::Owner::Module(extern_module), function::Signature::UndefinedChar(
-			Id::Extern(id::Extern::CharOpt),
-			ty::Expr::Instance(ty::Ref::Defined(lexing_error_ty), Vec::new())
-		), None));
+		let lexing_error_fn = ir.add_function(Function::new(
+			function::Owner::Module(extern_module),
+			FunctionId::UndefinedChar,
+			function::Signature::undefined_char_constructor(
+				Id::Extern(id::Extern::CharOpt),
+				ty::Expr::Instance(ty::Ref::Defined(lexing_error_ty), Vec::new())
+			),
+			None
+		));
 
-		struct DefinitionEnv<'a, 'p> {
-			config: &'a super::Config,
-			ir: &'a mut chom_ir::Context<Namespace<'p>>,
+		struct DefinitionEnv<'e, 'a, 'p> {
+			config: &'e super::Config,
+			ir: &'e mut chom_ir::Context<Namespace<'a, 'p>>,
 			ast_module: u32,
-			grammar_extern_type: &'a HashMap<u32, u32>,
-			grammar_type: &'a mut HashMap<u32, u32>,
-			function_variants: &'a mut HashMap<u32, u32>,
+			grammar_extern_type: &'e HashMap<u32, u32>,
+			grammar_type: &'e mut HashMap<u32, u32>,
+			function_variants: &'e mut HashMap<u32, u32>,
 		}
 
-		fn sub_type_expr<'a, 'p>(
-			env: &mut DefinitionEnv<'a, 'p>,
+		fn sub_type_expr<'e, 'a, 'p>(
+			env: &mut DefinitionEnv<'e, 'a, 'p>,
 			context_ty: &poly::Type,
 			expr: &poly::ty::Expr,
-		) -> Option<TypeExpr<'p>> {
+		) -> Option<TypeExpr<'a, 'p>> {
 			log::info!("IR: sub type expr...");
 			match expr {
 				poly::ty::Expr::Type(index, params) => {
@@ -347,7 +349,7 @@ impl<'a, 'p> Context<'a, 'p> {
 					Some(ty::Expr::Instance(ty::Ref::Defined(ir_ty), params))
 				}
 				poly::ty::Expr::Terminal(index) => {
-					let grammar = env.ir.id().grammar();
+					let grammar = env.ir.id().grammar().poly();
 					let t = grammar.terminal(*index).unwrap();
 					t.extern_type(grammar).map(|i| {
 						let ir_ty = *env.grammar_extern_type.get(&i).unwrap();
@@ -361,12 +363,12 @@ impl<'a, 'p> Context<'a, 'p> {
 			}
 		}
 
-		fn type_expr<'a, 'p>(
-			env: &mut DefinitionEnv<'a, 'p>,
+		fn type_expr<'e, 'a, 'p>(
+			env: &mut DefinitionEnv<'e, 'a, 'p>,
 			context_ty_index: u32,
 			expr: &poly::ty::Expr,
-		) -> Option<TypeExpr<'p>> {
-			let grammar = env.ir.id().grammar();
+		) -> Option<TypeExpr<'a, 'p>> {
+			let grammar = env.ir.id().grammar().poly();
 			let context_ty = grammar.ty(context_ty_index).unwrap();
 			sub_type_expr(env, context_ty, expr).map(|mut p| {
 				if env.config.locate {
@@ -381,11 +383,11 @@ impl<'a, 'p> Context<'a, 'p> {
 			})
 		}
 
-		fn define_type<'a, 'p>(env: &mut DefinitionEnv<'a, 'p>, index: u32) -> u32 {
+		fn define_type<'e, 'a, 'p>(env: &mut DefinitionEnv<'e, 'a, 'p>, index: u32) -> u32 {
 			match env.grammar_type.get(&index).cloned() {
 				Some(ir_ty) => ir_ty,
 				None => {
-					let grammar = env.ir.id().grammar();
+					let grammar = env.ir.id().grammar().poly();
 					let ty = grammar.ty(index).unwrap();
 					let id = TypeId::Grammar(index);
 					match ty.id() {
@@ -475,9 +477,9 @@ impl<'a, 'p> Context<'a, 'p> {
 		}
 
 		let provided = provided::Types::new(
-			grammar,
 			&mut ir,
 			extern_module,
+			lexing_error_ty,
 			lexer_module,
 			parser_module,
 			&grammar_extern_type,
@@ -486,7 +488,6 @@ impl<'a, 'p> Context<'a, 'p> {
 
 		let mut context = Self {
 			config,
-			grammar,
 			ir,
 			provided,
 			extern_module,
@@ -518,7 +519,11 @@ impl<'a, 'p> Context<'a, 'p> {
 		let lexer = super::lexer::generate(&context, lexing_table);
 		context.ir.add_function(Function::new(
 			function::Owner::Type(context.provided().lexer_type()),
-			function::Signature::Lexer(context.provided().token_type_expr(), context.lexing_error_type_expr()),
+			FunctionId::Lexer,
+			function::Signature::lexer(
+				context.provided().token_type_expr(),
+				context.lexing_error_type_expr()
+			),
 			Some(lexer)
 		));
 
@@ -527,10 +532,16 @@ impl<'a, 'p> Context<'a, 'p> {
 				log::info!("IR: LR0 parsing functions...");
 				for (q, ty_index) in table.initial_states() {
 					let parser = super::parser::lr0::generate(&context, table, q);
-					let ir_type = context.type_expr(ty_index);
 					context.ir.add_function(Function::new(
 						function::Owner::Module(parser_module),
-						function::Signature::Parser(Id::Parser(id::Parser::Lexer), context.provided().token_type_expr(), ir_type),
+						FunctionId::Parser(ty_index),
+						function::Signature::parser(
+							Id::Parser(id::Parser::Lexer),
+							context.provided().token_type_expr(), 
+							context.lexing_error_type_expr(),
+							context.type_expr(ty_index),
+							context.lexing_error_type_expr()
+						),
 						Some(parser)
 					));
 				}

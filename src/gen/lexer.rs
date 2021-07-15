@@ -25,11 +25,11 @@ use std::{
 	ops::{Bound, RangeBounds},
 };
 
-pub fn generate<'a, 'p>(context: &Context<'a, 'p>, table: &Table) -> Expr<'p> {
+pub fn generate<'a, 'p>(context: &Context<'a, 'p>, table: &Table) -> Expr<'a, 'p> {
 	generate_automaton(context, table, 0, false)
 }
 
-fn locate<'a, 'p>(context: &Context<'a, 'p>, e: Expr<'p>) -> Expr<'p> {
+fn locate<'a, 'p>(context: &Context<'a, 'p>, e: Expr<'a, 'p>) -> Expr<'a, 'p> {
 	if context.config().locate {
 		Expr::locate(
 			e,
@@ -99,7 +99,7 @@ fn locate<'a, 'p>(context: &Context<'a, 'p>, e: Expr<'p>) -> Expr<'p> {
 /// 	...
 /// }
 /// ```
-fn generate_automaton<'a, 'p>(context: &Context<'a, 'p>, table: &Table, index: u32, default_token: bool) -> Expr<'p> {
+fn generate_automaton<'a, 'p>(context: &Context<'a, 'p>, table: &Table, index: u32, default_token: bool) -> Expr<'a, 'p> {
 	let automaton = table.automaton(index).unwrap();
 	let recurse_args = if default_token {
 		vec![
@@ -324,7 +324,7 @@ fn generate_automaton<'a, 'p>(context: &Context<'a, 'p>, table: &Table, index: u
 	))
 }
 
-fn ranges_pattern<'p>(ranges: &BTreeSet<AnyRange<char>>) -> Pattern<'p> {
+fn ranges_pattern<'a, 'p>(ranges: &BTreeSet<AnyRange<char>>) -> Pattern<'a, 'p> {
 	if ranges.len() == 1 {
 		range_pattern(ranges.iter().next().unwrap())
 	} else {
@@ -332,7 +332,7 @@ fn ranges_pattern<'p>(ranges: &BTreeSet<AnyRange<char>>) -> Pattern<'p> {
 	}
 }
 
-fn range_pattern<'p>(range: &btree_range_map::AnyRange<char>) -> Pattern<'p> {
+fn range_pattern<'a, 'p>(range: &btree_range_map::AnyRange<char>) -> Pattern<'a, 'p> {
 	let a = included_start_bound(range.start_bound());
 	let b = included_end_bound(range.end_bound());
 

@@ -12,12 +12,12 @@ pub mod parser;
 
 pub use context::*;
 
-pub type Pattern<'p> = chom_ir::Pattern<Namespace<'p>>;
-pub type Expr<'p> = chom_ir::Expr<Namespace<'p>>;
-pub type Module<'p> = chom_ir::Module<Namespace<'p>>;
-pub type Type<'p> = chom_ir::Type<Namespace<'p>>;
-pub type TypeExpr<'p> = chom_ir::ty::Expr<Namespace<'p>>;
-pub type Path<'a, 'p> = chom_ir::Path<'a, Namespace<'p>>;
+pub type Pattern<'a, 'p> = chom_ir::Pattern<Namespace<'a, 'p>>;
+pub type Expr<'a, 'p> = chom_ir::Expr<Namespace<'a, 'p>>;
+pub type Module<'a, 'p> = chom_ir::Module<Namespace<'a, 'p>>;
+pub type Type<'a, 'p> = chom_ir::Type<Namespace<'a, 'p>>;
+pub type TypeExpr<'a, 'p> = chom_ir::ty::Expr<Namespace<'a, 'p>>;
+pub type Path<'c, 'a, 'p> = chom_ir::Path<'c, Namespace<'a, 'p>>;
 
 // pub mod pseudo;
 // pub mod target;

@@ -1,6 +1,7 @@
 use crate::{
 	Ident,
-	poly
+	poly,
+	mono
 };
 use super::{
 	Id,
@@ -60,9 +61,30 @@ impl Label {
 	}
 }
 
-pub struct Namespace<'p> {
+#[derive(Clone, Copy)]
+pub enum FunctionId {
+	/// Undefined character error constructor.
+	UndefinedChar,
+
+	/// Extern parser.
+	/// 
+	/// The given parameter is the index of the target
+	/// extern type in the grammar.
+	ExternParser(u32),
+
+	/// Lexer.
+	Lexer,
+
+	/// Parser.
+	/// 
+	/// The given parameter is the index of the target
+	/// type in the grammar.
+	Parser(mono::Index)
+}
+
+pub struct Namespace<'a, 'p> {
 	/// Grammar.
-	grammar: &'p poly::Grammar,
+	grammar: &'a mono::Grammar<'p>,
 
 	/// The name of each module.
 	modules: Vec<Ident>,
@@ -78,8 +100,8 @@ pub struct Namespace<'p> {
 	node_variants: Vec<Ident>,
 }
 
-impl<'p> Namespace<'p> {
-	pub fn new(grammar: &'p poly::Grammar) -> Self {
+impl<'a, 'p> Namespace<'a, 'p> {
+	pub fn new(grammar: &'a mono::Grammar<'p>) -> Self {
 		Self {
 			grammar,
 			modules: Vec::new(),
@@ -89,7 +111,7 @@ impl<'p> Namespace<'p> {
 		}
 	}
 
-	pub fn grammar(&self) -> &'p poly::Grammar {
+	pub fn grammar(&self) -> &'a mono::Grammar<'p> {
 		self.grammar
 	}
 
@@ -118,7 +140,7 @@ impl<'p> Namespace<'p> {
 	}
 }
 
-impl<'p> chom_ir::Namespace for Namespace<'p> {
+impl<'a, 'p> chom_ir::Namespace for Namespace<'a, 'p> {
 	type Var = Id;
 
 	type Module = ModuleId;
@@ -132,6 +154,8 @@ impl<'p> chom_ir::Namespace for Namespace<'p> {
 	type Field = FieldId;
 
 	type Label = Label;
+
+	type Function = FunctionId;
 
 	fn var_ident(&self, v: Self::Var) -> Ident {
 		v.to_ident()
@@ -151,7 +175,7 @@ impl<'p> chom_ir::Namespace for Namespace<'p> {
 				Ident::new("error").unwrap() // TODO: test for reserved name error.
 			}
 			TypeId::Grammar(t) => {
-				let ty = self.grammar.ty(t).unwrap();
+				let ty = self.grammar.poly().ty(t).unwrap();
 				ty.id().as_defined().expect("expected defined grammar type").clone()
 			},
 			TypeId::Provided(p) => p.ident()
@@ -165,7 +189,7 @@ impl<'p> chom_ir::Namespace for Namespace<'p> {
 	fn variant_ident(&self, v: Self::Variant) -> Ident {
 		match v {
 			VariantId::Function(i) => {
-				self.grammar().function(i).unwrap().id().as_defined().clone()
+				self.grammar().poly().function(i).unwrap().id().as_defined().clone()
 			}
 			VariantId::Provided(p) => {
 				use provided::{
@@ -195,10 +219,26 @@ impl<'p> chom_ir::Namespace for Namespace<'p> {
 	}
 
 	fn field_ident(&self, f: Self::Field) -> Ident {
-		self.grammar.function(f.0).unwrap().argument(f.1).unwrap().label().unwrap().clone()
+		self.grammar.poly().function(f.0).unwrap().argument(f.1).unwrap().label().unwrap().clone()
 	}
 
 	fn label_ident(&self, l: Self::Label) -> Ident {
 		l.to_ident()
+	}
+
+	fn function_ident(&self, f: Self::Function) -> Ident {
+		match f {
+			FunctionId::UndefinedChar => Ident::new("undefined-char").unwrap(),
+			FunctionId::ExternParser(index) => {
+				let ty = self.grammar.extern_type(index).unwrap();
+				Ident::new(format!("parse-{}", ty)).unwrap()
+			}
+			FunctionId::Lexer => Ident::new("lexer").unwrap(),
+			FunctionId::Parser(index) => {
+				let ty = self.grammar.ty(index).unwrap();
+				let id = ty.composed_id(self.grammar);
+				Ident::new(format!("parse-{}", id)).unwrap()
+			}
+		}
 	}
 }

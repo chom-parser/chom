@@ -4,7 +4,7 @@ use chom_ir::{
 	function
 };
 use crate::{lexing::Token, mono, Ident, gen::{id, Id}};
-use super::{Namespace,Expr,Pattern,TypeExpr,TypeId};
+use super::{Namespace,Expr,Pattern,TypeExpr,TypeId,FunctionId};
 use std::collections::{
 	HashMap,
 	hash_map::Entry
@@ -12,15 +12,15 @@ use std::collections::{
 
 pub use crate::lexing::token::{Delimiter, Operator, Punct};
 
-struct TokenData<'p> {
-	pattern: Pattern<'p>,
+struct TokenData<'a, 'p> {
+	pattern: Pattern<'a, 'p>,
 	parsing_function: Option<u32>
 }
 
 /// Provided types.
 /// 
 /// Stores the IR type index of each provided type.
-pub struct Types<'p> {
+pub struct Types<'a, 'p> {
 	/// Enum type of tokens.
 	///
 	/// Defined in the lexer.
@@ -39,7 +39,7 @@ pub struct Types<'p> {
 	pub punct_ty: Option<u32>,
 
 	/// Maps each grammar terminal to a token pattern.
-	tokens_data: HashMap<u32, TokenData<'p>>,
+	tokens_data: HashMap<u32, TokenData<'a, 'p>>,
 
 	/// Enum type of AST nodes (types/non terminals).
 	///
@@ -58,7 +58,7 @@ pub struct Types<'p> {
 	pub lexer_ty: u32
 }
 
-impl<'p> Types<'p> {
+impl<'a, 'p> Types<'a, 'p> {
 	pub fn lexer_type(&self) -> ty::Ref {
 		ty::Ref::Defined(self.lexer_ty)
 	}
@@ -71,11 +71,11 @@ impl<'p> Types<'p> {
 		ty::Ref::Defined(self.token_ty)
 	}
 
-	pub fn token_type_expr(&self) -> TypeExpr<'p> {
+	pub fn token_type_expr(&self) -> TypeExpr<'a, 'p> {
 		ty::Expr::Instance(self.token_type(), Vec::new())
 	}
 
-	pub fn token_pattern<F>(&self, index: u32, f: F) -> Pattern<'p>
+	pub fn token_pattern<F>(&self, index: u32, f: F) -> Pattern<'a, 'p>
 	where
 		F: Copy + Fn() -> Id,
 	{
@@ -87,9 +87,9 @@ impl<'p> Types<'p> {
 	/// 
 	/// If the token takes a value, the input function is called
 	/// with the index of the token's parsing function declared in the IR.
-	pub fn token_expr<F>(&self, index: u32, f: F) -> Expr<'p>
+	pub fn token_expr<F>(&self, index: u32, f: F) -> Expr<'a, 'p>
 	where
-		F: Copy + Fn(u32) -> Expr<'p>,
+		F: Copy + Fn(u32) -> Expr<'a, 'p>,
 	{
 		let data = self.tokens_data.get(&index).unwrap();
 		data.pattern.as_expr(|_| {
@@ -97,7 +97,7 @@ impl<'p> Types<'p> {
 		})
 	}
 
-	pub fn node_pattern(&self, index: mono::Index, id: Id) -> Pattern<'p> {
+	pub fn node_pattern(&self, index: mono::Index, id: Id) -> Pattern<'a, 'p> {
 		Pattern::Cons(
 			ty::Ref::Defined(self.node_ty),
 			*self.nodes_variants_map.get(&index).unwrap(),
@@ -105,7 +105,7 @@ impl<'p> Types<'p> {
 		)
 	}
 
-	pub fn node_expr(&self, index: mono::Index, e: Expr<'p>) -> Expr<'p> {
+	pub fn node_expr(&self, index: mono::Index, e: Expr<'a, 'p>) -> Expr<'a, 'p> {
 		Expr::Cons(
 			ty::Ref::Defined(self.node_ty),
 			*self.nodes_variants_map.get(&index).unwrap(),
@@ -118,7 +118,7 @@ impl<'p> Types<'p> {
 	/// 
 	/// If the token takes a value, the input function is called
 	/// with the index of the token's parsing function declared in the IR.
-	pub fn item_token_pattern<F>(&self, index: u32, f: F) -> Pattern<'p>
+	pub fn item_token_pattern<F>(&self, index: u32, f: F) -> Pattern<'a, 'p>
 	where
 		F: Copy + Fn() -> Id,
 	{
@@ -129,9 +129,9 @@ impl<'p> Types<'p> {
 		)
 	}
 
-	pub fn item_token_expr<F>(&self, index: u32, f: F) -> Expr<'p>
+	pub fn item_token_expr<F>(&self, index: u32, f: F) -> Expr<'a, 'p>
 	where
-		F: Copy + Fn(u32) -> Expr<'p>,
+		F: Copy + Fn(u32) -> Expr<'a, 'p>,
 	{
 		Expr::Cons(
 			ty::Ref::Defined(self.item_ty),
@@ -140,7 +140,7 @@ impl<'p> Types<'p> {
 		)
 	}
 
-	pub fn item_node_pattern(&self, index: mono::Index, id: Id) -> Pattern<'p> {
+	pub fn item_node_pattern(&self, index: mono::Index, id: Id) -> Pattern<'a, 'p> {
 		Pattern::Cons(
 			ty::Ref::Defined(self.item_ty),
 			1,
@@ -148,7 +148,7 @@ impl<'p> Types<'p> {
 		)
 	}
 
-	pub fn item_node_expr(&self, index: mono::Index, e: Expr<'p>) -> Expr<'p> {
+	pub fn item_node_expr(&self, index: mono::Index, e: Expr<'a, 'p>) -> Expr<'a, 'p> {
 		Expr::Cons(
 			ty::Ref::Defined(self.item_ty),
 			1,
@@ -158,14 +158,16 @@ impl<'p> Types<'p> {
 
 	/// The creates all the provided types in the intermediate representation.
 	pub fn new(
-		grammar: &mono::Grammar<'p>,
-		ir: &mut chom_ir::Context<Namespace<'p>>,
+		ir: &mut chom_ir::Context<Namespace<'a, 'p>>,
 		extern_module: u32,
+		extern_error_ty: u32,
 		lexer_module: u32,
 		parser_module: u32,
 		grammar_extern_type: &HashMap<u32, u32>,
 		grammar_type: &HashMap<u32, u32>,
 	) -> Self {
+		let grammar = ir.id().grammar();
+
 		let token_ty = ir.add_type(super::Type::new(lexer_module, TypeId::Provided(Type::Token), ty::Desc::Opaque));
 		let mut keyword_ty: Option<(u32, u32)> = None;
 		let mut delimiter_ty: Option<u32> = None;
@@ -196,10 +198,15 @@ impl<'p> Types<'p> {
 						let extern_ty_id = grammar.extern_type(extern_ty).unwrap().clone();
 						let ir_ty = grammar_extern_type.get(&extern_ty).unwrap().clone();
 						let ty_expr = TypeExpr::Instance(ty::Ref::Defined(ir_ty), Vec::new());
-						let desc = VariantDesc::Tuple(vec![ty_expr]);
+						let desc = VariantDesc::Tuple(vec![ty_expr.clone()]);
 						let ir_function = ir.add_function(Function::new(
 							function::Owner::Module(extern_module),
-							function::Signature::ExternParser(Id::Extern(id::Extern::String), extern_ty_id),
+							FunctionId::ExternParser(extern_ty),
+							function::Signature::extern_parser(
+								Id::Extern(id::Extern::String),
+								ty_expr,
+								ty::Expr::Instance(ty::Ref::Defined(extern_error_ty), Vec::new())
+							),
 							None
 						));
 						(desc, Some(ir_function))
@@ -417,12 +424,12 @@ impl<'p> Types<'p> {
 			}
 		}
 
-		fn type_expr<'p>(
-			grammar: &mono::Grammar<'p>,
+		fn type_expr<'a, 'p>(
+			grammar: &'a mono::Grammar<'p>,
 			grammar_extern_type: &HashMap<u32, u32>,
 			grammar_type: &HashMap<u32, u32>,
 			index: mono::Index,
-		) -> TypeExpr<'p> {
+		) -> TypeExpr<'a, 'p> {
 			let ty = grammar.ty(index).unwrap();
 			let params = ty
 				.parameters()
@@ -482,10 +489,10 @@ impl<'p> Types<'p> {
 
 		let item_ty = ir.add_type(super::Type::new(parser_module, super::TypeId::Provided(Type::Item), ty::Desc::Enum(items)));
 
-		fn define_type<'p>(
-			ir: &mut chom_ir::Context<Namespace<'p>>,
+		fn define_type<'a, 'p>(
+			ir: &mut chom_ir::Context<Namespace<'a, 'p>>,
 			index: Option<u32>,
-			enm: ty::Enum<Namespace<'p>>,
+			enm: ty::Enum<Namespace<'a, 'p>>,
 		) -> Option<u32> {
 			index.map(|index| {
 				ir.ty_mut(ty::Ref::Defined(index)).unwrap().set_desc(ty::Desc::Enum(enm));

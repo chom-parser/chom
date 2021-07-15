@@ -79,7 +79,7 @@ use std::collections::HashSet;
 /// 	}
 /// }
 /// ```
-pub fn generate<'a, 'p>(context: &Context<'a, 'p>, table: &table::LR0, initial_state: u32) -> Expr<'p> {
+pub fn generate<'a, 'p>(context: &Context<'a, 'p>, table: &table::LR0, initial_state: u32) -> Expr<'a, 'p> {
 	let mut cases = Vec::new();
 	let mut stack = vec![initial_state];
 	let mut visited = HashSet::new();
@@ -97,6 +97,23 @@ pub fn generate<'a, 'p>(context: &Context<'a, 'p>, table: &table::LR0, initial_s
 		expr: Expr::Unreachable,
 	});
 
+	let loop_args = if context.config().locate {
+		vec![
+			Var::Defined(Id::Parser(id::Parser::Lexer)),
+			Var::Defined(Id::Parser(id::Parser::Position)),
+			Var::Defined(Id::Parser(id::Parser::Stack)),
+			Var::Defined(Id::Parser(id::Parser::AnyNodeOpt)),
+			Var::Defined(Id::Parser(id::Parser::State)),
+		]
+	} else {
+		vec![
+			Var::Defined(Id::Parser(id::Parser::Lexer)),
+			Var::Defined(Id::Parser(id::Parser::Stack)),
+			Var::Defined(Id::Parser(id::Parser::AnyNodeOpt)),
+			Var::Defined(Id::Parser(id::Parser::State)),
+		]
+	};
+
 	let expr = Expr::Let(
 		Id::Parser(id::Parser::Stack),
 		true,
@@ -113,12 +130,7 @@ pub fn generate<'a, 'p>(context: &Context<'a, 'p>, table: &table::LR0, initial_s
 					"init done!".to_string(),
 					Box::new(Expr::TailRecursion {
 						label: Label::Parser,
-						args: vec![
-							Var::Defined(Id::Parser(id::Parser::Lexer)),
-							Var::Defined(Id::Parser(id::Parser::Stack)),
-							Var::Defined(Id::Parser(id::Parser::AnyNodeOpt)),
-							Var::Defined(Id::Parser(id::Parser::State)),
-						],
+						args: loop_args,
 						body: Box::new(Expr::Match {
 							expr: Box::new(Expr::Get(Var::Defined(Id::Parser(id::Parser::State)))),
 							cases,
@@ -141,7 +153,7 @@ pub fn generate<'a, 'p>(context: &Context<'a, 'p>, table: &table::LR0, initial_s
 	}
 }
 
-fn stack_pop<'a, 'p>(context: &Context<'a, 'p>, patterns: &[Pattern<'p>], next: Expr<'p>, returning: bool) -> Expr<'p> {
+fn stack_pop<'a, 'p>(context: &Context<'a, 'p>, patterns: &[Pattern<'a, 'p>], next: Expr<'a, 'p>, returning: bool) -> Expr<'a, 'p> {
 	let mut expr = next;
 	let last = (patterns.len() - 1) as u32;
 
@@ -233,13 +245,23 @@ fn stack_pop<'a, 'p>(context: &Context<'a, 'p>, patterns: &[Pattern<'p>], next: 
 	expr
 }
 
-fn generate_state<'a, 'p>(context: &Context<'a, 'p>, table: &table::LR0, stack: &mut Vec<u32>, q: u32) -> Expr<'p> {
-	let recurse_args = vec![
-		Var::Defined(Id::Parser(id::Parser::Lexer)),
-		Var::Defined(Id::Parser(id::Parser::Stack)),
-		Var::Defined(Id::Parser(id::Parser::AnyNodeOpt)),
-		Var::Defined(Id::Parser(id::Parser::State)),
-	];
+fn generate_state<'a, 'p>(context: &Context<'a, 'p>, table: &table::LR0, stack: &mut Vec<u32>, q: u32) -> Expr<'a, 'p> {
+	let recurse_args = if context.config().locate {
+		vec![
+			Var::Defined(Id::Parser(id::Parser::Lexer)),
+			Var::Defined(Id::Parser(id::Parser::Position)),
+			Var::Defined(Id::Parser(id::Parser::Stack)),
+			Var::Defined(Id::Parser(id::Parser::AnyNodeOpt)),
+			Var::Defined(Id::Parser(id::Parser::State)),
+		]
+	} else {
+		vec![
+			Var::Defined(Id::Parser(id::Parser::Lexer)),
+			Var::Defined(Id::Parser(id::Parser::Stack)),
+			Var::Defined(Id::Parser(id::Parser::AnyNodeOpt)),
+			Var::Defined(Id::Parser(id::Parser::State)),
+		]
+	};
 	let state = table.state(q).unwrap();
 
 	match state {
