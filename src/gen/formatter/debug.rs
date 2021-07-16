@@ -30,7 +30,7 @@ pub fn function<'c, 'a: 'c, 'p>(context: &'c chom_ir::Context<Namespace<'a, 'p>>
 	)
 }
 
-pub fn generate_args_fmt<'c, 'a: 'c, 'p, A>(args: A) -> Expr<'a, 'p> where A: IntoIterator<Item=&'c TypeExpr<'a, 'p>>, A::IntoIter: ExactSizeIterator + DoubleEndedIterator {
+pub fn generate_args_fmt<'c, 'a: 'c, 'p, A>(args: A, fields: bool) -> Expr<'a, 'p> where A: IntoIterator<Item=&'c TypeExpr<'a, 'p>>, A::IntoIter: ExactSizeIterator + DoubleEndedIterator {
 	let args = args.into_iter();
 	if args.len() == 0 {
 		Expr::Literal(Constant::Unit)
@@ -44,7 +44,11 @@ pub fn generate_args_fmt<'c, 'a: 'c, 'p, A>(args: A) -> Expr<'a, 'p> where A: In
 		for (i, _) in args.enumerate().rev() {
 			expr = Expr::DebugFormat(
 				Id::Format(id::Format::Output),
-				Var::Defined(Id::Format(id::Format::Arg(i as u32))),
+				Box::new(if fields {
+					Expr::RefField(Var::This, i as u32, false)
+				} else {
+					Expr::Get(Var::Defined(Id::Format(id::Format::Arg(i as u32))))
+				}),
 				Box::new(expr)
 			);
 
@@ -90,8 +94,8 @@ pub fn generate<'c, 'a: 'c, 'p>(context: &'c chom_ir::Context<Namespace<'a, 'p>>
 							use ty::VariantDesc;
 
 							let (args, len) = match desc {
-								VariantDesc::Tuple(args) => (generate_args_fmt(args), args.len()),
-								VariantDesc::Struct(strct) => (generate_args_fmt(strct.fields().iter().map(|f| &f.ty)), strct.fields().len())
+								VariantDesc::Tuple(args) => (generate_args_fmt(args, false), args.len()),
+								VariantDesc::Struct(strct) => (generate_args_fmt(strct.fields().iter().map(|f| &f.ty), false), strct.fields().len())
 							};
 
 							let expr = Expr::Write(
@@ -121,13 +125,13 @@ pub fn generate<'c, 'a: 'c, 'p>(context: &'c chom_ir::Context<Namespace<'a, 'p>>
 				})
 				.collect();
 
-			Expr::Match {
+			Expr::MatchRef {
 				expr: Box::new(Expr::Get(Var::This)),
 				cases,
 			}
 		}
 		Desc::Struct(strct) => {
-			let args = generate_args_fmt(strct.fields().iter().map(|f| &f.ty));
+			let args = generate_args_fmt(strct.fields().iter().map(|f| &f.ty), true);
 			Expr::Write(
 				Id::Format(id::Format::Output),
 				ty.id().ident(context.id()).to_snake_case().to_string(),
@@ -135,7 +139,7 @@ pub fn generate<'c, 'a: 'c, 'p>(context: &'c chom_ir::Context<Namespace<'a, 'p>>
 			)
 		},
 		Desc::TupleStruct(args) => {
-			let args = generate_args_fmt(args);
+			let args = generate_args_fmt(args, true);
 			Expr::Write(
 				Id::Format(id::Format::Output),
 				ty.id().ident(context.id()).to_snake_case().to_string(),
