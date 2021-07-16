@@ -79,7 +79,10 @@ pub enum FunctionId {
 	/// 
 	/// The given parameter is the index of the target
 	/// type in the grammar.
-	Parser(mono::Index)
+	Parser(mono::Index),
+
+	/// Debug formatter.
+	DebugFormat
 }
 
 pub struct Namespace<'a, 'p> {
@@ -239,6 +242,7 @@ impl<'a, 'p> chom_ir::Namespace for Namespace<'a, 'p> {
 				let id = ty.composed_id(self.grammar);
 				Ident::new(format!("parse-{}", id)).unwrap()
 			}
+			FunctionId::DebugFormat => Ident::new("debug-format").unwrap()
 		}
 	}
 }

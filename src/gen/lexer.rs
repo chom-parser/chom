@@ -103,14 +103,14 @@ fn generate_automaton<'a, 'p>(context: &Context<'a, 'p>, table: &Table, index: u
 	let automaton = table.automaton(index).unwrap();
 	let recurse_args = if default_token {
 		vec![
-			Var::This,
-			Var::Defined(Id::Lexer(id::Lexer::BufferChars)),
-			Var::Defined(Id::Lexer(id::Lexer::State)),
+			(Var::This, true),
+			(Var::Defined(Id::Lexer(id::Lexer::BufferChars)), true),
+			(Var::Defined(Id::Lexer(id::Lexer::State)), true),
 		]
 	} else {
 		vec![
-			Var::This,
-			Var::Defined(Id::Lexer(id::Lexer::State))
+			(Var::This, true),
+			(Var::Defined(Id::Lexer(id::Lexer::State)), true)
 		]
 	};
 
@@ -157,7 +157,7 @@ fn generate_automaton<'a, 'p>(context: &Context<'a, 'p>, table: &Table, index: u
 					let next_state_expr = Expr::Update(
 						Id::Lexer(id::Lexer::State),
 						Box::new(Expr::Literal(Constant::Int(target_id))),
-						Box::new(Expr::Recurse(Label::Lexer(index), recurse_args.clone())),
+						Box::new(Expr::Recurse(Label::Lexer(index), recurse_args.iter().map(|a| a.0).collect())),
 					);
 
 					MatchCase {
@@ -171,14 +171,19 @@ fn generate_automaton<'a, 'p>(context: &Context<'a, 'p>, table: &Table, index: u
 				})
 				.collect();
 
-			state_cases.push(match q {
+			// Default case(s)
+			match q {
 				DetState::Final(terminal_index, _) => {
 					let terminal = context.grammar().terminal(*terminal_index).unwrap();
 					let expr = match terminal.desc() {
 						terminal::Desc::Whitespace(_) => Expr::Lexer(Var::This, LexerExpr::Clear(
-							Box::new(Expr::Recurse(
-								Label::Lexer(0),
-								vec![Var::This, Var::Defined(Id::Lexer(id::Lexer::State))],
+							Box::new(Expr::Update(
+								Id::Lexer(id::Lexer::State),
+								Box::new(Expr::Literal(Constant::Int(init_id))),
+								Box::new(Expr::Recurse(
+									Label::Lexer(0),
+									vec![Var::This, Var::Defined(Id::Lexer(id::Lexer::State))],
+								))
 							)),
 						)),
 						terminal::Desc::RegExp(_) => {
@@ -243,30 +248,42 @@ fn generate_automaton<'a, 'p>(context: &Context<'a, 'p>, table: &Table, index: u
 						}
 					};
 
-					MatchCase {
+					state_cases.push(MatchCase {
 						pattern: Pattern::Any,
 						expr,
-					}
+					})
 				}
 				_ => {
 					if default_token {
-						MatchCase {
+						state_cases.push(MatchCase {
 							pattern: Pattern::Any,
 							expr: Expr::none(),
-						}
+						})
 					} else {
 						let err = Expr::Call(context.lexing_error_function(), None, vec![
 							Expr::Get(
 								Var::Defined(Id::Lexer(id::Lexer::Unexpected)),
 							)
 						]);
-						MatchCase {
+
+						if id == init_id {
+							state_cases.push(MatchCase {
+								pattern: Pattern::none(),
+								expr: Expr::If(
+									Box::new(Expr::Lexer(Var::This, LexerExpr::IsEmpty)),
+									Box::new(Expr::ok(Expr::none())),
+									Box::new(Expr::err(locate(context, err.clone())))
+								),
+							})
+						}
+
+						state_cases.push(MatchCase {
 							pattern: Pattern::Bind(Id::Lexer(id::Lexer::Unexpected)),
 							expr: Expr::err(locate(context, err)),
-						}
+						})
 					}
 				}
-			});
+			}
 
 			let expr = if default_token {
 				Expr::Stream(

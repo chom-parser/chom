@@ -29,6 +29,7 @@ fn simple() -> io::Result<()> {
 
 					let phrase = "1 + 2";
 					let target_ty = "expr";
+					let expected = "expr.add(expr.term(term.integer(1)), expr.term(term.integer(2)))";
 					
 					let mut source = phrase.chars().map(|c| Ok(c));
 					let mut eval = eval::Evaluator::new(context.ir_context());
@@ -40,7 +41,15 @@ fn simple() -> io::Result<()> {
 					match eval.parse(parser, lexer) {
 						Ok(result) => {
 							match result {
-								Ok(value) => Ok(()),
+								Ok(value) => {
+									match eval.debug_format(value) {
+										Ok(result) => {
+											assert_eq!(result, expected);
+											Ok(())
+										}
+										Err(e) => panic!("failed while formatting with: {}", e)
+									}
+								},
 								Err(e) => panic!("failed with: {}", e.as_ref().name())
 							}
 						},

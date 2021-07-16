@@ -9,9 +9,11 @@ use crate::{
 mod context;
 pub mod lexer;
 pub mod parser;
+pub mod formatter;
 
 pub use context::*;
 
+pub type Function<'a, 'p> = chom_ir::Function<Namespace<'a, 'p>>;
 pub type Pattern<'a, 'p> = chom_ir::Pattern<Namespace<'a, 'p>>;
 pub type Expr<'a, 'p> = chom_ir::Expr<Namespace<'a, 'p>>;
 pub type Module<'a, 'p> = chom_ir::Module<Namespace<'a, 'p>>;

@@ -503,17 +503,12 @@ impl<'a, 'p> Context<'a, 'p> {
 		};
 
 		// log::info!("IR: generating debug formatting routines...");
-		// for (i, _) in grammar.poly().types().iter().enumerate() {
-		// 	let ty_index = i as u32;
-		// 	let ir_ty = *context.grammar_type.get(&ty_index).unwrap();
-		// 	let ty_ref = ty::Ref::Defined(ir_ty);
-		// 	let debug_format =
-		// 		Routine::Format(ty_ref, routine::format::generate_debug(&context, ty_ref));
-		// 	context
-		// 		.module_mut(context.ast_module)
-		// 		.unwrap()
-		// 		.add_routine(debug_format);
-		// }
+		for (i, _) in grammar.poly().types().iter().enumerate() {
+			let ty_index = i as u32;
+			let ir_ty = *context.grammar_type.get(&ty_index).unwrap();
+			let ty_ref = ty::Ref::Defined(ir_ty);
+			context.ir.add_function(super::formatter::debug::function(context.ir_context(), ty_ref));
+		}
 
 		log::info!("IR: lexer function...");
 		let lexer = super::lexer::generate(&context, lexing_table);

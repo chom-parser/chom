@@ -99,18 +99,18 @@ pub fn generate<'a, 'p>(context: &Context<'a, 'p>, table: &table::LR0, initial_s
 
 	let loop_args = if context.config().locate {
 		vec![
-			Var::Defined(Id::Parser(id::Parser::Lexer)),
-			Var::Defined(Id::Parser(id::Parser::Position)),
-			Var::Defined(Id::Parser(id::Parser::Stack)),
-			Var::Defined(Id::Parser(id::Parser::AnyNodeOpt)),
-			Var::Defined(Id::Parser(id::Parser::State)),
+			(Var::Defined(Id::Parser(id::Parser::Lexer)), true),
+			(Var::Defined(Id::Parser(id::Parser::Position)), true),
+			(Var::Defined(Id::Parser(id::Parser::Stack)), true),
+			(Var::Defined(Id::Parser(id::Parser::AnyNodeOpt)), true),
+			(Var::Defined(Id::Parser(id::Parser::State)), true),
 		]
 	} else {
 		vec![
-			Var::Defined(Id::Parser(id::Parser::Lexer)),
-			Var::Defined(Id::Parser(id::Parser::Stack)),
-			Var::Defined(Id::Parser(id::Parser::AnyNodeOpt)),
-			Var::Defined(Id::Parser(id::Parser::State)),
+			(Var::Defined(Id::Parser(id::Parser::Lexer)), true),
+			(Var::Defined(Id::Parser(id::Parser::Stack)), true),
+			(Var::Defined(Id::Parser(id::Parser::AnyNodeOpt)), true),
+			(Var::Defined(Id::Parser(id::Parser::State)), true),
 		]
 	};
 
@@ -347,9 +347,13 @@ fn generate_state<'a, 'p>(context: &Context<'a, 'p>, table: &table::LR0, stack: 
 				.map(|(index, next_state)| {
 					stack.push(*next_state);
 					let next_state_expr = Expr::Update(
-						Id::Parser(id::Parser::State),
-						Box::new(Expr::Literal(Constant::Int(*next_state))),
-						Box::new(Expr::Recurse(Label::Parser, recurse_args.clone())),
+						Id::Parser(id::Parser::AnyNodeOpt),
+						Box::new(Expr::none()),
+						Box::new(Expr::Update(
+							Id::Parser(id::Parser::State),
+							Box::new(Expr::Literal(Constant::Int(*next_state))),
+							Box::new(Expr::Recurse(Label::Parser, recurse_args.clone())),
+						))
 					);
 
 					match index {
@@ -430,9 +434,13 @@ fn generate_state<'a, 'p>(context: &Context<'a, 'p>, table: &table::LR0, stack: 
 								Box::new(expr),
 								Box::new(Expr::Get(Var::Defined(Id::Parser(id::Parser::State)))),
 								Box::new(Expr::Update(
-									Id::Parser(id::Parser::State),
-									Box::new(Expr::Literal(Constant::Int(*next_state))),
-									Box::new(Expr::Recurse(Label::Parser, recurse_args.clone())),
+									Id::Parser(id::Parser::AnyNodeOpt),
+									Box::new(Expr::none()),
+									Box::new(Expr::Update(
+										Id::Parser(id::Parser::State),
+										Box::new(Expr::Literal(Constant::Int(*next_state))),
+										Box::new(Expr::Recurse(Label::Parser, recurse_args.clone())),
+									))
 								)
 							),
 						)),

@@ -156,12 +156,16 @@ impl Parser {
 pub enum Format {
 	/// Argument.
 	Arg(u32),
+
+	/// Output.
+	Output
 }
 
 impl Format {
 	pub fn to_ident(&self) -> Ident {
 		match self {
 			Self::Arg(i) => Ident::new(format!("a{}", i)).unwrap(),
+			Self::Output => Ident::new("output").unwrap()
 		}
 	}
 }
