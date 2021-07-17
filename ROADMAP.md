@@ -2,26 +2,42 @@
 
 - [x] Negative charset.
 - [x] Subterminals.
-- [ ] Keywords optimiation.
-- [ ] Modules.
-- [ ] Generate grammar HTML doc.
+- [x] Keywords optimiation.
+- [x] Modules.
+- [ ] Separate identifier for native types.
+- [ ] Option built-in type.
+- [ ] List built-in type.
 
-## Rust target
+## IR
 
-- [ ] Standard types.
+- [x] Standard types.
 - [x] Generate AST enums.
-- [ ] Wrap in `Loc`.
-- [ ] Generate AST strucs.
+- [x] Wrap in `Loc`.
+- [x] Generate AST strucs.
 - [ ] Type aliases.
-- [ ] Handle modules.
+- [x] Handle modules.
+- [ ] Debug formatter.
 - [ ] LALR1 parser.
 
-## Bugs
+## IR targets
 
-- [ ] The `.` bug.
+- [ ] Rust.
+
+## Testing
+
+- [ ] Test generation.
+- [ ] Define tests in a dedicated crate.
 
 # Roadmap to version 1.0
 
 - [ ] Generate TextMate 1.5 language grammar.
 - [ ] Generate TextMate 2.0 language grammar.
 - [ ] Export parse table.
+
+## IR targets
+
+- [ ] Ocaml.
+
+## Non-IR targets
+
+- [ ] HTML doc.
