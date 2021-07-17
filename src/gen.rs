@@ -1,15 +1,10 @@
+use crate::{lexing, mono, parsing, poly};
 use source_span::Loc;
-use crate::{
-	poly,
-	mono,
-	lexing,
-	parsing
-};
 
 mod context;
+pub mod formatter;
 pub mod lexer;
 pub mod parser;
-pub mod formatter;
 
 pub use context::*;
 
@@ -42,10 +37,7 @@ pub struct Config {
 
 pub enum Error<'a, 'p> {
 	Lexing(&'p poly::Grammar, Loc<lexing::Error>),
-	LR0Ambiguity(
-		&'a mono::Grammar<'p>,
-		Loc<parsing::table::lr0::Ambiguity>,
-	)
+	LR0Ambiguity(&'a mono::Grammar<'p>, Loc<parsing::table::lr0::Ambiguity>),
 }
 
 pub fn context_from_grammar<'a, 'p, S>(
@@ -55,23 +47,24 @@ pub fn context_from_grammar<'a, 'p, S>(
 	ast_mod_path: &[S],
 	lexer_mod_path: &[S],
 	parser_mod_path: &[S],
-) -> Result<Context<'a, 'p>, Error<'a, 'p>> where S: AsRef<str> {
+) -> Result<Context<'a, 'p>, Error<'a, 'p>>
+where
+	S: AsRef<str>,
+{
 	match lexing::Table::new(grammar.poly()) {
 		Ok(lexing_table) => {
 			let parsing_table = parsing::table::NonDeterministic::new(grammar);
 			match parsing::table::LR0::from_non_deterministic(grammar, &parsing_table) {
-				Ok(lr0_table) => {
-					Ok(Context::new(
-						config,
-						grammar,
-						extern_mod_path,
-						ast_mod_path,
-						lexer_mod_path,
-						&lexing_table,
-						parser_mod_path,
-						&parsing::Table::LR0(lr0_table),
-					))
-				},
+				Ok(lr0_table) => Ok(Context::new(
+					config,
+					grammar,
+					extern_mod_path,
+					ast_mod_path,
+					lexer_mod_path,
+					&lexing_table,
+					parser_mod_path,
+					&parsing::Table::LR0(lr0_table),
+				)),
 				Err(e) => Err(Error::LR0Ambiguity(grammar, e)),
 			}
 		}

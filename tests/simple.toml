@@ -1,0 +1,13 @@
+parser = "lr0"
+
+[[challenge]]
+name = "add2"
+input = "1 + 2"
+type = "expr"
+success = "expr.add(expr.term(term(int(1))), term(int(2)))"
+
+[[challenge]]
+name = "add3"
+input = "1 + 2 + 3"
+type = "expr"
+success = "expr.add(expr.add(expr.term(term(int(1))), term(int(2))), term(int(3)))"

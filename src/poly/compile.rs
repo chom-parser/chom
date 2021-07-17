@@ -89,16 +89,16 @@ fn compile_ty_expr(
 		syntax::ty::Expr::Terminal(t) => {
 			if let Some(id) = t.as_reference() {
 				if let Some(x) = types.get_terminal_parameter(context_ty, &id) {
-					return Ok(ty::Expr::Var(x))
+					return Ok(ty::Expr::Var(x));
 				}
 			}
-			
+
 			Ok(ty::Expr::Terminal(compile_loc_terminal(
 				regexps,
 				terminals,
 				Loc::new(t, span),
 			)?))
-		},
+		}
 		syntax::ty::Expr::NonTerminal(id, args) => {
 			match types.get_type_parameter(context_ty, &id) {
 				Some(x) => Ok(ty::Expr::Var(x)),
@@ -107,7 +107,8 @@ fn compile_ty_expr(
 
 					let mut compiled_args = Vec::with_capacity(args.len());
 					for a in args {
-						compiled_args.push(compile_ty_expr(context_ty, regexps, types, terminals, a)?)
+						compiled_args
+							.push(compile_ty_expr(context_ty, regexps, types, terminals, a)?)
 					}
 
 					Ok(ty::Expr::Type(index, compiled_args))
@@ -198,8 +199,12 @@ impl syntax::Grammar {
 
 			for p in ast.parameters {
 				match p.into_inner() {
-					syntax::ty::Parameter::Terminal(id) => types.add_terminal_parameter(i, id.into_inner()),
-					syntax::ty::Parameter::NonTerminal(id) => types.add_type_parameter(i, id.into_inner())
+					syntax::ty::Parameter::Terminal(id) => {
+						types.add_terminal_parameter(i, id.into_inner())
+					}
+					syntax::ty::Parameter::NonTerminal(id) => {
+						types.add_type_parameter(i, id.into_inner())
+					}
 				}
 			}
 

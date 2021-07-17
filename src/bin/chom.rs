@@ -114,8 +114,11 @@ fn run_subcommand<'a, 'p>(
 				match context.module_index_from_path(&module_path) {
 					Some(m) => {
 						log::info!("generating module `{}`...", module_path_string);
-						let code = chom_rust::generate_module(context.ir_context(), context.module(m).unwrap());
-						
+						let code = chom_rust::generate_module(
+							context.ir_context(),
+							context.module(m).unwrap(),
+						);
+
 						use std::io::Write;
 						if std_output {
 							let stdout = std::io::stdout();
@@ -123,11 +126,12 @@ fn run_subcommand<'a, 'p>(
 							write!(out, "{}", code)?
 						} else {
 							let ir_path = context.module_path(m).unwrap();
-							let filename = chom_rust::module_filename(context.namespace(), root, ir_path);
+							let filename =
+								chom_rust::module_filename(context.namespace(), root, ir_path);
 							let mut file = File::create(filename)?;
 							write!(file, "{}", code)?
 						}
-					},
+					}
 					None => {
 						log::warn!("no module `{}` found!", module_path_string)
 					}
@@ -238,7 +242,7 @@ fn generate_context<'a, 'g>(
 						parser_module_path,
 						&chom::parsing::Table::LR0(lr0_table),
 					))
-				},
+				}
 				Err(e) => Err(Error::LR0Ambiguity(grammar, e)),
 			}
 		}

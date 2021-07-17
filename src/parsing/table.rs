@@ -351,7 +351,11 @@ impl ItemSet {
 		FormattedItemSet(grammar, self)
 	}
 
-	pub fn dot_format<'a, 'g>(&self, grammar: &'g Grammar<'a>, title: String) -> DotFormattedItemSet<'a, 'g, '_> {
+	pub fn dot_format<'a, 'g>(
+		&self,
+		grammar: &'g Grammar<'a>,
+		title: String,
+	) -> DotFormattedItemSet<'a, 'g, '_> {
 		DotFormattedItemSet(grammar, self, title)
 	}
 }

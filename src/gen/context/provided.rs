@@ -1,24 +1,25 @@
+use super::{Expr, FunctionId, Namespace, Pattern, TypeExpr, TypeId};
+use crate::{
+	gen::{id, Id},
+	lexing::Token,
+	mono, Ident,
+};
 use chom_ir::{
+	function,
 	ty::{self, Enum, VariantDesc},
 	Function,
-	function
 };
-use crate::{lexing::Token, mono, Ident, gen::{id, Id}};
-use super::{Namespace,Expr,Pattern,TypeExpr,TypeId,FunctionId};
-use std::collections::{
-	HashMap,
-	hash_map::Entry
-};
+use std::collections::{hash_map::Entry, HashMap};
 
 pub use crate::lexing::token::{Delimiter, Operator, Punct};
 
 struct TokenData<'a, 'p> {
 	pattern: Pattern<'a, 'p>,
-	parsing_function: Option<u32>
+	parsing_function: Option<u32>,
 }
 
 /// Provided types.
-/// 
+///
 /// Stores the IR type index of each provided type.
 pub struct Types<'a, 'p> {
 	/// Enum type of tokens.
@@ -55,7 +56,7 @@ pub struct Types<'a, 'p> {
 	pub item_ty: u32,
 
 	/// Lexer type.
-	pub lexer_ty: u32
+	pub lexer_ty: u32,
 }
 
 impl<'a, 'p> Types<'a, 'p> {
@@ -84,7 +85,7 @@ impl<'a, 'p> Types<'a, 'p> {
 	}
 
 	/// Generate an expression building a token corresponding to the given grammar terminal.
-	/// 
+	///
 	/// If the token takes a value, the input function is called
 	/// with the index of the token's parsing function declared in the IR.
 	pub fn token_expr<F>(&self, index: u32, f: F) -> Expr<'a, 'p>
@@ -92,9 +93,7 @@ impl<'a, 'p> Types<'a, 'p> {
 		F: Copy + Fn(u32) -> Expr<'a, 'p>,
 	{
 		let data = self.tokens_data.get(&index).unwrap();
-		data.pattern.as_expr(|_| {
-			f(data.parsing_function.unwrap())
-		})
+		data.pattern.as_expr(|_| f(data.parsing_function.unwrap()))
 	}
 
 	pub fn node_pattern(&self, index: mono::Index, id: Id) -> Pattern<'a, 'p> {
@@ -115,7 +114,7 @@ impl<'a, 'p> Types<'a, 'p> {
 
 	/// Generate an expression building a token corresponding to the given grammar terminal,
 	/// inside a `Item::Token` variant.
-	/// 
+	///
 	/// If the token takes a value, the input function is called
 	/// with the index of the token's parsing function declared in the IR.
 	pub fn item_token_pattern<F>(&self, index: u32, f: F) -> Pattern<'a, 'p>
@@ -168,7 +167,11 @@ impl<'a, 'p> Types<'a, 'p> {
 	) -> Self {
 		let grammar = ir.id().grammar();
 
-		let token_ty = ir.add_type(super::Type::new(lexer_module, TypeId::Provided(Type::Token), ty::Desc::Opaque));
+		let token_ty = ir.add_type(super::Type::new(
+			lexer_module,
+			TypeId::Provided(Type::Token),
+			ty::Desc::Opaque,
+		));
 		let mut keyword_ty: Option<(u32, u32)> = None;
 		let mut delimiter_ty: Option<u32> = None;
 		let mut delimiter_variant: HashMap<Delimiter, u32> = HashMap::new();
@@ -195,7 +198,6 @@ impl<'a, 'p> Types<'a, 'p> {
 				// and token parsing function (if any).
 				let (desc, parsing_function) = match token.parameter_type() {
 					Some(extern_ty) => {
-						let extern_ty_id = grammar.extern_type(extern_ty).unwrap().clone();
 						let ir_ty = grammar_extern_type.get(&extern_ty).unwrap().clone();
 						let ty_expr = TypeExpr::Instance(ty::Ref::Defined(ir_ty), Vec::new());
 						let desc = VariantDesc::Tuple(vec![ty_expr.clone()]);
@@ -205,13 +207,13 @@ impl<'a, 'p> Types<'a, 'p> {
 							function::Signature::extern_parser(
 								Id::Extern(id::Extern::String),
 								ty_expr,
-								ty::Expr::Instance(ty::Ref::Defined(extern_error_ty), Vec::new())
+								ty::Expr::Instance(ty::Ref::Defined(extern_error_ty), Vec::new()),
 							),
-							None
+							None,
 						));
 						(desc, Some(ir_function))
-					},
-					None => (VariantDesc::empty(), None)
+					}
+					None => (VariantDesc::empty(), None),
 				};
 				let pattern = match token {
 					Token::Named(id, ty) => {
@@ -221,7 +223,7 @@ impl<'a, 'p> Types<'a, 'p> {
 						// Create the `Token::Name` variant.
 						let v = tokens.add_variant(ty::Variant::Defined(
 							super::VariantId::Provided(Variant::Token(TokenVariant::Named(index))),
-							desc
+							desc,
 						));
 
 						// Create the associated pattern.
@@ -237,12 +239,14 @@ impl<'a, 'p> Types<'a, 'p> {
 					}
 					Token::Anonymous(i, ty) => {
 						// Register the token name.
-						let index = ir.id_mut().new_named_variant(Ident::new(format!("token{}", i)).unwrap());
+						let index = ir
+							.id_mut()
+							.new_named_variant(Ident::new(format!("token{}", i)).unwrap());
 
 						// Create the `Token::Name` variant.
 						let v = tokens.add_variant(ty::Variant::Defined(
 							super::VariantId::Provided(Variant::Token(TokenVariant::Named(index))),
-							desc
+							desc,
 						));
 
 						// Create the associated pattern.
@@ -259,14 +263,24 @@ impl<'a, 'p> Types<'a, 'p> {
 					Token::Keyword(k) => {
 						// Create the `Keyword` type is not already done,
 						// along with the `Token::Keyword` variant.
-						let (keyword_ty, token_keyword_variant) = *keyword_ty.get_or_insert_with(|| {
-							let ir_ty = ir.add_type(super::Type::new(lexer_module, super::TypeId::Provided(Type::Keyword), ty::Desc::Opaque));
-							let variant = ty::Variant::Defined(
-								super::VariantId::Provided(Variant::Token(TokenVariant::Keyword)),
-								VariantDesc::Tuple(vec![TypeExpr::Instance(ty::Ref::Defined(ir_ty), vec![])])
-							);
-							(ir_ty, tokens.add_variant(variant))
-						});
+						let (keyword_ty, token_keyword_variant) =
+							*keyword_ty.get_or_insert_with(|| {
+								let ir_ty = ir.add_type(super::Type::new(
+									lexer_module,
+									super::TypeId::Provided(Type::Keyword),
+									ty::Desc::Opaque,
+								));
+								let variant = ty::Variant::Defined(
+									super::VariantId::Provided(Variant::Token(
+										TokenVariant::Keyword,
+									)),
+									VariantDesc::Tuple(vec![TypeExpr::Instance(
+										ty::Ref::Defined(ir_ty),
+										vec![],
+									)]),
+								);
+								(ir_ty, tokens.add_variant(variant))
+							});
 
 						// Register the keyword.
 						let index = ir.id_mut().new_keyword_variant(Ident::new(k).unwrap());
@@ -290,14 +304,21 @@ impl<'a, 'p> Types<'a, 'p> {
 					Token::Begin(d) => {
 						// Create the `Delimiter` type is not already done.
 						let delimiter_ty = *delimiter_ty.get_or_insert_with(|| {
-							ir.add_type(super::Type::new(lexer_module, super::TypeId::Provided(Type::Delimiter), ty::Desc::Opaque))
+							ir.add_type(super::Type::new(
+								lexer_module,
+								super::TypeId::Provided(Type::Delimiter),
+								ty::Desc::Opaque,
+							))
 						});
 
 						// Create the `Delimiter::Begin` variant if not already done.
 						let token_begin_variant = *token_begin_variant.get_or_insert_with(|| {
 							let variant = ty::Variant::Defined(
 								super::VariantId::Provided(Variant::Token(TokenVariant::Begin)),
-								VariantDesc::Tuple(vec![TypeExpr::Instance(ty::Ref::Defined(delimiter_ty), vec![])])
+								VariantDesc::Tuple(vec![TypeExpr::Instance(
+									ty::Ref::Defined(delimiter_ty),
+									vec![],
+								)]),
 							);
 							tokens.add_variant(variant)
 						});
@@ -326,14 +347,21 @@ impl<'a, 'p> Types<'a, 'p> {
 					Token::End(d) => {
 						// Create the `Delimiter` type is not already done.
 						let delimiter_ty = *delimiter_ty.get_or_insert_with(|| {
-							ir.add_type(super::Type::new(lexer_module, super::TypeId::Provided(Type::Delimiter), ty::Desc::Opaque))
+							ir.add_type(super::Type::new(
+								lexer_module,
+								super::TypeId::Provided(Type::Delimiter),
+								ty::Desc::Opaque,
+							))
 						});
 
 						// Create the `Delimiter::End` variant if not already done.
 						let token_end_variant = *token_end_variant.get_or_insert_with(|| {
 							let variant = ty::Variant::Defined(
 								super::VariantId::Provided(Variant::Token(TokenVariant::End)),
-								VariantDesc::Tuple(vec![TypeExpr::Instance(ty::Ref::Defined(delimiter_ty), vec![])])
+								VariantDesc::Tuple(vec![TypeExpr::Instance(
+									ty::Ref::Defined(delimiter_ty),
+									vec![],
+								)]),
 							);
 							tokens.add_variant(variant)
 						});
@@ -362,14 +390,24 @@ impl<'a, 'p> Types<'a, 'p> {
 					Token::Operator(o) => {
 						// Create the `Operator` type is not already done,
 						// along with the `Token::Operator` variant.
-						let (operator_ty, token_operator_variant) = *operator_ty.get_or_insert_with(|| {
-							let ir_ty = ir.add_type(super::Type::new(lexer_module, super::TypeId::Provided(Type::Operator), ty::Desc::Opaque));
-							let variant = ty::Variant::Defined(
-								super::VariantId::Provided(Variant::Token(TokenVariant::Operator)),
-								VariantDesc::Tuple(vec![TypeExpr::Instance(ty::Ref::Defined(ir_ty), vec![])])
-							);
-							(ir_ty, tokens.add_variant(variant))
-						});
+						let (operator_ty, token_operator_variant) = *operator_ty
+							.get_or_insert_with(|| {
+								let ir_ty = ir.add_type(super::Type::new(
+									lexer_module,
+									super::TypeId::Provided(Type::Operator),
+									ty::Desc::Opaque,
+								));
+								let variant = ty::Variant::Defined(
+									super::VariantId::Provided(Variant::Token(
+										TokenVariant::Operator,
+									)),
+									VariantDesc::Tuple(vec![TypeExpr::Instance(
+										ty::Ref::Defined(ir_ty),
+										vec![],
+									)]),
+								);
+								(ir_ty, tokens.add_variant(variant))
+							});
 
 						// Create the keyword variant.
 						let id = super::VariantId::Provided(Variant::Operator(o));
@@ -391,10 +429,17 @@ impl<'a, 'p> Types<'a, 'p> {
 						// Create the `Punct` type is not already done,
 						// along with the `Token::Punct` variant.
 						let (punct_ty, token_punct_variant) = *punct_ty.get_or_insert_with(|| {
-							let ir_ty = ir.add_type(super::Type::new(lexer_module, super::TypeId::Provided(Type::Punct), ty::Desc::Opaque));
+							let ir_ty = ir.add_type(super::Type::new(
+								lexer_module,
+								super::TypeId::Provided(Type::Punct),
+								ty::Desc::Opaque,
+							));
 							let variant = ty::Variant::Defined(
 								super::VariantId::Provided(Variant::Token(TokenVariant::Punct)),
-								VariantDesc::Tuple(vec![TypeExpr::Instance(ty::Ref::Defined(ir_ty), vec![])])
+								VariantDesc::Tuple(vec![TypeExpr::Instance(
+									ty::Ref::Defined(ir_ty),
+									vec![],
+								)]),
 							);
 							(ir_ty, tokens.add_variant(variant))
 						});
@@ -417,10 +462,13 @@ impl<'a, 'p> Types<'a, 'p> {
 					}
 				};
 
-				tokens_data.insert(index, TokenData {
-					pattern,
-					parsing_function
-				});
+				tokens_data.insert(
+					index,
+					TokenData {
+						pattern,
+						parsing_function,
+					},
+				);
 			}
 		}
 
@@ -471,23 +519,37 @@ impl<'a, 'p> Types<'a, 'p> {
 			nodes_variants_map.insert(index, v);
 		}
 
-		let node_ty = ir.add_type(super::Type::new(parser_module, super::TypeId::Provided(Type::Node), ty::Desc::Enum(nodes)));
+		let node_ty = ir.add_type(super::Type::new(
+			parser_module,
+			super::TypeId::Provided(Type::Node),
+			ty::Desc::Enum(nodes),
+		));
 
 		let mut items = Enum::new();
 
 		// Create the `Item::Token` variant.
 		items.add_variant(ty::Variant::Defined(
 			super::VariantId::Provided(Variant::Item(ItemVariant::Token)),
-			VariantDesc::Tuple(vec![ty::Expr::Instance(ty::Ref::Defined(token_ty), Vec::new())])
+			VariantDesc::Tuple(vec![ty::Expr::Instance(
+				ty::Ref::Defined(token_ty),
+				Vec::new(),
+			)]),
 		));
 
 		// Create the `Item::Node` variant.
 		items.add_variant(ty::Variant::Defined(
 			super::VariantId::Provided(Variant::Item(ItemVariant::Node)),
-			VariantDesc::Tuple(vec![ty::Expr::Instance(ty::Ref::Defined(node_ty), Vec::new())])
+			VariantDesc::Tuple(vec![ty::Expr::Instance(
+				ty::Ref::Defined(node_ty),
+				Vec::new(),
+			)]),
 		));
 
-		let item_ty = ir.add_type(super::Type::new(parser_module, super::TypeId::Provided(Type::Item), ty::Desc::Enum(items)));
+		let item_ty = ir.add_type(super::Type::new(
+			parser_module,
+			super::TypeId::Provided(Type::Item),
+			ty::Desc::Enum(items),
+		));
 
 		fn define_type<'a, 'p>(
 			ir: &mut chom_ir::Context<Namespace<'a, 'p>>,
@@ -495,12 +557,16 @@ impl<'a, 'p> Types<'a, 'p> {
 			enm: ty::Enum<Namespace<'a, 'p>>,
 		) -> Option<u32> {
 			index.map(|index| {
-				ir.ty_mut(ty::Ref::Defined(index)).unwrap().set_desc(ty::Desc::Enum(enm));
+				ir.ty_mut(ty::Ref::Defined(index))
+					.unwrap()
+					.set_desc(ty::Desc::Enum(enm));
 				index
 			})
 		}
 
-		ir.ty_mut(ty::Ref::Defined(token_ty)).unwrap().set_desc(ty::Desc::Enum(tokens));
+		ir.ty_mut(ty::Ref::Defined(token_ty))
+			.unwrap()
+			.set_desc(ty::Desc::Enum(tokens));
 
 		Self {
 			token_ty,
@@ -512,7 +578,11 @@ impl<'a, 'p> Types<'a, 'p> {
 			node_ty,
 			nodes_variants_map,
 			item_ty,
-			lexer_ty: ir.add_type(super::Type::new(lexer_module, TypeId::Provided(Type::Lexer), ty::Desc::Lexer))
+			lexer_ty: ir.add_type(super::Type::new(
+				lexer_module,
+				TypeId::Provided(Type::Lexer),
+				ty::Desc::Lexer,
+			)),
 		}
 	}
 }
@@ -615,7 +685,7 @@ impl ItemVariant {
 	pub fn ident(&self) -> Ident {
 		match self {
 			Self::Token => Ident::new("Token").unwrap(),
-			Self::Node => Ident::new("Node").unwrap()
+			Self::Node => Ident::new("Node").unwrap(),
 		}
 	}
 }

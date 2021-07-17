@@ -1,25 +1,13 @@
+use super::{id, Context, Expr, Id, Label, Pattern};
 use crate::{
 	lexing::{DetState, Table},
 	mono::terminal,
 };
-use super::{
-	Context,
-	Id,
-	id,
-	Expr,
-	Label,
-	Pattern
-};
-use chom_ir::{
-	Constant,
-	expr::{
-		Var,
-		LexerExpr,
-		StreamExpr,
-		MatchCase
-	}
-};
 use btree_range_map::{util::PartialEnum, AnyRange};
+use chom_ir::{
+	expr::{LexerExpr, MatchCase, StreamExpr},
+	Constant,
+};
 use std::{
 	collections::{BTreeMap, BTreeSet, HashMap},
 	ops::{Bound, RangeBounds},
@@ -31,13 +19,14 @@ pub fn generate<'a, 'p>(context: &Context<'a, 'p>, table: &Table) -> Expr<'a, 'p
 
 fn locate<'a, 'p>(context: &Context<'a, 'p>, e: Expr<'a, 'p>) -> Expr<'a, 'p> {
 	if context.config().locate {
-		Expr::locate(
-			e,
-			Expr::Lexer(Var::This, LexerExpr::Span)
-		)
+		Expr::locate(e, Expr::Lexer(Id::Lexer(id::Lexer::This), LexerExpr::Span))
 	} else {
 		e
 	}
+}
+
+fn retrn<'a, 'p>(result: Expr<'a, 'p>) -> Expr<'a, 'p> {
+	Expr::Return(vec![Expr::Get(Id::Lexer(id::Lexer::This)), result])
 }
 
 /// ## Pseudo code
@@ -99,18 +88,23 @@ fn locate<'a, 'p>(context: &Context<'a, 'p>, e: Expr<'a, 'p>) -> Expr<'a, 'p> {
 /// 	...
 /// }
 /// ```
-fn generate_automaton<'a, 'p>(context: &Context<'a, 'p>, table: &Table, index: u32, default_token: bool) -> Expr<'a, 'p> {
+fn generate_automaton<'a, 'p>(
+	context: &Context<'a, 'p>,
+	table: &Table,
+	index: u32,
+	default_token: bool,
+) -> Expr<'a, 'p> {
 	let automaton = table.automaton(index).unwrap();
 	let recurse_args = if default_token {
 		vec![
-			(Var::This, true),
-			(Var::Defined(Id::Lexer(id::Lexer::BufferChars)), true),
-			(Var::Defined(Id::Lexer(id::Lexer::State)), true),
+			(Id::Lexer(id::Lexer::This), true),
+			(Id::Lexer(id::Lexer::BufferChars), true),
+			(Id::Lexer(id::Lexer::State), true),
 		]
 	} else {
 		vec![
-			(Var::This, true),
-			(Var::Defined(Id::Lexer(id::Lexer::State)), true)
+			(Id::Lexer(id::Lexer::This), true),
+			(Id::Lexer(id::Lexer::State), true),
 		]
 	};
 
@@ -157,7 +151,10 @@ fn generate_automaton<'a, 'p>(context: &Context<'a, 'p>, table: &Table, index: u
 					let next_state_expr = Expr::Update(
 						Id::Lexer(id::Lexer::State),
 						Box::new(Expr::Literal(Constant::Int(target_id))),
-						Box::new(Expr::Recurse(Label::Lexer(index), recurse_args.iter().map(|a| a.0).collect())),
+						Box::new(Expr::Recurse(
+							Label::Lexer(index),
+							recurse_args.iter().map(|a| a.0).collect(),
+						)),
 					);
 
 					MatchCase {
@@ -165,8 +162,11 @@ fn generate_automaton<'a, 'p>(context: &Context<'a, 'p>, table: &Table, index: u
 						expr: if default_token {
 							next_state_expr
 						} else {
-							Expr::Lexer(Var::This, LexerExpr::Consume(Box::new(next_state_expr)))
-						}
+							Expr::Lexer(
+								Id::Lexer(id::Lexer::This),
+								LexerExpr::Consume(Box::new(next_state_expr)),
+							)
+						},
 					}
 				})
 				.collect();
@@ -176,20 +176,30 @@ fn generate_automaton<'a, 'p>(context: &Context<'a, 'p>, table: &Table, index: u
 				DetState::Final(terminal_index, _) => {
 					let terminal = context.grammar().terminal(*terminal_index).unwrap();
 					let expr = match terminal.desc() {
-						terminal::Desc::Whitespace(_) => Expr::Lexer(Var::This, LexerExpr::Clear(
-							Box::new(Expr::Update(
+						terminal::Desc::Whitespace(_) => Expr::Lexer(
+							Id::Lexer(id::Lexer::This),
+							LexerExpr::Clear(Box::new(Expr::Update(
 								Id::Lexer(id::Lexer::State),
 								Box::new(Expr::Literal(Constant::Int(init_id))),
 								Box::new(Expr::Recurse(
 									Label::Lexer(0),
-									vec![Var::This, Var::Defined(Id::Lexer(id::Lexer::State))],
-								))
-							)),
-						)),
+									vec![Id::Lexer(id::Lexer::This), Id::Lexer(id::Lexer::State)],
+								)),
+							))),
+						),
 						terminal::Desc::RegExp(_) => {
-							let expr = context.provided().token_expr(*terminal_index, |ir_function| {
-								Expr::Call(ir_function, None, vec![Expr::Lexer(Var::This, LexerExpr::Buffer)])
-							});
+							let expr =
+								context
+									.provided()
+									.token_expr(*terminal_index, |ir_function| {
+										Expr::Call(
+											ir_function,
+											vec![Expr::Lexer(
+												Id::Lexer(id::Lexer::This),
+												LexerExpr::Buffer,
+											)],
+										)
+									});
 							let result = if default_token {
 								Expr::some(expr)
 							} else {
@@ -203,47 +213,46 @@ fn generate_automaton<'a, 'p>(context: &Context<'a, 'p>, table: &Table, index: u
 									Expr::Let(
 										Id::Lexer(id::Lexer::BufferChars),
 										true,
-										Box::new(Expr::Lexer(Var::This, LexerExpr::Chars)),
+										Box::new(Expr::Lexer(
+											Id::Lexer(id::Lexer::This),
+											LexerExpr::Chars,
+										)),
 										Box::new(Expr::Let(
 											Id::Lexer(id::Lexer::SubToken),
 											false,
 											Box::new(sub_expr),
 											Box::new(Expr::Match {
-												expr: Box::new(Expr::Get(Var::Defined(Id::Lexer(
+												expr: Box::new(Expr::Get(Id::Lexer(
 													id::Lexer::SubToken,
-												)))),
+												))),
 												cases: vec![
 													MatchCase {
-														pattern: Pattern::some(
-															Pattern::Bind(Id::Lexer(
-																id::Lexer::SubToken,
-															)),
-														),
+														pattern: Pattern::some(Pattern::Bind(
+															Id::Lexer(id::Lexer::SubToken),
+														)),
 														expr: if default_token {
-															Expr::some(Expr::Get(
-																Var::Defined(Id::Lexer(id::Lexer::SubToken)),
-															))
+															Expr::some(Expr::Get(Id::Lexer(
+																id::Lexer::SubToken,
+															)))
 														} else {
-															Expr::ok(Expr::some(
-																locate(
-																	context,
-																	Expr::Get(Var::Defined(Id::Lexer(
-																		id::Lexer::SubToken,
-																	))),
-																),
-															))
+															retrn(Expr::ok(Expr::some(locate(
+																context,
+																Expr::Get(Id::Lexer(
+																	id::Lexer::SubToken,
+																)),
+															))))
 														},
 													},
 													MatchCase {
 														pattern: Pattern::none(),
-														expr: result,
+														expr: retrn(result),
 													},
 												],
 											}),
 										)),
 									)
 								}
-								None => result,
+								None => retrn(result),
 							}
 						}
 					};
@@ -260,26 +269,28 @@ fn generate_automaton<'a, 'p>(context: &Context<'a, 'p>, table: &Table, index: u
 							expr: Expr::none(),
 						})
 					} else {
-						let err = Expr::Call(context.lexing_error_function(), None, vec![
-							Expr::Get(
-								Var::Defined(Id::Lexer(id::Lexer::Unexpected)),
-							)
-						]);
+						let err = Expr::Call(
+							context.lexing_error_function(),
+							vec![Expr::Get(Id::Lexer(id::Lexer::Unexpected))],
+						);
 
 						if id == init_id {
 							state_cases.push(MatchCase {
 								pattern: Pattern::none(),
 								expr: Expr::If(
-									Box::new(Expr::Lexer(Var::This, LexerExpr::IsEmpty)),
-									Box::new(Expr::ok(Expr::none())),
-									Box::new(Expr::err(locate(context, err.clone())))
+									Box::new(Expr::Lexer(
+										Id::Lexer(id::Lexer::This),
+										LexerExpr::IsEmpty,
+									)),
+									Box::new(retrn(Expr::ok(Expr::none()))),
+									Box::new(retrn(Expr::err(locate(context, err.clone())))),
 								),
 							})
 						}
 
 						state_cases.push(MatchCase {
 							pattern: Pattern::Bind(Id::Lexer(id::Lexer::Unexpected)),
-							expr: Expr::err(locate(context, err)),
+							expr: retrn(Expr::err(locate(context, err))),
 						})
 					}
 				}
@@ -287,28 +298,28 @@ fn generate_automaton<'a, 'p>(context: &Context<'a, 'p>, table: &Table, index: u
 
 			let expr = if default_token {
 				Expr::Stream(
-					Var::Defined(Id::Lexer(id::Lexer::BufferChars)),
+					Id::Lexer(id::Lexer::BufferChars),
 					StreamExpr::Pull(
 						Id::Lexer(id::Lexer::CharOpt),
 						Box::new(Expr::Match {
-							expr: Box::new(Expr::Get(Var::Defined(Id::Lexer(id::Lexer::CharOpt)))),
+							expr: Box::new(Expr::Get(Id::Lexer(id::Lexer::CharOpt))),
 							cases: state_cases,
-						}
-					))
+						}),
+					),
 				)
 			} else {
 				Expr::Let(
 					Id::Lexer(id::Lexer::UnsafeCharOpt),
 					false,
-					Box::new(Expr::Lexer(Var::This, LexerExpr::Peek)),
+					Box::new(Expr::Lexer(Id::Lexer(id::Lexer::This), LexerExpr::Peek)),
 					Box::new(Expr::Check(
 						Id::Lexer(id::Lexer::CharOpt),
-						Box::new(Expr::Get(Var::Defined(Id::Lexer(id::Lexer::UnsafeCharOpt)))),
+						Box::new(Expr::Get(Id::Lexer(id::Lexer::UnsafeCharOpt))),
 						Box::new(Expr::Match {
-							expr: Box::new(Expr::Get(Var::Defined(Id::Lexer(id::Lexer::CharOpt)))),
+							expr: Box::new(Expr::Get(Id::Lexer(id::Lexer::CharOpt))),
 							cases: state_cases,
-						})
-					))
+						}),
+					)),
 				)
 			};
 
@@ -324,8 +335,9 @@ fn generate_automaton<'a, 'p>(context: &Context<'a, 'p>, table: &Table, index: u
 		expr: Expr::Unreachable,
 	});
 
-	Expr::Lexer(Var::This, LexerExpr::Clear(
-		Box::new(Expr::Let(
+	Expr::Lexer(
+		Id::Lexer(id::Lexer::This),
+		LexerExpr::Clear(Box::new(Expr::Let(
 			Id::Lexer(id::Lexer::State),
 			true,
 			Box::new(Expr::Literal(Constant::Int(init_id))),
@@ -333,12 +345,12 @@ fn generate_automaton<'a, 'p>(context: &Context<'a, 'p>, table: &Table, index: u
 				label: Label::Lexer(index),
 				args: recurse_args,
 				body: Box::new(Expr::Match {
-					expr: Box::new(Expr::Get(Var::Defined(Id::Lexer(id::Lexer::State)))),
+					expr: Box::new(Expr::Get(Id::Lexer(id::Lexer::State))),
 					cases,
 				}),
 			}),
-		)),
-	))
+		))),
+	)
 }
 
 fn ranges_pattern<'a, 'p>(ranges: &BTreeSet<AnyRange<char>>) -> Pattern<'a, 'p> {

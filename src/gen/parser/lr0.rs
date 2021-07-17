@@ -1,25 +1,11 @@
+use super::super::{id, Context, Expr, Id, Label, Pattern};
 use crate::{
-	parsing::table::{self, lr0::State, Rule},
 	mono,
-};
-use super::super::{
-	Context,
-	Id,
-	id,
-	Expr,
-	Label,
-	Pattern
+	parsing::table::{self, lr0::State, Rule},
 };
 use chom_ir::{
+	expr::{Error, MatchCase, SpanExpr, StackExpr, StreamExpr},
 	Constant,
-	expr::{
-		Var,
-		StackExpr,
-		StreamExpr,
-		SpanExpr,
-		MatchCase,
-		Error
-	}
 };
 use std::collections::HashSet;
 
@@ -79,7 +65,11 @@ use std::collections::HashSet;
 /// 	}
 /// }
 /// ```
-pub fn generate<'a, 'p>(context: &Context<'a, 'p>, table: &table::LR0, initial_state: u32) -> Expr<'a, 'p> {
+pub fn generate<'a, 'p>(
+	context: &Context<'a, 'p>,
+	table: &table::LR0,
+	initial_state: u32,
+) -> Expr<'a, 'p> {
 	let mut cases = Vec::new();
 	let mut stack = vec![initial_state];
 	let mut visited = HashSet::new();
@@ -99,18 +89,18 @@ pub fn generate<'a, 'p>(context: &Context<'a, 'p>, table: &table::LR0, initial_s
 
 	let loop_args = if context.config().locate {
 		vec![
-			(Var::Defined(Id::Parser(id::Parser::Lexer)), true),
-			(Var::Defined(Id::Parser(id::Parser::Position)), true),
-			(Var::Defined(Id::Parser(id::Parser::Stack)), true),
-			(Var::Defined(Id::Parser(id::Parser::AnyNodeOpt)), true),
-			(Var::Defined(Id::Parser(id::Parser::State)), true),
+			(Id::Parser(id::Parser::Lexer), true),
+			(Id::Parser(id::Parser::Position), true),
+			(Id::Parser(id::Parser::Stack), true),
+			(Id::Parser(id::Parser::AnyNodeOpt), true),
+			(Id::Parser(id::Parser::State), true),
 		]
 	} else {
 		vec![
-			(Var::Defined(Id::Parser(id::Parser::Lexer)), true),
-			(Var::Defined(Id::Parser(id::Parser::Stack)), true),
-			(Var::Defined(Id::Parser(id::Parser::AnyNodeOpt)), true),
-			(Var::Defined(Id::Parser(id::Parser::State)), true),
+			(Id::Parser(id::Parser::Lexer), true),
+			(Id::Parser(id::Parser::Stack), true),
+			(Id::Parser(id::Parser::AnyNodeOpt), true),
+			(Id::Parser(id::Parser::State), true),
 		]
 	};
 
@@ -126,17 +116,14 @@ pub fn generate<'a, 'p>(context: &Context<'a, 'p>, table: &table::LR0, initial_s
 				Id::Parser(id::Parser::State),
 				true,
 				Box::new(Expr::Literal(Constant::Int(initial_state))),
-				Box::new(Expr::Print(
-					"init done!".to_string(),
-					Box::new(Expr::TailRecursion {
-						label: Label::Parser,
-						args: loop_args,
-						body: Box::new(Expr::Match {
-							expr: Box::new(Expr::Get(Var::Defined(Id::Parser(id::Parser::State)))),
-							cases,
-						}),
-					})
-				)),
+				Box::new(Expr::TailRecursion {
+					label: Label::Parser,
+					args: loop_args,
+					body: Box::new(Expr::Match {
+						expr: Box::new(Expr::Get(Id::Parser(id::Parser::State))),
+						cases,
+					}),
+				}),
 			)),
 		)),
 	);
@@ -153,7 +140,12 @@ pub fn generate<'a, 'p>(context: &Context<'a, 'p>, table: &table::LR0, initial_s
 	}
 }
 
-fn stack_pop<'a, 'p>(context: &Context<'a, 'p>, patterns: &[Pattern<'a, 'p>], next: Expr<'a, 'p>, returning: bool) -> Expr<'a, 'p> {
+fn stack_pop<'a, 'p>(
+	context: &Context<'a, 'p>,
+	patterns: &[Pattern<'a, 'p>],
+	next: Expr<'a, 'p>,
+	returning: bool,
+) -> Expr<'a, 'p> {
 	let mut expr = next;
 	let last = (patterns.len() - 1) as u32;
 
@@ -162,7 +154,7 @@ fn stack_pop<'a, 'p>(context: &Context<'a, 'p>, patterns: &[Pattern<'a, 'p>], ne
 			expr = Expr::Update(
 				Id::Parser(id::Parser::Position),
 				Box::new(Expr::Span(SpanExpr::After(Box::new(Expr::Get(
-					Var::Defined(Id::Parser(id::Parser::Span)),
+					Id::Parser(id::Parser::Span),
 				))))),
 				Box::new(expr),
 			);
@@ -173,8 +165,8 @@ fn stack_pop<'a, 'p>(context: &Context<'a, 'p>, patterns: &[Pattern<'a, 'p>], ne
 				Id::Parser(id::Parser::Span),
 				false,
 				Box::new(Expr::Span(SpanExpr::Merge(
-					Box::new(Expr::Get(Var::Defined(Id::Parser(id::Parser::AnyItemSpan(0))))),
-					Box::new(Expr::Get(Var::Defined(Id::Parser(id::Parser::AnyItemSpan(last))))),
+					Box::new(Expr::Get(Id::Parser(id::Parser::AnyItemSpan(0)))),
+					Box::new(Expr::Get(Id::Parser(id::Parser::AnyItemSpan(last)))),
 				))),
 				Box::new(expr),
 			)
@@ -182,7 +174,7 @@ fn stack_pop<'a, 'p>(context: &Context<'a, 'p>, patterns: &[Pattern<'a, 'p>], ne
 			Expr::Let(
 				Id::Parser(id::Parser::Span),
 				false,
-				Box::new(Expr::Get(Var::Defined(Id::Parser(id::Parser::AnyItemSpan(0))))),
+				Box::new(Expr::Get(Id::Parser(id::Parser::AnyItemSpan(0)))),
 				Box::new(expr),
 			)
 		}
@@ -193,11 +185,11 @@ fn stack_pop<'a, 'p>(context: &Context<'a, 'p>, patterns: &[Pattern<'a, 'p>], ne
 			let i = i as u32;
 			expr = Expr::LetMatch(
 				pattern.clone(),
-				Box::new(Expr::Get(Var::Defined(Id::Parser(if context.config().locate {
+				Box::new(Expr::Get(Id::Parser(if context.config().locate {
 					id::Parser::AnyItemSpanless(i)
 				} else {
 					id::Parser::AnyItem(i)
-				})))),
+				}))),
 				Box::new(expr),
 			)
 		}
@@ -215,7 +207,7 @@ fn stack_pop<'a, 'p>(context: &Context<'a, 'p>, patterns: &[Pattern<'a, 'p>], ne
 						None
 					},
 					Some(Id::Parser(id::Parser::AnyItemSpan(i))),
-					Box::new(Expr::Get(Var::Defined(Id::Parser(id::Parser::AnyItem(i))))),
+					Box::new(Expr::Get(Id::Parser(id::Parser::AnyItem(i)))),
 					Box::new(expr),
 				))
 			}
@@ -237,29 +229,34 @@ fn stack_pop<'a, 'p>(context: &Context<'a, 'p>, patterns: &[Pattern<'a, 'p>], ne
 		};
 
 		expr = Expr::Stack(
-			Var::Defined(Id::Parser(id::Parser::Stack)),
-			StackExpr::Pop(value, state, Box::new(expr))
+			Id::Parser(id::Parser::Stack),
+			StackExpr::Pop(value, state, Box::new(expr)),
 		)
 	}
 
 	expr
 }
 
-fn generate_state<'a, 'p>(context: &Context<'a, 'p>, table: &table::LR0, stack: &mut Vec<u32>, q: u32) -> Expr<'a, 'p> {
+fn generate_state<'a, 'p>(
+	context: &Context<'a, 'p>,
+	table: &table::LR0,
+	stack: &mut Vec<u32>,
+	q: u32,
+) -> Expr<'a, 'p> {
 	let recurse_args = if context.config().locate {
 		vec![
-			Var::Defined(Id::Parser(id::Parser::Lexer)),
-			Var::Defined(Id::Parser(id::Parser::Position)),
-			Var::Defined(Id::Parser(id::Parser::Stack)),
-			Var::Defined(Id::Parser(id::Parser::AnyNodeOpt)),
-			Var::Defined(Id::Parser(id::Parser::State)),
+			Id::Parser(id::Parser::Lexer),
+			Id::Parser(id::Parser::Position),
+			Id::Parser(id::Parser::Stack),
+			Id::Parser(id::Parser::AnyNodeOpt),
+			Id::Parser(id::Parser::State),
 		]
 	} else {
 		vec![
-			Var::Defined(Id::Parser(id::Parser::Lexer)),
-			Var::Defined(Id::Parser(id::Parser::Stack)),
-			Var::Defined(Id::Parser(id::Parser::AnyNodeOpt)),
-			Var::Defined(Id::Parser(id::Parser::State)),
+			Id::Parser(id::Parser::Lexer),
+			Id::Parser(id::Parser::Stack),
+			Id::Parser(id::Parser::AnyNodeOpt),
+			Id::Parser(id::Parser::State),
 		]
 	};
 	let state = table.state(q).unwrap();
@@ -270,12 +267,9 @@ fn generate_state<'a, 'p>(context: &Context<'a, 'p>, table: &table::LR0, stack: 
 				let pattern = context
 					.provided()
 					.item_node_pattern(*ty_index, Id::Parser(id::Parser::Result));
-				let mut result = Expr::Get(Var::Defined(Id::Parser(id::Parser::Result)));
+				let mut result = Expr::Get(Id::Parser(id::Parser::Result));
 				if context.config().locate {
-					result = Expr::locate(
-						result,
-						Expr::Get(Var::Defined(Id::Parser(id::Parser::Span))),
-					)
+					result = Expr::locate(result, Expr::Get(Id::Parser(id::Parser::Span)))
 				}
 				stack_pop(context, &[pattern], Expr::ok(result), true)
 			}
@@ -301,12 +295,12 @@ fn generate_state<'a, 'p>(context: &Context<'a, 'p>, table: &table::LR0, stack: 
 				let mut expr = context.provided().node_expr(
 					f.return_ty(),
 					context.constructor_expr(*f_index, |i| {
-						let mut arg_expr = Expr::Get(Var::Defined(Id::Parser(id::Parser::Item(i))));
+						let mut arg_expr = Expr::Get(Id::Parser(id::Parser::Item(i)));
 
 						if context.config().locate {
 							arg_expr = Expr::locate(
 								arg_expr,
-								Expr::Get(Var::Defined(Id::Parser(id::Parser::AnyItemSpan(i)))),
+								Expr::Get(Id::Parser(id::Parser::AnyItemSpan(i))),
 							)
 						}
 
@@ -319,10 +313,7 @@ fn generate_state<'a, 'p>(context: &Context<'a, 'p>, table: &table::LR0, stack: 
 				);
 
 				if context.config().locate {
-					expr = Expr::locate(
-						expr,
-						Expr::Get(Var::Defined(Id::Parser(id::Parser::Span))),
-					)
+					expr = Expr::locate(expr, Expr::Get(Id::Parser(id::Parser::Span)))
 				}
 
 				stack_pop(
@@ -333,7 +324,7 @@ fn generate_state<'a, 'p>(context: &Context<'a, 'p>, table: &table::LR0, stack: 
 						Box::new(Expr::some(expr)),
 						Box::new(Expr::Update(
 							Id::Parser(id::Parser::State),
-							Box::new(Expr::Get(Var::Defined(Id::Parser(id::Parser::SavedState)))),
+							Box::new(Expr::Get(Id::Parser(id::Parser::SavedState))),
 							Box::new(Expr::Recurse(Label::Parser, recurse_args.clone())),
 						)),
 					),
@@ -353,7 +344,7 @@ fn generate_state<'a, 'p>(context: &Context<'a, 'p>, table: &table::LR0, stack: 
 							Id::Parser(id::Parser::State),
 							Box::new(Expr::Literal(Constant::Int(*next_state))),
 							Box::new(Expr::Recurse(Label::Parser, recurse_args.clone())),
-						))
+						)),
 					);
 
 					match index {
@@ -362,25 +353,22 @@ fn generate_state<'a, 'p>(context: &Context<'a, 'p>, table: &table::LR0, stack: 
 								.provided()
 								.token_pattern(*index, || Id::Parser(id::Parser::Token));
 							let mut expr = context.provided().item_token_expr(*index, |_| {
-								Expr::Get(Var::Defined(Id::Parser(id::Parser::Token)))
+								Expr::Get(Id::Parser(id::Parser::Token))
 							});
 
 							if context.config().locate {
-								expr = Expr::locate(
-									expr,
-									Expr::Get(Var::Defined(Id::Parser(id::Parser::Span))),
-								)
+								expr = Expr::locate(expr, Expr::Get(Id::Parser(id::Parser::Span)))
 							}
 
 							MatchCase {
 								pattern: Pattern::some(pattern),
 								expr: Expr::Stack(
-									Var::Defined(Id::Parser(id::Parser::Stack)),
+									Id::Parser(id::Parser::Stack),
 									StackExpr::Push(
 										Box::new(expr),
-										Box::new(Expr::Get(Var::Defined(Id::Parser(id::Parser::State)))),
+										Box::new(Expr::Get(Id::Parser(id::Parser::State))),
 										Box::new(next_state_expr),
-									)
+									),
 								),
 							}
 						}
@@ -393,14 +381,11 @@ fn generate_state<'a, 'p>(context: &Context<'a, 'p>, table: &table::LR0, stack: 
 				.collect();
 
 			if action_cases.len() < context.provided().token_count() + 1 {
-				let mut err = Expr::Error(Error::UnexpectedToken(Box::new(Expr::Get(Var::Defined(Id::Parser(
+				let mut err = Expr::Error(Error::UnexpectedToken(Box::new(Expr::Get(Id::Parser(
 					id::Parser::Unexpected,
-				))))));
+				)))));
 				if context.config().locate {
-					err = Expr::locate(
-						err,
-						Expr::Get(Var::Defined(Id::Parser(id::Parser::Span))),
-					)
+					err = Expr::locate(err, Expr::Get(Id::Parser(id::Parser::Span)))
 				}
 				action_cases.push(MatchCase {
 					pattern: Pattern::Bind(Id::Parser(id::Parser::Unexpected)),
@@ -417,46 +402,43 @@ fn generate_state<'a, 'p>(context: &Context<'a, 'p>, table: &table::LR0, stack: 
 						.node_pattern(*index, Id::Parser(id::Parser::Node));
 					let mut expr = context
 						.provided()
-						.item_node_expr(*index, Expr::Get(Var::Defined(Id::Parser(id::Parser::Node))));
+						.item_node_expr(*index, Expr::Get(Id::Parser(id::Parser::Node)));
 
 					if context.config().locate {
-						expr = Expr::locate(
-							expr,
-							Expr::Get(Var::Defined(Id::Parser(id::Parser::Span))),
-						)
+						expr = Expr::locate(expr, Expr::Get(Id::Parser(id::Parser::Span)))
 					}
 
 					MatchCase {
 						pattern,
 						expr: Expr::Stack(
-							Var::Defined(Id::Parser(id::Parser::Stack)),
+							Id::Parser(id::Parser::Stack),
 							StackExpr::Push(
 								Box::new(expr),
-								Box::new(Expr::Get(Var::Defined(Id::Parser(id::Parser::State)))),
+								Box::new(Expr::Get(Id::Parser(id::Parser::State))),
 								Box::new(Expr::Update(
 									Id::Parser(id::Parser::AnyNodeOpt),
 									Box::new(Expr::none()),
 									Box::new(Expr::Update(
 										Id::Parser(id::Parser::State),
 										Box::new(Expr::Literal(Constant::Int(*next_state))),
-										Box::new(Expr::Recurse(Label::Parser, recurse_args.clone())),
-									))
-								)
+										Box::new(Expr::Recurse(
+											Label::Parser,
+											recurse_args.clone(),
+										)),
+									)),
+								)),
 							),
-						)),
+						),
 					}
 				})
 				.collect();
 
 			if (goto_cases.len() as u32) < context.grammar().type_count() {
-				let mut err = Expr::Error(Error::UnexpectedNode(Box::new(Expr::Get(Var::Defined(Id::Parser(
+				let mut err = Expr::Error(Error::UnexpectedNode(Box::new(Expr::Get(Id::Parser(
 					id::Parser::Unexpected,
-				))))));
+				)))));
 				if context.config().locate {
-					err = Expr::locate(
-						err,
-						Expr::Get(Var::Defined(Id::Parser(id::Parser::Span))),
-					)
+					err = Expr::locate(err, Expr::Get(Id::Parser(id::Parser::Span)))
 				}
 				goto_cases.push(MatchCase {
 					pattern: Pattern::Bind(Id::Parser(id::Parser::Unexpected)),
@@ -469,51 +451,49 @@ fn generate_state<'a, 'p>(context: &Context<'a, 'p>, table: &table::LR0, stack: 
 					Some(Id::Parser(id::Parser::AnyTokenOptSpanless)),
 					Some(Id::Parser(id::Parser::Span)),
 					Box::new(Expr::Span(SpanExpr::Transpose(
-						Box::new(Expr::Get(Var::Defined(Id::Parser(id::Parser::AnyTokenOpt)))),
-						Box::new(Expr::Span(SpanExpr::FromPosition(Box::new(
-							Expr::Get(Var::Defined(Id::Parser(id::Parser::Position))),
-						)))),
+						Box::new(Expr::Get(Id::Parser(id::Parser::AnyTokenOpt))),
+						Box::new(Expr::Span(SpanExpr::FromPosition(Box::new(Expr::Get(
+							Id::Parser(id::Parser::Position),
+						))))),
 					))),
 					Box::new(Expr::Update(
 						Id::Parser(id::Parser::Position),
 						Box::new(Expr::Span(SpanExpr::After(Box::new(Expr::Get(
-							Var::Defined(Id::Parser(id::Parser::Span)),
+							Id::Parser(id::Parser::Span),
 						))))),
 						Box::new(Expr::Match {
-							expr: Box::new(Expr::Get(Var::Defined(Id::Parser(id::Parser::AnyTokenOptSpanless)))),
+							expr: Box::new(Expr::Get(Id::Parser(id::Parser::AnyTokenOptSpanless))),
 							cases: action_cases,
 						}),
 					)),
 				))
 			} else {
 				Expr::Match {
-					expr: Box::new(Expr::Get(Var::Defined(Id::Parser(id::Parser::AnyTokenOpt)))),
+					expr: Box::new(Expr::Get(Id::Parser(id::Parser::AnyTokenOpt))),
 					cases: action_cases,
 				}
 			};
 
 			let cases = vec![
 				MatchCase {
-					pattern: Pattern::some(Pattern::Bind(Id::Parser(
-						id::Parser::AnyNode,
-					))),
+					pattern: Pattern::some(Pattern::Bind(Id::Parser(id::Parser::AnyNode))),
 					expr: Expr::Match {
-						expr: Box::new(Expr::Get(Var::Defined(Id::Parser(id::Parser::AnyNode)))),
+						expr: Box::new(Expr::Get(Id::Parser(id::Parser::AnyNode))),
 						cases: goto_cases,
 					},
 				},
 				MatchCase {
 					pattern: Pattern::none(),
 					expr: Expr::Stream(
-						Var::Defined(Id::Parser(id::Parser::Lexer)),
+						Id::Parser(id::Parser::Lexer),
 						StreamExpr::Pull(
 							Id::Parser(id::Parser::UnsafeTokenOpt),
 							Box::new(Expr::Check(
 								Id::Parser(id::Parser::AnyTokenOpt),
-								Box::new(Expr::Get(Var::Defined(Id::Parser(id::Parser::UnsafeTokenOpt)))),
-								Box::new(action_case)
-							))
-						)
+								Box::new(Expr::Get(Id::Parser(id::Parser::UnsafeTokenOpt))),
+								Box::new(action_case),
+							)),
+						),
 					),
 				},
 			];
@@ -523,19 +503,19 @@ fn generate_state<'a, 'p>(context: &Context<'a, 'p>, table: &table::LR0, stack: 
 					Some(Id::Parser(id::Parser::AnyNodeOptSpanless)),
 					Some(Id::Parser(id::Parser::Span)),
 					Box::new(Expr::Span(SpanExpr::Transpose(
-						Box::new(Expr::Get(Var::Defined(Id::Parser(id::Parser::AnyNodeOpt)))),
-						Box::new(Expr::Span(SpanExpr::FromPosition(Box::new(
-							Expr::Get(Var::Defined(Id::Parser(id::Parser::Position))),
-						)))),
+						Box::new(Expr::Get(Id::Parser(id::Parser::AnyNodeOpt))),
+						Box::new(Expr::Span(SpanExpr::FromPosition(Box::new(Expr::Get(
+							Id::Parser(id::Parser::Position),
+						))))),
 					))),
 					Box::new(Expr::Match {
-						expr: Box::new(Expr::Get(Var::Defined(Id::Parser(id::Parser::AnyNodeOptSpanless)))),
+						expr: Box::new(Expr::Get(Id::Parser(id::Parser::AnyNodeOptSpanless))),
 						cases,
 					}),
 				))
 			} else {
 				Expr::Match {
-					expr: Box::new(Expr::Get(Var::Defined(Id::Parser(id::Parser::AnyNodeOpt)))),
+					expr: Box::new(Expr::Get(Id::Parser(id::Parser::AnyNodeOpt))),
 					cases,
 				}
 			}

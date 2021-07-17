@@ -3,6 +3,7 @@ name = "chom"
 version = "0.1.0-alpha"
 authors = ["Timothée Haudebourg <author@haudebourg.net>"]
 edition = "2018"
+build = "build.rs"
 
 [features]
 bin = [
@@ -25,6 +26,14 @@ log = "^0.4"
 chom-rust = { path = "../rust", optional = true }
 stderrlog = { version = "^0.5", optional = true }
 clap = { version = "^2.33", features = ["yaml"], optional = true }
+
+[dev-dependencies]
+lazy_static = "^1.4"
+
+[build-dependencies]
+toml = "*"
+proc-macro2 = "*"
+quote = "*"
 
 [[bin]]
 name = "chom"

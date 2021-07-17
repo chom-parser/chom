@@ -19,7 +19,7 @@ pub use poly::{terminal, Terminal};
 
 pub struct OwnedGrammar {
 	poly: Box<poly::Grammar>,
-	mono: Grammar<'static>
+	mono: Grammar<'static>,
 }
 
 impl OwnedGrammar {
@@ -27,10 +27,7 @@ impl OwnedGrammar {
 		let poly = Box::new(poly);
 		let static_poly: &'static poly::Grammar = unsafe { &*(poly.as_ref() as *const _) };
 		let mono = Grammar::new(static_poly);
-		Self {
-			poly,
-			mono
-		}
+		Self { poly, mono }
 	}
 
 	pub fn poly(&self) -> &poly::Grammar {

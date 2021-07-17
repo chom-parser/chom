@@ -1,25 +1,7 @@
+use super::{Expr, Module, Path, Pattern, Type, TypeExpr};
+use crate::{lexing, mono, parsing, poly, Ident};
+use chom_ir::{function, ty, Function};
 use std::collections::HashMap;
-use chom_ir::{
-	expr,
-	ty,
-	Function,
-	function
-};
-use crate::{
-	Ident,
-	mono,
-	poly,
-	parsing,
-	lexing
-};
-use super::{
-	Pattern,
-	Expr,
-	Module,
-	Type,
-	TypeExpr,
-	Path
-};
 
 pub mod id;
 mod namespace;
@@ -71,7 +53,7 @@ pub struct Context<'a, 'p> {
 	function_variants: HashMap<u32, u32>,
 
 	/// Keeps track of the name of each submodules.
-	submodules: Vec<HashMap<String, u32>>
+	submodules: Vec<HashMap<String, u32>>,
 }
 
 impl<'a, 'p> Context<'a, 'p> {
@@ -157,11 +139,10 @@ impl<'a, 'p> Context<'a, 'p> {
 
 	pub fn module_index_from_path(&self, path: &[String]) -> Option<u32> {
 		match path.split_last() {
-			Some((name, parent_path)) => {
-				self.module_index_from_path(parent_path).map(|parent_index| {
-					self.submodules[parent_index as usize].get(name).cloned()
-				}).flatten()
-			}
+			Some((name, parent_path)) => self
+				.module_index_from_path(parent_path)
+				.map(|parent_index| self.submodules[parent_index as usize].get(name).cloned())
+				.flatten(),
 			None => Some(0),
 		}
 	}
@@ -253,7 +234,7 @@ impl<'a, 'p> Context<'a, 'p> {
 			ir: &mut chom_ir::Context<Namespace<'a, 'p>>,
 			submodules: &mut Vec<HashMap<String, u32>>,
 			path: &[S],
-			is_extern: bool
+			is_extern: bool,
 		) -> u32 {
 			use std::collections::hash_map::Entry;
 			let index = match path.split_last() {
@@ -280,30 +261,10 @@ impl<'a, 'p> Context<'a, 'p> {
 			index
 		}
 
-		let extern_module = declare_module(
-			&mut ir,
-			&mut submodules,
-			extern_module_path,
-			true,
-		);
-		let ast_module = declare_module(
-			&mut ir,
-			&mut submodules,
-			ast_module_path,
-			false,
-		);
-		let lexer_module = declare_module(
-			&mut ir,
-			&mut submodules,
-			lexer_module_path,
-			false,
-		);
-		let parser_module = declare_module(
-			&mut ir,
-			&mut submodules,
-			parser_module_path,
-			false,
-		);
+		let extern_module = declare_module(&mut ir, &mut submodules, extern_module_path, true);
+		let ast_module = declare_module(&mut ir, &mut submodules, ast_module_path, false);
+		let lexer_module = declare_module(&mut ir, &mut submodules, lexer_module_path, false);
+		let parser_module = declare_module(&mut ir, &mut submodules, parser_module_path, false);
 
 		log::info!("IR: declaring extern types...");
 		let mut grammar_extern_type = HashMap::new();
@@ -319,9 +280,9 @@ impl<'a, 'p> Context<'a, 'p> {
 			FunctionId::UndefinedChar,
 			function::Signature::undefined_char_constructor(
 				Id::Extern(id::Extern::CharOpt),
-				ty::Expr::Instance(ty::Ref::Defined(lexing_error_ty), Vec::new())
+				ty::Expr::Instance(ty::Ref::Defined(lexing_error_ty), Vec::new()),
 			),
-			None
+			None,
 		));
 
 		struct DefinitionEnv<'e, 'a, 'p> {
@@ -396,7 +357,9 @@ impl<'a, 'p> Context<'a, 'p> {
 						}
 						poly::ty::Id::Defined(ident) => {
 							log::info!("IR: defining type `{}` ({})", ident, index);
-							let ir_ty = env.ir.add_type(Type::new(env.ast_module, id, ty::Desc::Opaque));
+							let ir_ty =
+								env.ir
+									.add_type(Type::new(env.ast_module, id, ty::Desc::Opaque));
 							env.grammar_type.insert(index, ir_ty);
 
 							let desc = if ty.constructor_count() == 1 {
@@ -431,7 +394,10 @@ impl<'a, 'p> Context<'a, 'p> {
 										let mut strct = ty::Struct::new();
 										for (p_index, p) in f.arguments().iter().enumerate() {
 											if let Some(p_ty) = type_expr(env, index, p.expr()) {
-												strct.add_field(FieldId(f_index, p_index as u32), p_ty);
+												strct.add_field(
+													FieldId(f_index, p_index as u32),
+													p_ty,
+												);
 											}
 										}
 										ty::VariantDesc::Struct(strct)
@@ -444,7 +410,8 @@ impl<'a, 'p> Context<'a, 'p> {
 										ty::VariantDesc::Tuple(args.collect())
 									};
 
-									let variant = ty::Variant::Defined(VariantId::Function(f_index), desc);
+									let variant =
+										ty::Variant::Defined(VariantId::Function(f_index), desc);
 									env.function_variants
 										.insert(f_index, enm.add_variant(variant));
 								}
@@ -452,7 +419,10 @@ impl<'a, 'p> Context<'a, 'p> {
 								ty::Desc::Enum(enm)
 							};
 
-							env.ir.ty_mut(ty::Ref::Defined(ir_ty)).unwrap().set_desc(desc);
+							env.ir
+								.ty_mut(ty::Ref::Defined(ir_ty))
+								.unwrap()
+								.set_desc(desc);
 							ir_ty
 						}
 					}
@@ -499,7 +469,7 @@ impl<'a, 'p> Context<'a, 'p> {
 			lexing_error_fn,
 			grammar_type,
 			function_variants,
-			submodules
+			submodules,
 		};
 
 		// log::info!("IR: generating debug formatting routines...");
@@ -507,7 +477,10 @@ impl<'a, 'p> Context<'a, 'p> {
 			let ty_index = i as u32;
 			let ir_ty = *context.grammar_type.get(&ty_index).unwrap();
 			let ty_ref = ty::Ref::Defined(ir_ty);
-			context.ir.add_function(super::formatter::debug::function(context.ir_context(), ty_ref));
+			context.ir.add_function(super::formatter::debug::function(
+				context.ir_context(),
+				ty_ref,
+			));
 		}
 
 		log::info!("IR: lexer function...");
@@ -516,10 +489,12 @@ impl<'a, 'p> Context<'a, 'p> {
 			function::Owner::Type(context.provided().lexer_type()),
 			FunctionId::Lexer,
 			function::Signature::lexer(
+				Id::Lexer(id::Lexer::This),
+				ty::Expr::Instance(context.provided().lexer_type(), Vec::new()),
 				context.provided().token_type_expr(),
-				context.lexing_error_type_expr()
+				context.lexing_error_type_expr(),
 			),
-			Some(lexer)
+			Some(lexer),
 		));
 
 		match parsing_table {
@@ -532,12 +507,12 @@ impl<'a, 'p> Context<'a, 'p> {
 						FunctionId::Parser(ty_index),
 						function::Signature::parser(
 							Id::Parser(id::Parser::Lexer),
-							context.provided().token_type_expr(), 
+							context.provided().token_type_expr(),
 							context.lexing_error_type_expr(),
 							context.type_expr(ty_index),
-							context.lexing_error_type_expr()
+							context.lexing_error_type_expr(),
 						),
-						Some(parser)
+						Some(parser),
 					));
 				}
 			}

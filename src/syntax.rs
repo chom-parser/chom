@@ -174,35 +174,50 @@ impl Parsable for Grammar {
 							let mut parameters = Vec::new();
 
 							loop {
-								let (token, token_span) = expect(lexer, &mut span)?.into_raw_parts();
+								let (token, token_span) =
+									expect(lexer, &mut span)?.into_raw_parts();
 								match token {
 									lexer::Token::Punct('=') => break,
-									lexer::Token::Group(d, g) if d == lexer::Delimiter::Angle && !g.is_empty() => {
+									lexer::Token::Group(d, g)
+										if d == lexer::Delimiter::Angle && !g.is_empty() =>
+									{
 										let mut inner = g.into_iter();
-										let (token, token_span) = inner.next().unwrap().into_raw_parts();
+										let (token, token_span) =
+											inner.next().unwrap().into_raw_parts();
 										match token {
-											lexer::Token::Ident(id) => {
-												parameters.push(Loc::new(
-													ast::ty::Parameter::NonTerminal(string_to_loc_ident(id, token_span)?),
-													token_span
+											lexer::Token::Ident(id) => parameters.push(Loc::new(
+												ast::ty::Parameter::NonTerminal(
+													string_to_loc_ident(id, token_span)?,
+												),
+												token_span,
+											)),
+											token => {
+												return Err(Loc::new(
+													Error::UnexpectedToken(token),
+													token_span,
 												))
-											},
-											token => return Err(Loc::new(Error::UnexpectedToken(token), token_span))
+											}
 										}
 
 										if let Some(token) = inner.next() {
 											let (token, token_span) = token.into_raw_parts();
-											return Err(Loc::new(Error::UnexpectedToken(token), token_span))
+											return Err(Loc::new(
+												Error::UnexpectedToken(token),
+												token_span,
+											));
 										}
-									},
-									lexer::Token::Ident(id) => {
-										parameters.push(Loc::new(
-											ast::ty::Parameter::Terminal(string_to_loc_ident(id, token_span)?),
-											token_span
-										))
-									},
+									}
+									lexer::Token::Ident(id) => parameters.push(Loc::new(
+										ast::ty::Parameter::Terminal(string_to_loc_ident(
+											id, token_span,
+										)?),
+										token_span,
+									)),
 									token => {
-										return Err(Loc::new(Error::UnexpectedToken(token), token_span))
+										return Err(Loc::new(
+											Error::UnexpectedToken(token),
+											token_span,
+										))
 									}
 								}
 							}

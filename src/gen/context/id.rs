@@ -6,7 +6,7 @@ pub enum Id {
 	Lexer(Lexer),
 	Parser(Parser),
 	Format(Format),
-	Extern(Extern)
+	Extern(Extern),
 }
 
 impl Id {
@@ -15,7 +15,7 @@ impl Id {
 			Self::Lexer(id) => id.to_ident(),
 			Self::Parser(id) => id.to_ident(),
 			Self::Format(id) => id.to_ident(),
-			Self::Extern(id) => id.to_ident()
+			Self::Extern(id) => id.to_ident(),
 		}
 	}
 }
@@ -23,11 +23,8 @@ impl Id {
 /// Variables occuring in the lexer.
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Lexer {
-	// /// Buffer member.
-	// Buffer,
-
-	// /// Location member.
-	// Span,
+	/// The lexer itself
+	This,
 
 	/// Current state.
 	State,
@@ -51,12 +48,13 @@ pub enum Lexer {
 impl Lexer {
 	pub fn to_ident(&self) -> Ident {
 		match self {
+			Self::This => Ident::new("this").unwrap(),
 			Self::State => Ident::new("state").unwrap(),
 			Self::BufferChars => Ident::new("chars").unwrap(),
 			Self::CharOpt => Ident::new("char_opt").unwrap(),
 			Self::UnsafeCharOpt => Ident::new("unsafe_char_opt").unwrap(),
 			Self::SubToken => Ident::new("sub_token").unwrap(),
-			Self::Unexpected => Ident::new("unexpected").unwrap()
+			Self::Unexpected => Ident::new("unexpected").unwrap(),
 		}
 	}
 }
@@ -147,25 +145,29 @@ impl Parser {
 			Self::Position => Ident::new("position").unwrap(),
 			Self::Span => Ident::new("span").unwrap(),
 			Self::Result => Ident::new("result").unwrap(),
-			Self::Unexpected => Ident::new("unexpected").unwrap()
+			Self::Unexpected => Ident::new("unexpected").unwrap(),
 		}
 	}
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Format {
+	/// A reference to the value beeing formatted.
+	This,
+
 	/// Argument.
 	Arg(u32),
 
 	/// Output.
-	Output
+	Output,
 }
 
 impl Format {
 	pub fn to_ident(&self) -> Ident {
 		match self {
+			Self::This => Ident::new("this").unwrap(),
 			Self::Arg(i) => Ident::new(format!("a{}", i)).unwrap(),
-			Self::Output => Ident::new("output").unwrap()
+			Self::Output => Ident::new("output").unwrap(),
 		}
 	}
 }
@@ -173,14 +175,14 @@ impl Format {
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Extern {
 	CharOpt,
-	String
+	String,
 }
 
 impl Extern {
 	pub fn to_ident(&self) -> Ident {
 		match self {
 			Self::CharOpt => Ident::new("c_opt").unwrap(),
-			Self::String => Ident::new("string").unwrap()
+			Self::String => Ident::new("string").unwrap(),
 		}
 	}
 }

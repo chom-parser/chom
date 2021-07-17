@@ -1,9 +1,6 @@
 use super::Grammar;
 use crate::Ident;
-use std::{
-	fmt,
-	collections::HashSet
-};
+use std::{collections::HashSet, fmt};
 
 /// Polymorphic type identifier.
 #[derive(Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -92,11 +89,11 @@ impl Parameters {
 		for (i, p) in self.list.iter().enumerate().rev() {
 			let pid = match p {
 				Parameter::Terminal(t) => &self.terminal_parameters[*t as usize],
-				Parameter::Type(t) => &self.type_parameters[*t as usize]
+				Parameter::Type(t) => &self.type_parameters[*t as usize],
 			};
 
 			if pid == id {
-				return Some(i as u32)
+				return Some(i as u32);
 			}
 		}
 
@@ -108,7 +105,7 @@ impl Parameters {
 			if let Parameter::Type(t) = p {
 				let pid = &self.type_parameters[*t as usize];
 				if pid == id {
-					return Some(i as u32)
+					return Some(i as u32);
 				}
 			}
 		}
@@ -121,7 +118,7 @@ impl Parameters {
 			if let Parameter::Terminal(t) = p {
 				let pid = &self.terminal_parameters[*t as usize];
 				if pid == id {
-					return Some(i as u32)
+					return Some(i as u32);
 				}
 			}
 		}
@@ -345,7 +342,12 @@ impl Expr {
 		self.depends_on_under(grammar, ty_index, &mut visited)
 	}
 
-	fn depends_on_under(&self, grammar: &Grammar, ty_index: u32, visited: &mut HashSet<u32>) -> bool {
+	fn depends_on_under(
+		&self,
+		grammar: &Grammar,
+		ty_index: u32,
+		visited: &mut HashSet<u32>,
+	) -> bool {
 		if let Self::Type(other_ty_index, args) = self {
 			if visited.insert(*other_ty_index) {
 				if *other_ty_index == ty_index {
@@ -357,7 +359,9 @@ impl Expr {
 						c.arguments()
 							.iter()
 							.any(|a| a.expr().depends_on_under(grammar, ty_index, visited))
-					}) || args.iter().any(|a| a.depends_on_under(grammar, ty_index, visited))
+					}) || args
+						.iter()
+						.any(|a| a.depends_on_under(grammar, ty_index, visited))
 				} else {
 					false
 				}

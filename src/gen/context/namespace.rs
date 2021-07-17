@@ -1,12 +1,5 @@
-use crate::{
-	Ident,
-	poly,
-	mono
-};
-use super::{
-	Id,
-	provided
-};
+use super::{provided, Id};
+use crate::{mono, Ident};
 
 #[derive(Clone, Copy)]
 pub struct ModuleId(u32);
@@ -29,17 +22,17 @@ pub enum TypeId {
 #[derive(Clone, Copy)]
 pub enum VariantId {
 	/// Function variant.
-	/// 
+	///
 	/// It corresponds to the index of the defining function
 	/// in the polymorphic grammar.
 	Function(u32),
 
 	/// Provided variant.
-	Provided(provided::Variant)
+	Provided(provided::Variant),
 }
 
 /// References a field in a structure.
-/// 
+///
 /// The first parameter is the index of the polymorphic function/constructor in the grammar
 /// that defined the structure.
 /// The second parameter is the index of the labeled parameter in the function that serves as a field.
@@ -49,14 +42,14 @@ pub struct FieldId(pub u32, pub u32);
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Label {
 	Lexer(u32),
-	Parser
+	Parser,
 }
 
 impl Label {
 	pub fn to_ident(&self) -> Ident {
 		match self {
 			Self::Lexer(i) => Ident::new(format!("lexer{}", i)).unwrap(),
-			Self::Parser => Ident::new("parser").unwrap()
+			Self::Parser => Ident::new("parser").unwrap(),
 		}
 	}
 }
@@ -67,7 +60,7 @@ pub enum FunctionId {
 	UndefinedChar,
 
 	/// Extern parser.
-	/// 
+	///
 	/// The given parameter is the index of the target
 	/// extern type in the grammar.
 	ExternParser(u32),
@@ -76,13 +69,13 @@ pub enum FunctionId {
 	Lexer,
 
 	/// Parser.
-	/// 
+	///
 	/// The given parameter is the index of the target
 	/// type in the grammar.
 	Parser(mono::Index),
 
 	/// Debug formatter.
-	DebugFormat
+	DebugFormat,
 }
 
 pub struct Namespace<'a, 'p> {
@@ -110,7 +103,7 @@ impl<'a, 'p> Namespace<'a, 'p> {
 			modules: Vec::new(),
 			named_variants: Vec::new(),
 			keyword_variants: Vec::new(),
-			node_variants: Vec::new()
+			node_variants: Vec::new(),
 		}
 	}
 
@@ -170,18 +163,19 @@ impl<'a, 'p> chom_ir::Namespace for Namespace<'a, 'p> {
 
 	fn type_ident(&self, t: Self::Type) -> Ident {
 		match t {
-			TypeId::Extern(t) => {
-				self.grammar().extern_type(t).unwrap().clone()
-			},
+			TypeId::Extern(t) => self.grammar().extern_type(t).unwrap().clone(),
 			TypeId::ExternError => {
 				// Note: because of this, `error` is the only reserved extern type name.
 				Ident::new("error").unwrap() // TODO: test for reserved name error.
 			}
 			TypeId::Grammar(t) => {
 				let ty = self.grammar.poly().ty(t).unwrap();
-				ty.id().as_defined().expect("expected defined grammar type").clone()
-			},
-			TypeId::Provided(p) => p.ident()
+				ty.id()
+					.as_defined()
+					.expect("expected defined grammar type")
+					.clone()
+			}
+			TypeId::Provided(p) => p.ident(),
 		}
 	}
 
@@ -191,38 +185,46 @@ impl<'a, 'p> chom_ir::Namespace for Namespace<'a, 'p> {
 
 	fn variant_ident(&self, v: Self::Variant) -> Ident {
 		match v {
-			VariantId::Function(i) => {
-				self.grammar().poly().function(i).unwrap().id().as_defined().clone()
-			}
+			VariantId::Function(i) => self
+				.grammar()
+				.poly()
+				.function(i)
+				.unwrap()
+				.id()
+				.as_defined()
+				.clone(),
 			VariantId::Provided(p) => {
-				use provided::{
-					Variant,
-					TokenVariant
-				};
+				use provided::{TokenVariant, Variant};
 				match p {
-					Variant::Token(t) => {
-						match t {
-							TokenVariant::Named(i) => self.named_variants[i as usize].clone(),
-							TokenVariant::Keyword => Ident::new("Keyword").unwrap(),
-							TokenVariant::Operator => Ident::new("Operator").unwrap(),
-							TokenVariant::Begin => Ident::new("Begin").unwrap(),
-							TokenVariant::End => Ident::new("End").unwrap(),
-							TokenVariant::Punct => Ident::new("Punct").unwrap()
-						}
-					}
+					Variant::Token(t) => match t {
+						TokenVariant::Named(i) => self.named_variants[i as usize].clone(),
+						TokenVariant::Keyword => Ident::new("Keyword").unwrap(),
+						TokenVariant::Operator => Ident::new("Operator").unwrap(),
+						TokenVariant::Begin => Ident::new("Begin").unwrap(),
+						TokenVariant::End => Ident::new("End").unwrap(),
+						TokenVariant::Punct => Ident::new("Punct").unwrap(),
+					},
 					Variant::Keyword(i) => self.keyword_variants[i as usize].clone(),
 					Variant::Delimiter(d) => d.ident(),
 					Variant::Operator(o) => o.ident(),
 					Variant::Punct(p) => p.ident(),
 					Variant::Node(i) => self.node_variants[i as usize].clone(),
-					Variant::Item(i) => i.ident()
+					Variant::Item(i) => i.ident(),
 				}
 			}
 		}
 	}
 
 	fn field_ident(&self, f: Self::Field) -> Ident {
-		self.grammar.poly().function(f.0).unwrap().argument(f.1).unwrap().label().unwrap().clone()
+		self.grammar
+			.poly()
+			.function(f.0)
+			.unwrap()
+			.argument(f.1)
+			.unwrap()
+			.label()
+			.unwrap()
+			.clone()
 	}
 
 	fn label_ident(&self, l: Self::Label) -> Ident {
@@ -242,7 +244,7 @@ impl<'a, 'p> chom_ir::Namespace for Namespace<'a, 'p> {
 				let id = ty.composed_id(self.grammar);
 				Ident::new(format!("parse-{}", id)).unwrap()
 			}
-			FunctionId::DebugFormat => Ident::new("debug-format").unwrap()
+			FunctionId::DebugFormat => Ident::new("debug-format").unwrap(),
 		}
 	}
 }

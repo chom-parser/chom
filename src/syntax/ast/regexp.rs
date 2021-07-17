@@ -45,7 +45,7 @@ impl Atom {
 		match self {
 			Self::Ref(id) => Some(id),
 			Self::Group(g) => g.as_reference(),
-			_ => None
+			_ => None,
 		}
 	}
 }
