@@ -8,6 +8,7 @@ use chom_ir::{
 	function,
 	ty::{self, Enum, VariantDesc},
 	Function,
+	expr::SpanExpr
 };
 use std::collections::{hash_map::Entry, HashMap};
 
@@ -42,6 +43,10 @@ pub struct Types<'a, 'p> {
 	/// Maps each grammar terminal to a token pattern.
 	tokens_data: HashMap<u32, TokenData<'a, 'p>>,
 
+	/// Index of the function used to locate an lexing
+	/// error.
+	pub locate_lexer_err_function: Option<u32>,
+
 	/// Enum type of AST nodes (types/non terminals).
 	///
 	/// Defined in the parser.
@@ -50,6 +55,9 @@ pub struct Types<'a, 'p> {
 	/// Maps each grammar type to a variant index in `nodes_variants`.
 	nodes_variants_map: HashMap<mono::Index, u32>,
 
+	/// Parsing error type.
+	pub error_ty: u32,
+
 	/// Enum type of tokens or AST nodes.
 	///
 	/// Defined in the parser.
@@ -57,6 +65,10 @@ pub struct Types<'a, 'p> {
 
 	/// Lexer type.
 	pub lexer_ty: u32,
+
+	/// Index of the function used to convert a
+	/// lexing error into a parsing error.
+	pub lexer_to_parser_err_function: u32,
 }
 
 impl<'a, 'p> Types<'a, 'p> {
@@ -84,6 +96,13 @@ impl<'a, 'p> Types<'a, 'p> {
 		pattern.bind_any(f)
 	}
 
+	/// Returns the index of the extern parsing function associated
+	/// to the given grammar terminal.
+	pub fn token_parsing_function(&self, index: u32) -> Option<u32> {
+		let data = self.tokens_data.get(&index).unwrap();
+		data.parsing_function
+	}
+
 	/// Generate an expression building a token corresponding to the given grammar terminal.
 	///
 	/// If the token takes a value, the input function is called
@@ -94,6 +113,10 @@ impl<'a, 'p> Types<'a, 'p> {
 	{
 		let data = self.tokens_data.get(&index).unwrap();
 		data.pattern.as_expr(|_| f(data.parsing_function.unwrap()))
+	}
+
+	pub fn locate_lexer_err_function(&self) -> Option<u32> {
+		self.locate_lexer_err_function
 	}
 
 	pub fn node_pattern(&self, index: mono::Index, id: Id) -> Pattern<'a, 'p> {
@@ -155,8 +178,33 @@ impl<'a, 'p> Types<'a, 'p> {
 		)
 	}
 
+	pub fn error_type_expr(&self) -> TypeExpr<'a, 'p> {
+		TypeExpr::Instance(ty::Ref::Defined(self.error_ty), Vec::new())
+	}
+
+	pub fn unexpected_token_expr(&self, e: Expr<'a, 'p>) -> Expr<'a, 'p> {
+		Expr::Cons(
+			ty::Ref::Defined(self.error_ty),
+			1,
+			vec![e]
+		)
+	}
+
+	pub fn unexpected_node_expr(&self, e: Expr<'a, 'p>) -> Expr<'a, 'p> {
+		Expr::Cons(
+			ty::Ref::Defined(self.error_ty),
+			2,
+			vec![e]
+		)
+	}
+
+	pub fn lexer_to_parser_err_function(&self) -> u32 {
+		self.lexer_to_parser_err_function
+	}
+
 	/// The creates all the provided types in the intermediate representation.
 	pub fn new(
+		config: &crate::gen::Config,
 		ir: &mut chom_ir::Context<Namespace<'a, 'p>>,
 		extern_module: u32,
 		extern_error_ty: u32,
@@ -551,6 +599,35 @@ impl<'a, 'p> Types<'a, 'p> {
 			ty::Desc::Enum(items),
 		));
 
+		let mut errors = Enum::new();
+		errors.add_variant(ty::Variant::Defined(
+			super::VariantId::Provided(Variant::Error(ErrorVariant::Lexer)),
+			VariantDesc::Tuple(vec![ty::Expr::Instance(
+				ty::Ref::Defined(extern_error_ty),
+				Vec::new()
+			)])
+		));
+		errors.add_variant(ty::Variant::Defined(
+			super::VariantId::Provided(Variant::Error(ErrorVariant::UnexpectedToken)),
+			VariantDesc::Tuple(vec![ty::Expr::option(ty::Expr::Instance(
+				ty::Ref::Defined(token_ty),
+				Vec::new()
+			))])
+		));
+		errors.add_variant(ty::Variant::Defined(
+			super::VariantId::Provided(Variant::Error(ErrorVariant::UnexpectedNode)),
+			VariantDesc::Tuple(vec![ty::Expr::Instance(
+				ty::Ref::Defined(node_ty),
+				Vec::new(),
+			)])
+		));
+
+		let error_ty = ir.add_type(super::Type::new(
+			parser_module,
+			super::TypeId::Provided(Type::Error),
+			ty::Desc::Enum(errors)
+		));
+
 		fn define_type<'a, 'p>(
 			ir: &mut chom_ir::Context<Namespace<'a, 'p>>,
 			index: Option<u32>,
@@ -568,6 +645,58 @@ impl<'a, 'p> Types<'a, 'p> {
 			.unwrap()
 			.set_desc(ty::Desc::Enum(tokens));
 
+		let locate_lexer_err_function = if config.locate {
+			Some(ir.add_function(Function::new(
+				function::Owner::Module(lexer_module),
+				FunctionId::LocateLexerError,
+				function::Signature::new(
+					vec![
+						function::Arg::new(Id::Aux(id::Aux::Span), false, ty::Expr::span()),
+						function::Arg::new(Id::Aux(id::Aux::Error), false, ty::Expr::Instance(ty::Ref::Defined(extern_error_ty), Vec::new()))
+					],
+					ty::Expr::locate(ty::Expr::Instance(ty::Ref::Defined(extern_error_ty), Vec::new()))
+				),
+				Some(Expr::locate(
+					Expr::Get(Id::Aux(id::Aux::Error)),
+					Expr::Get(Id::Aux(id::Aux::Span))
+				))
+			)))
+		} else {
+			None
+		};
+
+		let lexer_to_parser_err_function = ir.add_function(Function::new(
+			function::Owner::Module(parser_module),
+			FunctionId::LexerToParserError,
+			function::Signature::new(
+				vec![
+					function::Arg::new(Id::Aux(id::Aux::Error), false, config.loc_type(ty::Expr::Instance(ty::Ref::Defined(extern_error_ty), Vec::new())))
+				],
+				config.loc_type(ty::Expr::Instance(ty::Ref::Defined(error_ty), Vec::new()))
+			),
+			Some(if config.locate {
+				Expr::Span(SpanExpr::Unwrap(
+					Some(Id::Aux(id::Aux::SpanlessError)),
+					Some(Id::Aux(id::Aux::Span)),
+					Box::new(Expr::Get(Id::Aux(id::Aux::Error))),
+					Box::new(Expr::locate(
+						Expr::Cons(
+							ty::Ref::Defined(error_ty),
+							0,
+							vec![Expr::Get(Id::Aux(id::Aux::SpanlessError))]
+						),
+						Expr::Get(Id::Aux(id::Aux::Span))
+					))
+				))
+			} else {
+				Expr::Cons(
+					ty::Ref::Defined(error_ty),
+					0,
+					vec![Expr::Get(Id::Aux(id::Aux::Error))]
+				)
+			})
+		));
+
 		Self {
 			token_ty,
 			keyword_ty: define_type(ir, keyword_ty.map(|(i, _)| i), keywords),
@@ -575,6 +704,8 @@ impl<'a, 'p> Types<'a, 'p> {
 			delimiter_ty: define_type(ir, delimiter_ty, delimiters),
 			punct_ty: define_type(ir, punct_ty.map(|(i, _)| i), puncts),
 			tokens_data,
+			locate_lexer_err_function,
+			error_ty,
 			node_ty,
 			nodes_variants_map,
 			item_ty,
@@ -583,6 +714,7 @@ impl<'a, 'p> Types<'a, 'p> {
 				TypeId::Provided(Type::Lexer),
 				ty::Desc::Lexer,
 			)),
+			lexer_to_parser_err_function
 		}
 	}
 }
@@ -613,6 +745,9 @@ pub enum Type {
 
 	/// Token or node.
 	Item,
+
+	/// Parsing error.
+	Error
 }
 
 impl Type {
@@ -626,6 +761,7 @@ impl Type {
 			Self::Punct => Ident::new("Punct").unwrap(),
 			Self::Node => Ident::new("Node").unwrap(),
 			Self::Item => Ident::new("Item").unwrap(),
+			Self::Error => Ident::new("Error").unwrap(),
 		}
 	}
 }
@@ -652,6 +788,9 @@ pub enum Variant {
 
 	/// Item variant.
 	Item(ItemVariant),
+
+	/// Parsing error variant.
+	Error(ErrorVariant),
 }
 
 #[derive(Clone, Copy)]
@@ -686,6 +825,23 @@ impl ItemVariant {
 		match self {
 			Self::Token => Ident::new("Token").unwrap(),
 			Self::Node => Ident::new("Node").unwrap(),
+		}
+	}
+}
+
+#[derive(Clone, Copy)]
+pub enum ErrorVariant {
+	Lexer,
+	UnexpectedToken,
+	UnexpectedNode,
+}
+
+impl ErrorVariant {
+	pub fn ident(&self) -> Ident {
+		match self {
+			Self::Lexer => Ident::new("Lexer").unwrap(),
+			Self::UnexpectedToken => Ident::new("UnexpectedToken").unwrap(),
+			Self::UnexpectedNode => Ident::new("UnexpectedNode").unwrap(),
 		}
 	}
 }

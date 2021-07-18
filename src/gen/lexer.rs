@@ -188,24 +188,13 @@ fn generate_automaton<'a, 'p>(
 							))),
 						),
 						terminal::Desc::RegExp(_) => {
-							let expr =
-								context
-									.provided()
-									.token_expr(*terminal_index, |ir_function| {
-										Expr::Call(
-											ir_function,
-											vec![Expr::Lexer(
-												Id::Lexer(id::Lexer::This),
-												LexerExpr::Buffer,
-											)],
-										)
-									});
 							let result = if default_token {
-								Expr::some(expr)
+								Expr::some(Expr::Get(Id::Lexer(id::Lexer::Result)))
 							} else {
-								Expr::ok(Expr::some(locate(context, expr)))
+								Expr::ok(Expr::some(locate(context, Expr::Get(Id::Lexer(id::Lexer::Result)))))
 							};
-							match table.sub_automaton_index(*terminal_index) {
+
+							let expr = match table.sub_automaton_index(*terminal_index) {
 								Some(sub_automaton) => {
 									let sub_expr =
 										generate_automaton(context, table, sub_automaton, true);
@@ -253,6 +242,56 @@ fn generate_automaton<'a, 'p>(
 									)
 								}
 								None => retrn(result),
+							};
+
+							match context.provided().token_parsing_function(*terminal_index) {
+								Some(ir_function) => {
+									let call = Expr::Call(
+										ir_function,
+										vec![Expr::Lexer(
+											Id::Lexer(id::Lexer::This),
+											LexerExpr::Buffer,
+										)],
+									);
+
+									let next = Expr::Let(
+										Id::Lexer(id::Lexer::Result),
+										false,
+										Box::new(context.provided().token_expr(*terminal_index, |_| {
+											Expr::Get(Id::Lexer(id::Lexer::Data))
+										})),
+										Box::new(expr)
+									);
+
+									if context.config().locate {
+										Expr::CheckMap(
+											Id::Lexer(id::Lexer::Data),
+											Box::new(call),
+											context.provided().locate_lexer_err_function().unwrap(),
+											vec![Expr::Lexer(
+												Id::Lexer(id::Lexer::This),
+												LexerExpr::Span,
+											)],
+											Box::new(next)
+										)
+									} else {
+										Expr::Check(
+											Id::Lexer(id::Lexer::Data),
+											Box::new(call),
+											Box::new(next)
+										)
+									}
+								}
+								None => {
+									Expr::Let(
+										Id::Lexer(id::Lexer::Result),
+										false,
+										Box::new(context.provided().token_expr(*terminal_index, |_| {
+											unreachable!()
+										})),
+										Box::new(expr)
+									)
+								}
 							}
 						}
 					};
@@ -269,11 +308,6 @@ fn generate_automaton<'a, 'p>(
 							expr: Expr::none(),
 						})
 					} else {
-						let err = Expr::Call(
-							context.lexing_error_function(),
-							vec![Expr::Get(Id::Lexer(id::Lexer::Unexpected))],
-						);
-
 						if id == init_id {
 							state_cases.push(MatchCase {
 								pattern: Pattern::none(),
@@ -283,10 +317,18 @@ fn generate_automaton<'a, 'p>(
 										LexerExpr::IsEmpty,
 									)),
 									Box::new(retrn(Expr::ok(Expr::none()))),
-									Box::new(retrn(Expr::err(locate(context, err.clone())))),
+									Box::new(retrn(Expr::err(locate(context, Expr::Call(
+										context.lexing_error_function(),
+										vec![Expr::none()]
+									))))),
 								),
 							})
 						}
+
+						let err = Expr::Call(
+							context.lexing_error_function(),
+							vec![Expr::Get(Id::Lexer(id::Lexer::Unexpected))],
+						);
 
 						state_cases.push(MatchCase {
 							pattern: Pattern::Bind(Id::Lexer(id::Lexer::Unexpected)),

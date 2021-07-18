@@ -30,6 +30,18 @@ pub struct Config {
 	pub locate: bool,
 }
 
+impl Config {
+	/// Wraps the given type expression under a `loc` type only
+	/// if required by the configuration.
+	pub fn loc_type<'a, 'p>(&self, ty: TypeExpr<'a, 'p>) -> TypeExpr<'a, 'p> {
+		if self.locate {
+			TypeExpr::locate(ty)
+		} else {
+			ty
+		}
+	}
+}
+
 // pub enum Parser {
 // 	LR0(pseudo::Expr),
 // 	LALR1(pseudo::Expr),

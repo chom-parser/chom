@@ -90,7 +90,7 @@ fn run_subcommand<'a, 'p>(
 		("table", Some(_m)) => generate_parse_table(grammar.poly(), &mut Output::std()?),
 		("generate", Some(m)) => {
 			log::info!("entering parser generation.");
-			let config = chom::gen::Config { locate: true };
+			let config = chom::gen::Config { locate: false };
 
 			let extern_mod_path = parse_path(m.value_of("EXTERN").unwrap());
 			let ast_mod_path = parse_path(m.value_of("AST").unwrap());

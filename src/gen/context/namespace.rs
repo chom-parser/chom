@@ -56,8 +56,8 @@ impl Label {
 
 #[derive(Clone, Copy)]
 pub enum FunctionId {
-	/// Undefined character error constructor.
-	UndefinedChar,
+	/// Unexpected character error constructor.
+	UnexpectedChar,
 
 	/// Extern parser.
 	///
@@ -68,11 +68,17 @@ pub enum FunctionId {
 	/// Lexer.
 	Lexer,
 
+	/// Locate lexer error.
+	LocateLexerError,
+
 	/// Parser.
 	///
 	/// The given parameter is the index of the target
 	/// type in the grammar.
 	Parser(mono::Index),
+
+	/// Convert a lexer error into a parser error.
+	LexerToParserError,
 
 	/// Debug formatter.
 	DebugFormat,
@@ -210,6 +216,7 @@ impl<'a, 'p> chom_ir::Namespace for Namespace<'a, 'p> {
 					Variant::Punct(p) => p.ident(),
 					Variant::Node(i) => self.node_variants[i as usize].clone(),
 					Variant::Item(i) => i.ident(),
+					Variant::Error(e) => e.ident()
 				}
 			}
 		}
@@ -233,17 +240,19 @@ impl<'a, 'p> chom_ir::Namespace for Namespace<'a, 'p> {
 
 	fn function_ident(&self, f: Self::Function) -> Ident {
 		match f {
-			FunctionId::UndefinedChar => Ident::new("undefined-char").unwrap(),
+			FunctionId::UnexpectedChar => Ident::new("unexpected-char").unwrap(),
 			FunctionId::ExternParser(index) => {
 				let ty = self.grammar.extern_type(index).unwrap();
 				Ident::new(format!("parse-{}", ty)).unwrap()
 			}
 			FunctionId::Lexer => Ident::new("lexer").unwrap(),
+			FunctionId::LocateLexerError => Ident::new("locate-error").unwrap(),
 			FunctionId::Parser(index) => {
 				let ty = self.grammar.ty(index).unwrap();
 				let id = ty.composed_id(self.grammar);
 				Ident::new(format!("parse-{}", id)).unwrap()
 			}
+			FunctionId::LexerToParserError => Ident::new("lexer-to-parser-error").unwrap(),
 			FunctionId::DebugFormat => Ident::new("debug-format").unwrap(),
 		}
 	}

@@ -277,8 +277,8 @@ impl<'a, 'p> Context<'a, 'p> {
 		let lexing_error_ty = ir.add_type(Type::opaque(extern_module, TypeId::ExternError));
 		let lexing_error_fn = ir.add_function(Function::new(
 			function::Owner::Module(extern_module),
-			FunctionId::UndefinedChar,
-			function::Signature::undefined_char_constructor(
+			FunctionId::UnexpectedChar,
+			function::Signature::unexpected_char_constructor(
 				Id::Extern(id::Extern::CharOpt),
 				ty::Expr::Instance(ty::Ref::Defined(lexing_error_ty), Vec::new()),
 			),
@@ -447,6 +447,7 @@ impl<'a, 'p> Context<'a, 'p> {
 		}
 
 		let provided = provided::Types::new(
+			&config,
 			&mut ir,
 			extern_module,
 			lexing_error_ty,
@@ -491,8 +492,8 @@ impl<'a, 'p> Context<'a, 'p> {
 			function::Signature::lexer(
 				Id::Lexer(id::Lexer::This),
 				ty::Expr::Instance(context.provided().lexer_type(), Vec::new()),
-				context.provided().token_type_expr(),
-				context.lexing_error_type_expr(),
+				context.config().loc_type(context.provided().token_type_expr()),
+				context.config().loc_type(context.lexing_error_type_expr()),
 			),
 			Some(lexer),
 		));
@@ -507,10 +508,10 @@ impl<'a, 'p> Context<'a, 'p> {
 						FunctionId::Parser(ty_index),
 						function::Signature::parser(
 							Id::Parser(id::Parser::Lexer),
-							context.provided().token_type_expr(),
-							context.lexing_error_type_expr(),
-							context.type_expr(ty_index),
-							context.lexing_error_type_expr(),
+							context.config().loc_type(context.provided().token_type_expr()),
+							context.config().loc_type(context.lexing_error_type_expr()),
+							context.config().loc_type(context.type_expr(ty_index)),
+							context.config().loc_type(context.provided().error_type_expr()),
 						),
 						Some(parser),
 					));

@@ -7,6 +7,9 @@ pub enum Id {
 	Parser(Parser),
 	Format(Format),
 	Extern(Extern),
+
+	/// Auxiliary functions.
+	Aux(Aux)
 }
 
 impl Id {
@@ -16,6 +19,7 @@ impl Id {
 			Self::Parser(id) => id.to_ident(),
 			Self::Format(id) => id.to_ident(),
 			Self::Extern(id) => id.to_ident(),
+			Self::Aux(id) => id.to_ident()
 		}
 	}
 }
@@ -41,6 +45,12 @@ pub enum Lexer {
 	/// A sub-token emitted from a sub-automaton.
 	SubToken,
 
+	/// Token data.
+	Data,
+
+	/// Returned token.
+	Result,
+
 	/// Unexpected character.
 	Unexpected,
 }
@@ -54,6 +64,8 @@ impl Lexer {
 			Self::CharOpt => Ident::new("char_opt").unwrap(),
 			Self::UnsafeCharOpt => Ident::new("unsafe_char_opt").unwrap(),
 			Self::SubToken => Ident::new("sub_token").unwrap(),
+			Self::Data => Ident::new("data").unwrap(),
+			Self::Result => Ident::new("result").unwrap(),
 			Self::Unexpected => Ident::new("unexpected").unwrap(),
 		}
 	}
@@ -183,6 +195,28 @@ impl Extern {
 		match self {
 			Self::CharOpt => Ident::new("c_opt").unwrap(),
 			Self::String => Ident::new("string").unwrap(),
+		}
+	}
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Aux {
+	/// A span.
+	Span,
+
+	/// An error.
+	Error,
+
+	/// An error without span.
+	SpanlessError,
+}
+
+impl Aux {
+	pub fn to_ident(&self) -> Ident {
+		match self {
+			Self::Span => Ident::new("span").unwrap(),
+			Self::Error => Ident::new("err").unwrap(),
+			Self::SpanlessError => Ident::new("spanless_err").unwrap(),
 		}
 	}
 }

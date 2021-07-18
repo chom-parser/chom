@@ -21,26 +21,29 @@ pub fn function<'c, 'a: 'c, 'p>(
 	)
 }
 
-pub fn generate_args_fmt<'c, 'a: 'c, 'p, A>(args: A, fields: bool) -> Expr<'a, 'p>
+pub fn generate_args_fmt<'c, 'a: 'c, 'p, A>(ty_ref: ty::Ref, args: A, fields: bool) -> Expr<'a, 'p>
 where
 	A: IntoIterator<Item = &'c TypeExpr<'a, 'p>>,
 	A::IntoIter: ExactSizeIterator + DoubleEndedIterator,
 {
 	let args = args.into_iter();
+
+	let result = Expr::Return(vec![Expr::Get(Id::Format(id::Format::Output))]);
+
 	if args.len() == 0 {
-		Expr::Get(Id::Format(id::Format::Output))
+		result
 	} else {
 		let mut expr = Expr::Write(
 			Id::Format(id::Format::Output),
 			")".to_string(),
-			Box::new(Expr::Get(Id::Format(id::Format::Output))),
+			Box::new(result),
 		);
 
 		for (i, _) in args.enumerate().rev() {
 			expr = Expr::DebugFormat(
 				Id::Format(id::Format::Output),
 				Box::new(if fields {
-					Expr::RefField(Id::Format(id::Format::This), i as u32)
+					Expr::RefField(Id::Format(id::Format::This), ty_ref, i as u32)
 				} else {
 					Expr::Get(Id::Format(id::Format::Arg(i as u32)))
 				}),
@@ -93,10 +96,10 @@ pub fn generate<'c, 'a: 'c, 'p>(
 
 							let (args, len) = match desc {
 								VariantDesc::Tuple(args) => {
-									(generate_args_fmt(args, false), args.len())
+									(generate_args_fmt(ty_ref, args, false), args.len())
 								}
 								VariantDesc::Struct(strct) => (
-									generate_args_fmt(strct.fields().iter().map(|f| &f.ty), false),
+									generate_args_fmt(ty_ref, strct.fields().iter().map(|f| &f.ty), false),
 									strct.fields().len(),
 								),
 							};
@@ -134,7 +137,7 @@ pub fn generate<'c, 'a: 'c, 'p>(
 			}
 		}
 		Desc::Struct(strct) => {
-			let args = generate_args_fmt(strct.fields().iter().map(|f| &f.ty), true);
+			let args = generate_args_fmt(ty_ref, strct.fields().iter().map(|f| &f.ty), true);
 			Expr::Write(
 				Id::Format(id::Format::Output),
 				ty.id().ident(context.id()).to_snake_case().to_string(),
@@ -142,7 +145,7 @@ pub fn generate<'c, 'a: 'c, 'p>(
 			)
 		}
 		Desc::TupleStruct(args) => {
-			let args = generate_args_fmt(args, true);
+			let args = generate_args_fmt(ty_ref, args, true);
 			Expr::Write(
 				Id::Format(id::Format::Output),
 				ty.id().ident(context.id()).to_snake_case().to_string(),

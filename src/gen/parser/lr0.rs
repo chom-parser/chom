@@ -271,7 +271,7 @@ fn generate_state<'a, 'p>(
 				if context.config().locate {
 					result = Expr::locate(result, Expr::Get(Id::Parser(id::Parser::Span)))
 				}
-				stack_pop(context, &[pattern], Expr::ok(result), true)
+				stack_pop(context, &[pattern], Expr::Return(vec![Expr::ok(result)]), true)
 			}
 			Rule::Function(f_index) => {
 				let f = context.grammar().function(*f_index).unwrap();
@@ -381,15 +381,15 @@ fn generate_state<'a, 'p>(
 				.collect();
 
 			if action_cases.len() < context.provided().token_count() + 1 {
-				let mut err = Expr::Error(Error::UnexpectedToken(Box::new(Expr::Get(Id::Parser(
+				let mut err = context.provided().unexpected_token_expr(Expr::Get(Id::Parser(
 					id::Parser::Unexpected,
-				)))));
+				)));
 				if context.config().locate {
 					err = Expr::locate(err, Expr::Get(Id::Parser(id::Parser::Span)))
 				}
 				action_cases.push(MatchCase {
 					pattern: Pattern::Bind(Id::Parser(id::Parser::Unexpected)),
-					expr: Expr::err(err),
+					expr: Expr::Return(vec![Expr::err(err)]),
 				})
 			}
 
@@ -434,15 +434,15 @@ fn generate_state<'a, 'p>(
 				.collect();
 
 			if (goto_cases.len() as u32) < context.grammar().type_count() {
-				let mut err = Expr::Error(Error::UnexpectedNode(Box::new(Expr::Get(Id::Parser(
+				let mut err = context.provided().unexpected_node_expr(Expr::Get(Id::Parser(
 					id::Parser::Unexpected,
-				)))));
+				)));
 				if context.config().locate {
 					err = Expr::locate(err, Expr::Get(Id::Parser(id::Parser::Span)))
 				}
 				goto_cases.push(MatchCase {
 					pattern: Pattern::Bind(Id::Parser(id::Parser::Unexpected)),
-					expr: Expr::err(err),
+					expr: Expr::Return(vec![Expr::err(err)]),
 				})
 			}
 
@@ -488,9 +488,11 @@ fn generate_state<'a, 'p>(
 						Id::Parser(id::Parser::Lexer),
 						StreamExpr::Pull(
 							Id::Parser(id::Parser::UnsafeTokenOpt),
-							Box::new(Expr::Check(
+							Box::new(Expr::CheckMap(
 								Id::Parser(id::Parser::AnyTokenOpt),
-								Box::new(Expr::Get(Id::Parser(id::Parser::UnsafeTokenOpt))),
+								Box::new(Expr::Transpose(Box::new(Expr::Get(Id::Parser(id::Parser::UnsafeTokenOpt))))),
+								context.provided().lexer_to_parser_err_function(),
+								Vec::new(),
 								Box::new(action_case),
 							)),
 						),
